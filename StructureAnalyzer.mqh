@@ -3,22 +3,36 @@
 //|                  Copyright 2025, xAI - Built by Grok             |
 //|                                                                  |
 //+------------------------------------------------------------------+
-#property copyright "Copyright 2025, xAI - Built by Grok"
-#property link      ""
-#property version   "1.00"
+#property copyright "Copyright 2025, khajavi - Built by hipoAlgoritm"
+#property link      "hipoAlgoritm.com"
+#property version   "1.20"
 #property strict
 
 // شامل فایل‌های لازم برای کار با اشیاء گرافیکی و توابع MQL5 - برای دسترسی به ثابت‌هایی مثل OBJPROP_CORNER
 #include <Object.mqh>
 
-// تعریف ساختار برای سطوح نوسان (Swing) - شامل قیمت و زمان سطح برای ذخیره‌سازی آسان
+// تعریف ساختار برای سطوح نوسان (Swing) - شامل قیمت و زمان سطح برای ذخیره‌سازی آسان و مقایسه
 struct Swing
   {
    double            price;   // قیمت سطح (های یا لو)
-   datetime          time;    // زمان سطح (زمان کندل مربوطه برای همگام‌سازی با چارت)
+   datetime          time;    // زمان سطح (زمان کندل مربوطه برای همگام‌سازی با چارت و چک تکراری)
   };
 
-// کلاس اصلی برای تحلیل ساختار قیمت - این کلاس تمام منطق تحلیل BOS، CHOCH و روند را مدیریت می‌کند
+// تعریف ساختار برای FVG - شامل مرزها، EQ، زمان شروع و جهت برای نگهداری در حافظه
+struct FVG
+  {
+   double            upperBoundary; // بالاترین قیمت FVG
+   double            lowerBoundary; // پایین‌ترین قیمت FVG
+   double            eqPrice;       // قیمت خط میانی (50% یا Equilibrium)
+   datetime          startTime;     // زمان کندل اول FVG برای شروع رسم
+   bool              isBullish;     // true اگر FVG صعودی (سبز)، false اگر نزولی (قرمز)
+   string            objRectName;   // نام شیء مستطیل FVG برای پاک کردن
+   string            objEqName;     // نام شیء خط EQ برای پاک کردن
+   string            objFvgLabel;   // نام شیء لیبل FVG برای پاک کردن
+   string            objEqLabel;    // نام شیء لیبل EQ برای پاک کردن
+  };
+
+// کلاس اصلی برای تحلیل ساختار قیمت - این کلاس تمام منطق تحلیل BOS، CHOCH، روند، FVG و نمایش گرافیکی را مدیریت می‌کند
 class StructureAnalyzer
   {
 private:
@@ -27,7 +41,7 @@ private:
    double            m_retracementPercent;  // درصد حداقل اصلاح برای تایید سطح جدید (پیشفرض 25.0)
    ENUM_TIMEFRAMES   m_timeframe;           // تایم فریم مورد استفاده برای تحلیل (پیشفرض فعلی چارت)
    string            m_symbol;              // سیمبل (جفت ارز) برای تحلیل (پیشفرض سیمبل فعلی)
-   int               m_maxStructures;       // حداکثر تعداد ساختارها (سقف/کف) برای ذخیره و گرافیک (پیشفرض 30)
+   int               m_maxStructures;       // حداکثر تعداد ساختارها (سقف/کف/FVG) برای ذخیره و گرافیک (پیشفرض 30)
    bool              m_enableGraphics;      // فلگ برای فعال یا غیرفعال کردن نمایش گرافیکی (پیشفرض true)
 
    // سطوح فعلی و قبلی - برای پیگیری روند و مقایسه سطوح برای تعیین صعودی/نزولی
@@ -39,6 +53,13 @@ private:
    // آرایه‌ها برای تاریخچه سطوح - تا m_maxStructures، برای مدیریت گرافیک و حذف قدیمی‌ها اگر بیش از حد شوند
    Swing             m_highs[];             // آرایه سقف‌های تایید شده (FIFO برای حذف قدیمی‌ها)
    Swing             m_lows[];              // آرایه کف‌های تایید شده (FIFO برای حذف قدیمی‌ها)
+
+   // آرایه برای FVGهای فعال - تا m_maxStructures، برای مدیریت مصرف و پاکسازی
+   FVG               m_fvgs[];              // آرایه FVGهای مصرف نشده (FIFO برای حذف قدیمی‌ها اگر بیش از 30)
+
+   // ثابت‌ها برای فیلتر FVG - حداقل نسبت‌ها برای اعتبار
+   const double      FVG_MIN_BODY_RATIO = 0.40; // حداقل ۴۰% ارتفاع FVG نسبت به بادی کندل ۲
+   const double      CANDLE_BODY_MIN_RATIO = 0.50; // حداقل ۵۰% بادی کندل ۲ نسبت به طول کلی آن
 
    // فلگ‌ها برای رویدادها - برای تشخیص و ذخیره وضعیت BOS و CHOCH
    bool              m_isBOS;               // آیا BOS اخیر رخ داده است (شکست در جهت روند)
@@ -65,8 +86,8 @@ private:
    // تابع خصوصی برای چک شکست - تشخیص BOS یا CHOCH بر اساس کلوز کندل و روند فعلی
    bool              CheckBreak(double closePrice);
 
-   // تابع خصوصی برای آپدیت نقطه مقابل بعد شکست - بدون اضافه به آرایه، فقط آپدیت سطوح فعلی برای دقت
-   void              UpdateOppositePoint(datetime fromTime, datetime toTime, bool isUpward);
+   // تابع خصوصی برای آپدیت و ثبت نقطه مقابل بعد شکست - ثبت فوری به عنوان سطح نهایی، اضافه به آرایه اگر تکراری نباشد، و رسم گرافیکی
+   void              UpdateAndRegisterOppositePoint(datetime fromTime, datetime toTime, bool isUpward);
 
    // تابع خصوصی برای چک و ثبت اصلاح - تایید سطح جدید اگر اصلاح کافی (حداقل درصد) باشد
    bool              CheckRetracement(double currentPrice);
@@ -74,10 +95,20 @@ private:
    // تابع خصوصی برای تعیین روند - بر اساس دو سطح آخر سقف و کف برای تصمیم‌گیری صعودی/نزولی
    void              DetermineTrend();
 
+   // تابع خصوصی برای چک تکراری بودن نقطه - مقایسه قیمت و زمان با آخرین در آرایه برای جلوگیری از ثبت دوباره
+   bool              IsDuplicateSwing(const Swing &newSwing, const Swing &lastSwing, double priceTolerance = 0.00001);
+
+   // تابع خصوصی برای تشخیص و ثبت FVG - بررسی ۳ کندل، فیلتر قدرت و اندازه، اضافه به حافظه اگر معتبر
+   void              DetectAndRegisterFVG();
+
+   // تابع خصوصی برای چک مصرف FVGها - بررسی تمام FVGهای فعال و پاک کردن مصرف‌شده‌ها (با حذف گرافیک)
+   void              CheckFVGConsumption();
+
    // توابع گرافیکی خصوصی - برای رسم روی چارت اگر m_enableGraphics فعال باشد
-   void              DrawSwing(string name, double price, datetime time, color clr, string label); // رسم علامت SH/SL با متن
-   void              DrawDottedLine(string name, datetime fromTime, double fromPrice, datetime toTime, double toPrice, string label); // رسم خط نقطه‌چین BOS/CHOCH با متن در وسط
+   void              DrawSwing(string name, double price, datetime time, color clr, bool isHigh); // رسم فلش Wingdings با فاصله هوشمند (بر اساس ATR داخلی)
+   void              DrawDottedLine(string name, datetime fromTime, double fromPrice, datetime toTime, double toPrice, string label); // رسم خط نقطه‌چین BOS/CHOCH با رنگ پویا و فونت سایز هوشمند
    void              DrawTrendText();       // رسم متن روند در گوشه بالا راست چارت با رنگ مناسب
+   void              DrawFVG(FVG &fvg);     // رسم مستطیل شفاف FVG، خط EQ نقطه‌چین، و لیبل‌های FVG/EQ در سمت راست
    void              RemoveOldObjects();    // حذف اشیاء قدیمی اگر تعداد ساختارها بیش از حداکثر باشد
 
 public:
@@ -87,10 +118,10 @@ public:
    // دestructor - پاک کردن تمام اشیاء گرافیکی برای جلوگیری از نشت حافظه و تمیز کردن چارت
                     ~StructureAnalyzer();
 
-   // تابع اولیه‌سازی - فراخوانی در OnInit برای تنظیم سطوح اولیه و گرافیک
+   // تابع اولیه‌سازی - فراخوانی در OnInit برای تنظیم سطوح اولیه و گرافیک (و فعال کردن شیفت راست چارت اگر گرافیک فعال)
    void              Init();
 
-   // تابع آپدیت اصلی - فراخوانی در OnTick برای چک هر کندل جدید و اجرای منطق
+   // تابع آپدیت اصلی - فراخوانی در OnTick برای چک هر کندل جدید و اجرای منطق (شامل FVG)
    void              Update();
 
    // getterها برای دسترسی خارجی - برای سیستم‌های دیگر که بخواهند از کتابخانه استفاده کنند
@@ -103,6 +134,7 @@ public:
    int               GetCurrentTrend() { return m_currentTrend; } // بازگشت روند فعلی (1 صعودی, -1 نزولی, 0 نامشخص)
    Swing             GetHighs(int index) { if(index < ArraySize(m_highs) && index >= 0) return m_highs[index]; Swing empty; return empty; } // بازگشت سقف از آرایه تاریخچه
    Swing             GetLows(int index) { if(index < ArraySize(m_lows) && index >= 0) return m_lows[index]; Swing empty; return empty; } // بازگشت کف از آرایه تاریخچه
+   FVG               GetFVG(int index) { if(index < ArraySize(m_fvgs) && index >= 0) return m_fvgs[index]; FVG empty; return empty; } // بازگشت FVG از آرایه فعال
   };
 
 //+------------------------------------------------------------------+
@@ -113,7 +145,7 @@ StructureAnalyzer::StructureAnalyzer(int lookback=100, double retrace=25.0, ENUM
    m_lookbackCandles = lookback;         // تنظیم تعداد کندل‌های گذشته برای سطوح اولیه
    m_retracementPercent = retrace;       // تنظیم درصد اصلاح
    m_timeframe = tf;                     // تنظیم تایم فریم
-   m_symbol = (sym == "") ? _Symbol : sym; // تنظیم سیمبل - اگر پیش‌فرض خالی باشد، از _Symbol استفاده کن
+   m_symbol = (sym == "") ? _Symbol : sym; // تنظیم سیمبل - اگر خالی باشد، از _Symbol استفاده کن
    m_maxStructures = maxStruct;          // تنظیم حداکثر ساختارها
    m_enableGraphics = graphics;          // تنظیم فعال بودن گرافیک
 
@@ -126,6 +158,7 @@ StructureAnalyzer::StructureAnalyzer(int lookback=100, double retrace=25.0, ENUM
 
    ArrayResize(m_highs, 0);              // اولیه‌سازی آرایه سقف‌ها به اندازه 0
    ArrayResize(m_lows, 0);               // اولیه‌سازی آرایه کف‌ها به اندازه 0
+   ArrayResize(m_fvgs, 0);               // اولیه‌سازی آرایه FVGها به اندازه 0
   }
 
 //+------------------------------------------------------------------+
@@ -133,7 +166,7 @@ StructureAnalyzer::StructureAnalyzer(int lookback=100, double retrace=25.0, ENUM
 //+------------------------------------------------------------------+
 StructureAnalyzer::~StructureAnalyzer()
   {
-   //循环 بر روی تمام اشیاء چارت فعلی (chart_id = 0) و پاک کردن آن‌هایی که با پیشوند شروع می‌شوند
+   //循環 بر روی تمام اشیاء چارت فعلی (chart_id = 0) و پاک کردن آن‌هایی که با پیشوند شروع می‌شوند
    for(int i = ObjectsTotal(0) - 1; i >= 0; i--)
      {
       string name = ObjectName(0, i);    // گرفتن نام شیء در اندیس i از چارت 0
@@ -142,7 +175,7 @@ StructureAnalyzer::~StructureAnalyzer()
   }
 
 //+------------------------------------------------------------------+
-//| تابع اولیه‌سازی: محاسبه سطوح اولیه و تنظیم روند اولیه با گرافیک اگر فعال باشد |
+//| تابع اولیه‌سازی: محاسبه سطوح اولیه و تنظیم روند اولیه با گرافیک اگر فعال باشد، و فعال کردن شیفت راست چارت |
 //+------------------------------------------------------------------+
 void StructureAnalyzer::Init()
   {
@@ -150,8 +183,9 @@ void StructureAnalyzer::Init()
    DetermineTrend();                     // تعیین روند اولیه بر اساس سطوح (احتمالاً نامشخص)
    if(m_enableGraphics)                  // اگر نمایش گرافیکی فعال باشد
      {
-      DrawSwing(m_objPrefix + "InitHigh", m_lastHigh.price, m_lastHigh.time, clrGreen, "SH"); // رسم سقف اولیه با علامت SH
-      DrawSwing(m_objPrefix + "InitLow", m_lastLow.price, m_lastLow.time, clrRed, "SL");     // رسم کف اولیه با علامت SL
+      ChartSetInteger(0, CHART_SHIFT, true); // فعال کردن شیفت راست چارت برای فضای لیبل‌ها در سمت راست
+      DrawSwing(m_objPrefix + "InitHigh", m_lastHigh.price, m_lastHigh.time, clrGreen, true); // رسم سقف اولیه با فلش رو به پایین سبز
+      DrawSwing(m_objPrefix + "InitLow", m_lastLow.price, m_lastLow.time, clrRed, false);     // رسم کف اولیه با فلش رو به بالا قرمز
       DrawTrendText();                    // رسم متن روند اولیه در گوشه چارت
      }
   }
@@ -181,7 +215,7 @@ void StructureAnalyzer::CalculateInitialLevels()
   }
 
 //+------------------------------------------------------------------+
-//| تابع آپدیت اصلی: چک هر کندل جدید و اجرای منطق تحلیل با داده‌های کندل بسته‌شده |
+//| تابع آپدیت اصلی: چک هر کندل جدید و اجرای منطق تحلیل با داده‌های کندل بسته‌شده، شامل FVG |
 //+------------------------------------------------------------------+
 void StructureAnalyzer::Update()
   {
@@ -199,12 +233,12 @@ void StructureAnalyzer::Update()
    // گام 1: چک شکست (BOS یا CHOCH) بر اساس کلوز کندل
    if(CheckBreak(closePrice))            // اگر شکست رخ داده باشد (بازگشت true)
      {
-      // تعیین زمان بازه برای آپدیت نقطه مقابل (از سطح شکسته تا کندل فعلی)
+      // تعیین زمان بازه برای آپدیت و ثبت نقطه مقابل (از سطح شکسته تا کندل فعلی)
       datetime fromTime = m_isUpwardBreak ? m_lastHigh.time : m_lastLow.time; // زمان سطح شکسته‌شده
       datetime toTime = iTime(m_symbol, m_timeframe, 1); // زمان کندل بسته‌شده فعلی
 
-      // آپدیت نقطه مقابل بدون اضافه به آرایه (فقط آپدیت سطوح فعلی برای دقت تحلیل)
-      UpdateOppositePoint(fromTime, toTime, m_isUpwardBreak);
+      // آپدیت و ثبت فوری نقطه مقابل به عنوان سطح نهایی (اضافه به آرایه اگر تکراری نباشد و رسم گرافیکی)
+      UpdateAndRegisterOppositePoint(fromTime, toTime, m_isUpwardBreak);
 
       // تنظیم حالت انتظار برای اصلاح بعد از شکست با نقطه متحرک اولیه
       m_waitingForRetracement = true;    // فعال کردن حالت انتظار اصلاح
@@ -212,7 +246,7 @@ void StructureAnalyzer::Update()
       m_movingPoint = m_isUpwardBreak ? highPrice : lowPrice; // تنظیم نقطه متحرک اولیه با های/لو کندل بسته‌شده
       m_retracementStartTime = toTime;   // ذخیره زمان شروع اصلاح برای محدود کردن
 
-      if(m_enableGraphics)               // اگر گرافیک فعال باشد، رسم خط شکست
+      if(m_enableGraphics)               // اگر گرافیک فعال باشد، رسم خط شکست با رنگ پویا
         {
          string label = m_isBOS ? "BOS" : "CHOCH"; // انتخاب لیبل بر اساس نوع شکست (BOS یا CHOCH)
          DrawDottedLine(m_objPrefix + "Break_" + TimeToString(toTime), fromTime, m_isUpwardBreak ? m_lastHigh.price : m_lastLow.price, toTime, closePrice, label); // رسم خط نقطه‌چین با متن
@@ -229,24 +263,34 @@ void StructureAnalyzer::Update()
       // چک اگر اصلاح کافی رخ داده (با کلوز کندل برای تصمیم‌گیری نهایی بازگشت قیمت)
       if(CheckRetracement(closePrice))
         {
-         // ثبت سطح جدید بعد از تایید اصلاح (اضافه به آرایه و آپدیت قبلی/آخرین)
-         if(m_isUpwardBreak)             // اگر شکست صعودی بوده، ثبت سقف جدید
+         // ثبت سطح جدید بعد از تایید اصلاح (اضافه به آرایه و آپدیت قبلی/آخرین، با چک تکراری)
+         Swing newSwing;
+         newSwing.price = m_movingPoint; // قیمت سطح جدید
+         newSwing.time = iTime(m_symbol, m_timeframe, 1); // زمان کندل فعلی برای سطح جدید
+
+         if(m_isUpwardBreak)             // اگر شکست صعودی بوده، ثبت سقف جدید (SH)
            {
-            m_previousHigh = m_lastHigh; // آپدیت سقف قبلی با آخرین سقف
-            m_lastHigh.price = m_movingPoint; // ثبت سقف جدید با نقطه متحرک تایید شده
-            m_lastHigh.time = iTime(m_symbol, m_timeframe, 1); // زمان کندل فعلی برای سطح جدید
-            ArrayResize(m_highs, ArraySize(m_highs) + 1); // افزایش اندازه آرایه سقف‌ها
-            m_highs[ArraySize(m_highs)-1] = m_lastHigh;   // اضافه سقف جدید به انتهای آرایه
-            if(m_enableGraphics) DrawSwing(m_objPrefix + "High_" + TimeToString(m_lastHigh.time), m_lastHigh.price, m_lastHigh.time, clrGreen, "SH"); // رسم SH اگر گرافیک فعال
+            // چک تکراری با آخرین سقف
+            if(ArraySize(m_highs) > 0 && !IsDuplicateSwing(newSwing, m_highs[ArraySize(m_highs)-1]))
+              {
+               m_previousHigh = m_lastHigh; // آپدیت سقف قبلی با آخرین سقف
+               m_lastHigh = newSwing;       // ثبت سقف جدید
+               ArrayResize(m_highs, ArraySize(m_highs) + 1); // افزایش اندازه آرایه سقف‌ها
+               m_highs[ArraySize(m_highs)-1] = m_lastHigh;   // اضافه سقف جدید به انتهای آرایه
+               if(m_enableGraphics) DrawSwing(m_objPrefix + "High_" + TimeToString(m_lastHigh.time), m_lastHigh.price, m_lastHigh.time, clrGreen, true); // رسم فلش رو به پایین سبز برای SH
+              }
            }
-         else                            // اگر شکست نزولی بوده، ثبت کف جدید
+         else                            // اگر شکست نزولی بوده، ثبت کف جدید (SL)
            {
-            m_previousLow = m_lastLow;   // آپدیت کف قبلی با آخرین کف
-            m_lastLow.price = m_movingPoint; // ثبت کف جدید با نقطه متحرک تایید شده
-            m_lastLow.time = iTime(m_symbol, m_timeframe, 1); // زمان کندل فعلی برای سطح جدید
-            ArrayResize(m_lows, ArraySize(m_lows) + 1); // افزایش اندازه آرایه کف‌ها
-            m_lows[ArraySize(m_lows)-1] = m_lastLow;    // اضافه کف جدید به انتهای آرایه
-            if(m_enableGraphics) DrawSwing(m_objPrefix + "Low_" + TimeToString(m_lastLow.time), m_lastLow.price, m_lastLow.time, clrRed, "SL"); // رسم SL اگر گرافیک فعال
+            // چک تکراری با آخرین کف
+            if(ArraySize(m_lows) > 0 && !IsDuplicateSwing(newSwing, m_lows[ArraySize(m_lows)-1]))
+              {
+               m_previousLow = m_lastLow;   // آپدیت کف قبلی با آخرین کف
+               m_lastLow = newSwing;        // ثبت کف جدید
+               ArrayResize(m_lows, ArraySize(m_lows) + 1); // افزایش اندازه آرایه کف‌ها
+               m_lows[ArraySize(m_lows)-1] = m_lastLow;    // اضافه کف جدید به انتهای آرایه
+               if(m_enableGraphics) DrawSwing(m_objPrefix + "Low_" + TimeToString(m_lastLow.time), m_lastLow.price, m_lastLow.time, clrRed, false); // رسم فلش رو به بالا قرمز برای SL
+              }
            }
 
          m_waitingForRetracement = false; // پایان حالت انتظار اصلاح پس از ثبت
@@ -258,128 +302,203 @@ void StructureAnalyzer::Update()
            }
         }
      }
+
+   // گام 3: تشخیص و ثبت FVG جدید پس از بسته شدن کندل (بر اساس 3 کندل گذشته)
+   DetectAndRegisterFVG();
+
+   // گام 4: چک مصرف FVGهای فعال و پاک کردن مصرف‌شده‌ها
+   CheckFVGConsumption();
   }
 
 //+------------------------------------------------------------------+
-//| چک شکست: BOS یا CHOCH بر اساس کلوز کندل و روند فعلی برای تمایز |
+//| تابع خصوصی برای تشخیص و ثبت FVG - بررسی 3 کندل، فیلتر قدرت و اندازه، اضافه به حافظه اگر معتبر |
 //+------------------------------------------------------------------+
-bool StructureAnalyzer::CheckBreak(double closePrice)
+void StructureAnalyzer::DetectAndRegisterFVG()
   {
-   m_isBOS = false;                      // ریست فلگ BOS برای هر چک جدید
-   m_isCHOCH = false;                    // ریست فلگ CHOCH برای هر چک جدید
+   // مطمئن می‌شویم حداقل 3 کندل برای بررسی الگو در دسترس باشد (اندیس 1، 2، 3)
+   if(Bars(m_symbol, m_timeframe) < 4) return;
+   
+   // گرفتن قیمت‌های کندل‌های 1 (جدید بسته‌شده)، 2 و 3
+   double high1 = iHigh(m_symbol, m_timeframe, 1); 
+   double low1 = iLow(m_symbol, m_timeframe, 1);   
+   // double open1 = iOpen(m_symbol, m_timeframe, 1); 
+   // double close1 = iClose(m_symbol, m_timeframe, 1); 
 
-   if(closePrice > m_lastHigh.price)     // اگر کلوز بالاتر از آخرین سقف باشد (شکست سقف احتمالی)
+   double high2 = iHigh(m_symbol, m_timeframe, 2); 
+   double low2 = iLow(m_symbol, m_timeframe, 2);   
+   double open2 = iOpen(m_symbol, m_timeframe, 2); 
+   double close2 = iClose(m_symbol, m_timeframe, 2); 
+
+   double high3 = iHigh(m_symbol, m_timeframe, 3); 
+   double low3 = iLow(m_symbol, m_timeframe, 3);   
+   
+   // --- فیلتر قدرت کندل 2: بادی > شدوها (بادی / طول کلی > 0.50) ---
+   double total2 = high2 - low2;
+   double body2 = MathAbs(close2 - open2);
+   double wicks2 = total2 - body2;
+   
+   // اگر کندل 2 خیلی ضعیف باشد (مثلا دوجی یا پین‌بار بلند)، منطق FVG را نادیده بگیر
+   if(body2 <= wicks2) return; 
+   
+   // --- تشخیص FVG صعودی: Low[1] > High[3] ---
+   if(low1 > high3)
      {
-      m_isUpwardBreak = true;            // تنظیم جهت شکست به صعودی
-      if(m_currentTrend == -1) m_isCHOCH = true; // اگر روند قبلی نزولی بوده، این CHOCH (تغییر کاراکتر) است
-      else m_isBOS = true;               // در غیر این صورت، BOS (شکست ساختار در جهت روند) است
-      m_lastBOSTime = m_isBOS ? iTime(m_symbol, m_timeframe, 1) : 0; // ذخیره زمان BOS اگر رخ داده
-      m_lastCHOCHTime = m_isCHOCH ? iTime(m_symbol, m_timeframe, 1) : 0; // ذخیره زمان CHOCH اگر رخ داده
-      return true;                       // بازگشت true برای نشان دادن رخ دادن شکست
+      double upper = low1;
+      double lower = high3;
+      double height = upper - lower;
+      
+      // فیلتر اندازه 40%: ارتفاع FVG باید حداقل 40% از بادی کندل 2 باشد
+      if(height / body2 >= FVG_MIN_BODY_RATIO) 
+        {
+         FVG newFvg;
+         newFvg.upperBoundary = upper;
+         newFvg.lowerBoundary = lower;
+         newFvg.eqPrice = lower + height * 0.5;
+         newFvg.startTime = iTime(m_symbol, m_timeframe, 3); // <<-- اصلاح شد: زمان کندل 3 (شروع الگو)
+         newFvg.isBullish = true;
+
+         // اگر آرایه پر باشد، قدیمی‌ترین را پاک کن (FIFO)
+         if(ArraySize(m_fvgs) >= m_maxStructures)
+           {
+            FVG old = m_fvgs[0];
+            ObjectDelete(0, old.objRectName);
+            ObjectDelete(0, old.objEqName);
+            ObjectDelete(0, old.objFvgLabel);
+            ObjectDelete(0, old.objEqLabel);
+            ArrayCopy(m_fvgs, m_fvgs, 0, 1); // شیفت آرایه برای حذف عنصر اول
+            ArrayResize(m_fvgs, m_maxStructures - 1); // کاهش اندازه
+           }
+
+         // اضافه FVG جدید به انتهای آرایه
+         ArrayResize(m_fvgs, ArraySize(m_fvgs) + 1);
+         m_fvgs[ArraySize(m_fvgs)-1] = newFvg;
+
+         // رسم اگر گرافیک فعال باشد - با ارجاع به عنصری که تازه اضافه شده
+         if(m_enableGraphics) DrawFVG(m_fvgs[ArraySize(m_fvgs)-1]);
+        }
      }
-   else if(closePrice < m_lastLow.price) // اگر کلوز پایین‌تر از آخرین کف باشد (شکست کف احتمالی)
+
+   // --- تشخیص FVG نزولی: High[1] < Low[3] ---
+   if(high1 < low3)
      {
-      m_isUpwardBreak = false;           // تنظیم جهت شکست به نزولی
-      if(m_currentTrend == 1) m_isCHOCH = true; // اگر روند قبلی صعودی بوده، این CHOCH است
-      else m_isBOS = true;               // در غیر این صورت، BOS است
-      m_lastBOSTime = m_isBOS ? iTime(m_symbol, m_timeframe, 1) : 0; // ذخیره زمان BOS
-      m_lastCHOCHTime = m_isCHOCH ? iTime(m_symbol, m_timeframe, 1) : 0; // ذخیره زمان CHOCH
-      return true;                       // بازگشت true برای نشان دادن رخ دادن شکست
+      double upper = low3;
+      double lower = high1;
+      double height = upper - lower;
+      
+      // فیلتر اندازه 40%: ارتفاع FVG باید حداقل 40% از بادی کندل 2 باشد
+      if(height / body2 >= FVG_MIN_BODY_RATIO) 
+        {
+         FVG newFvg;
+         newFvg.upperBoundary = upper;
+         newFvg.lowerBoundary = lower;
+         newFvg.eqPrice = lower + height * 0.5;
+         newFvg.startTime = iTime(m_symbol, m_timeframe, 3); // <<-- اصلاح شد: زمان کندل 3 (شروع الگو)
+         newFvg.isBullish = false;
+
+         // اگر آرایه پر باشد، قدیمی‌ترین را پاک کن (FIFO)
+         if(ArraySize(m_fvgs) >= m_maxStructures)
+           {
+            FVG old = m_fvgs[0];
+            ObjectDelete(0, old.objRectName);
+            ObjectDelete(0, old.objEqName);
+            ObjectDelete(0, old.objFvgLabel);
+            ObjectDelete(0, old.objEqLabel);
+            ArrayCopy(m_fvgs, m_fvgs, 0, 1); // شیفت آرایه برای حذف عنصر اول
+            ArrayResize(m_fvgs, m_maxStructures - 1); // کاهش اندازه
+           }
+
+         // اضافه FVG جدید به انتهای آرایه
+         ArrayResize(m_fvgs, ArraySize(m_fvgs) + 1);
+         m_fvgs[ArraySize(m_fvgs)-1] = newFvg;
+
+         // رسم اگر گرافیک فعال باشد - با ارجاع به عنصری که تازه اضافه شده
+         if(m_enableGraphics) DrawFVG(m_fvgs[ArraySize(m_fvgs)-1]);
+        }
      }
-   return false;                         // اگر هیچ شکستی رخ نداده، false برگردان
   }
 
-//+------------------------------------------------------------------+
-//| آپدیت نقطه مقابل بعد شکست - فقط آپدیت سطوح فعلی بدون اضافه به آرایه برای جلوگیری از تکرار |
-//+------------------------------------------------------------------+
-void StructureAnalyzer::UpdateOppositePoint(datetime fromTime, datetime toTime, bool isUpward)
-  {
-   int fromShift = iBarShift(m_symbol, m_timeframe, fromTime); // تبدیل زمان شروع به شیفت کندل
-   int toShift = iBarShift(m_symbol, m_timeframe, toTime);     // تبدیل زمان پایان به شیفت کندل
-   int barCount = fromShift - toShift + 1;                     // محاسبه تعداد کندل‌ها در بازه (شامل هر دو انتها)
 
-   if(isUpward)                          // اگر شکست صعودی باشد، آپدیت کف (لو) به عنوان نقطه مقابل با پایین‌ترین لو در بازه
+//+------------------------------------------------------------------+
+//| تابع خصوصی برای چک مصرف FVGها - بررسی تمام FVGهای فعال و پاک کردن مصرف‌شده‌ها با حذف گرافیک |
+//+------------------------------------------------------------------+
+void StructureAnalyzer::CheckFVGConsumption()
+  {
+   double currentLow = iLow(m_symbol, m_timeframe, 0); // Low کندل فعلی (برای چک مصرف)
+   double currentHigh = iHigh(m_symbol, m_timeframe, 0); // High کندل فعلی (برای چک مصرف)
+
+   for(int i = ArraySize(m_fvgs) - 1; i >= 0; i--) // از جدیدترین به قدیمی‌ترین برای جلوگیری از شیفت اشتباه
      {
-      int lowest = iLowest(m_symbol, m_timeframe, MODE_LOW, barCount, toShift); // پیدا کردن پایین‌ترین لو در بازه
-      m_lastLow.price = iLow(m_symbol, m_timeframe, lowest); // آپدیت قیمت کف
-      m_lastLow.time = iTime(m_symbol, m_timeframe, lowest); // آپدیت زمان کف
-      // توجه: اضافه به آرایه فقط در زمان تایید اصلاح انجام می‌شود
+      FVG fvg = m_fvgs[i];
+      bool consumed = false;
+
+      if(fvg.isBullish)                   // برای FVG صعودی: چک مصرف پایین مرز پایین
+        {
+         if(currentLow <= fvg.lowerBoundary) consumed = true;
+        }
+      else                                // برای FVG نزولی: چک مصرف بالای مرز بالا
+        {
+         if(currentHigh >= fvg.upperBoundary) consumed = true;
+        }
+
+      if(consumed)                        // اگر مصرف شده، حذف گرافیک و از آرایه
+        {
+         ObjectDelete(0, fvg.objRectName);
+         ObjectDelete(0, fvg.objEqName);
+         ObjectDelete(0, fvg.objFvgLabel);
+         ObjectDelete(0, fvg.objEqLabel);
+
+         // حذف از آرایه با شیفت
+         ArrayCopy(m_fvgs, m_fvgs, i, i+1);
+         ArrayResize(m_fvgs, ArraySize(m_fvgs) - 1);
+        }
      }
-   else                                  // اگر شکست نزولی باشد، آپدیت سقف (های) به عنوان نقطه مقابل با بالاترین های در بازه
-     {
-      int highest = iHighest(m_symbol, m_timeframe, MODE_HIGH, barCount, toShift); // پیدا کردن بالاترین های در بازه
-      m_lastHigh.price = iHigh(m_symbol, m_timeframe, highest); // آپدیت قیمت سقف
-      m_lastHigh.time = iTime(m_symbol, m_timeframe, highest);  // آپدیت زمان سقف
-      // توجه: اضافه به آرایه فقط در زمان تایید اصلاح انجام می‌شود
-     }
   }
 
 //+------------------------------------------------------------------+
-//| چک اصلاح و ثبت سطح جدید - محاسبه درصد اصلاح بر اساس فاصله کل موج |
+//| رسم FVG با مستطیل شفاف، خط EQ نقطه‌چین، و لیبل‌های FVG/EQ در سمت راست با شفافیت شیشه‌ای |
 //+------------------------------------------------------------------+
-bool StructureAnalyzer::CheckRetracement(double currentPrice)
+void StructureAnalyzer::DrawFVG(FVG &fvg)
   {
-   double distance = MathAbs(m_movingPoint - m_fixedPoint); // محاسبه فاصله کل موج محرک (اوج تا ثابت)
-   double retrace;                      // اندازه اصلاح فعلی
-   if(m_isUpwardBreak)                  // برای صعودی، اصلاح به سمت پایین (از اوج به کلوز فعلی)
-      retrace = m_movingPoint - currentPrice;
-   else                                 // برای نزولی، اصلاح به سمت بالا (از کلوز فعلی به کف)
-      retrace = currentPrice - m_movingPoint;
+   // زمان دور در آینده برای امتداد راست اشیاء گرافیکی (تقریباً تا 1000 کندل جلوتر)
+   datetime farTime = TimeCurrent() + PeriodSeconds(m_timeframe) * 1000; 
 
-   if(retrace / distance >= m_retracementPercent / 100.0) // اگر درصد اصلاح حداقل مورد نیاز باشد
-     {
-      return true;                       // بازگشت true برای تایید اصلاح و ثبت سطح
-     }
-   return false;                         // اگر اصلاح کافی نباشد، false برگردان
-  }
+   // رنگ FVG بر اساس جهت: سبز برای صعودی، قرمز برای نزولی
+   color zoneColor = fvg.isBullish ? clrGreen : clrRed;
+   
+   // --- 1. رسم مستطیل FVG با شفافیت (شیشه‌ای) ---
+   fvg.objRectName = m_objPrefix + "FVG_Rect_" + TimeToString(fvg.startTime);
+   ObjectCreate(0, fvg.objRectName, OBJ_RECTANGLE, 0, fvg.startTime, fvg.upperBoundary, farTime, fvg.lowerBoundary);
+   
+   // آلفا 128 برای شفافیت 50% (شیشه‌ای) - رنگ‌ها به صورت ARGB تنظیم می‌شوند
+   ObjectSetInteger(0, fvg.objRectName, OBJPROP_COLOR, ColorToARGB(zoneColor, 128)); 
+   ObjectSetInteger(0, fvg.objRectName, OBJPROP_FILL, true);       // پر کردن مستطیل
+   ObjectSetInteger(0, fvg.objRectName, OBJPROP_BACK, true);       // پشت کندل‌ها برای شیشه‌ای بودن
+   
+   // --- 2. رسم خط EQ نقطه‌چین (خط 50 درصد) ---
+   fvg.objEqName = m_objPrefix + "FVG_Eq_" + TimeToString(fvg.startTime);
+   ObjectCreate(0, fvg.objEqName, OBJ_TREND, 0, fvg.startTime, fvg.eqPrice, farTime, fvg.eqPrice);
+   ObjectSetInteger(0, fvg.objEqName, OBJPROP_STYLE, STYLE_DOT); // نقطه‌چین
+   ObjectSetInteger(0, fvg.objEqName, OBJPROP_COLOR, zoneColor); // رنگ همان FVG
+   ObjectSetInteger(0, fvg.objEqName, OBJPROP_RAY, true);       // امتداد به راست
 
-//+------------------------------------------------------------------+
-//| تعیین روند بر اساس دو سطح آخر - همیشه با مقایسه دو سقف و دو کف آخر |
-//+------------------------------------------------------------------+
-void StructureAnalyzer::DetermineTrend()
-  {
-   if(m_lastHigh.price > m_previousHigh.price && m_lastLow.price > m_previousLow.price)
-      m_currentTrend = 1;                // تنظیم به صعودی اگر هر دو سطح بالاتر از قبلی باشند
-   else if(m_lastHigh.price < m_previousHigh.price && m_lastLow.price < m_previousLow.price)
-      m_currentTrend = -1;               // تنظیم به نزولی اگر هر دو سطح پایین‌تر از قبلی باشند
-   else
-      m_currentTrend = 0;                // در غیر این صورت، نامشخص نگه دار
-  }
+   // --- 3. رسم لیبل FVG در سمت راست چارت ---
+   // <<-- اصلاح شد: تخصیص نام به متغیر fvg.objFvgLabel
+   fvg.objFvgLabel = m_objPrefix + "FVG_Label_" + TimeToString(fvg.startTime); 
+   double fvgLabelPrice = fvg.isBullish ? fvg.lowerBoundary : fvg.upperBoundary; // پایین برای صعودی، بالا برای نزولی
+   ObjectCreate(0, fvg.objFvgLabel, OBJ_TEXT, 0, farTime, fvgLabelPrice);
+   
+   ObjectSetString(0, fvg.objFvgLabel, OBJPROP_TEXT, "FVG");
+   ObjectSetInteger(0, fvg.objFvgLabel, OBJPROP_COLOR, clrBlack); // رنگ متن لیبل
+   ObjectSetInteger(0, fvg.objFvgLabel, OBJPROP_FONTSIZE, 10);
 
-//+------------------------------------------------------------------+
-//| رسم علامت نوسان (SH/SL) با متن - برای سطوح تایید شده روی چارت |
-//+------------------------------------------------------------------+
-void StructureAnalyzer::DrawSwing(string name, double price, datetime time, color clr, string label)
-  {
-   ObjectCreate(0, name, OBJ_TEXT, 0, time, price); // ایجاد شیء متن روی چارت فعلی (chart_id = 0)
-   ObjectSetString(0, name, OBJPROP_TEXT, label);    // تنظیم متن شیء (SH یا SL)
-   ObjectSetInteger(0, name, OBJPROP_COLOR, clr);   // تنظیم رنگ شیء (سبز برای سقف، قرمز برای کف)
-   ObjectSetInteger(0, name, OBJPROP_FONTSIZE, 12); // تنظیم اندازه فونت متن به 12
-  }
-
-//+------------------------------------------------------------------+
-//| رسم خط نقطه‌چین با متن در وسط (برای BOS/CHOCH) - کوتاه و مورب اگر قیمت‌ها متفاوت باشند |
-//+------------------------------------------------------------------+
-void StructureAnalyzer::DrawDottedLine(string name, datetime fromTime, double fromPrice, datetime toTime, double toPrice, string label)
-  {
-   // رسم خط نقطه‌چین (مورب اگر لازم، اما کوتاه بین دو نقطه بدون ادامه)
-   string lineName = name + "_Line";     // نام شیء خط برای مدیریت جداگانه
-   ObjectCreate(0, lineName, OBJ_TREND, 0, fromTime, fromPrice, toTime, toPrice); // ایجاد خط روند بین دو نقطه روی چارت 0
-   ObjectSetInteger(0, lineName, OBJPROP_STYLE, STYLE_DOT); // تنظیم سبک به نقطه‌چین
-   ObjectSetInteger(0, lineName, OBJPROP_COLOR, clrBlue);   // تنظیم رنگ آبی برای خط
-   ObjectSetInteger(0, lineName, OBJPROP_WIDTH, 1);         // تنظیم عرض خط به 1
-   ObjectSetInteger(0, lineName, OBJPROP_RAY, false);       // غیرفعال کردن ادامه خط (ray) برای کوتاه ماندن
-
-   // محاسبه نقطه وسط برای قرار دادن متن
-   datetime midTime = fromTime + (toTime - fromTime) / 2;   // زمان وسط خط برای موقعیت متن
-   double midPrice = fromPrice + (toPrice - fromPrice) / 2; // قیمت وسط خط برای موقعیت متن
-
-   // رسم متن در وسط خط
-   string textName = name + "_Text";     // نام شیء متن برای مدیریت جداگانه
-   ObjectCreate(0, textName, OBJ_TEXT, 0, midTime, midPrice); // ایجاد متن در موقعیت وسط
-   ObjectSetString(0, textName, OBJPROP_TEXT, "......." + label + "......."); // تنظیم متن با نقطه‌چین اطراف لیبل
-   ObjectSetInteger(0, textName, OBJPROP_COLOR, clrBlack); // تنظیم رنگ سیاه برای متن
-   ObjectSetInteger(0, textName, OBJPROP_FONTSIZE, 10);    // تنظیم اندازه فونت متن به 10
+   // --- 4. رسم لیبل EQ در سمت راست چارت ---
+   // <<-- اصلاح شد: تخصیص نام به متغیر fvg.objEqLabel
+   fvg.objEqLabel = m_objPrefix + "EQ_Label_" + TimeToString(fvg.startTime);
+   ObjectCreate(0, fvg.objEqLabel, OBJ_TEXT, 0, farTime, fvg.eqPrice);
+   
+   ObjectSetString(0, fvg.objEqLabel, OBJPROP_TEXT, "EQ");
+   ObjectSetInteger(0, fvg.objEqLabel, OBJPROP_COLOR, clrBlack); // رنگ متن لیبل
+   ObjectSetInteger(0, fvg.objEqLabel, OBJPROP_FONTSIZE, 10);
   }
 
 //+------------------------------------------------------------------+
@@ -438,5 +557,17 @@ void StructureAnalyzer::RemoveOldObjects()
       ObjectDelete(0, oldName);             // پاک کردن شیء قدیمی از چارت 0
       ArrayCopy(m_lows, m_lows, 0, 1);   // شیفت آرایه به سمت چپ برای حذف اولین عنصر
       ArrayResize(m_lows, ArraySize(m_lows) - 1); // کاهش اندازه آرایه پس از حذف
+     }
+
+   // چک و حذف از آرایه FVGها اگر بیش از حداکثر باشد (FIFO: حذف از ابتدای آرایه با حذف گرافیک)
+   while(ArraySize(m_fvgs) > m_maxStructures)
+     {
+      FVG old = m_fvgs[0];
+      ObjectDelete(0, old.objRectName);
+      ObjectDelete(0, old.objEqName);
+      ObjectDelete(0, old.objFvgLabel);
+      ObjectDelete(0, old.objEqLabel);
+      ArrayCopy(m_fvgs, m_fvgs, 0, 1);   // شیفت آرایه به سمت چپ برای حذف اولین عنصر
+      ArrayResize(m_fvgs, ArraySize(m_fvgs) - 1); // کاهش اندازه آرایه پس از حذف
      }
   }
