@@ -82,7 +82,7 @@ private:
 
 public:
    // سازنده کلاس - تنظیم ورودی‌ها و اولیه‌سازی متغیرها برای شروع کار
-                     StructureAnalyzer(int lookback=100, double retrace=25.0, ENUM_TIMEFRAMES tf=PERIOD_CURRENT, string sym=_Symbol, int maxStruct=30, bool graphics=true);
+                     StructureAnalyzer(int lookback=100, double retrace=25.0, ENUM_TIMEFRAMES tf=PERIOD_CURRENT, string sym="", int maxStruct=30, bool graphics=true);
 
    // دestructor - پاک کردن تمام اشیاء گرافیکی برای جلوگیری از نشت حافظه و تمیز کردن چارت
                     ~StructureAnalyzer();
@@ -108,12 +108,12 @@ public:
 //+------------------------------------------------------------------+
 //| سازنده کلاس: تنظیم ورودی‌ها و پیشوند اشیاء - اولیه‌سازی متغیرها برای جلوگیری از تداخل |
 //+------------------------------------------------------------------+
-StructureAnalyzer::StructureAnalyzer(int lookback=100, double retrace=25.0, ENUM_TIMEFRAMES tf=PERIOD_CURRENT, string sym=_Symbol, int maxStruct=30, bool graphics=true)
+StructureAnalyzer::StructureAnalyzer(int lookback=100, double retrace=25.0, ENUM_TIMEFRAMES tf=PERIOD_CURRENT, string sym="", int maxStruct=30, bool graphics=true)
   {
    m_lookbackCandles = lookback;         // تنظیم تعداد کندل‌های گذشته برای سطوح اولیه
    m_retracementPercent = retrace;       // تنظیم درصد اصلاح
    m_timeframe = tf;                     // تنظیم تایم فریم
-   m_symbol = sym;                       // تنظیم سیمبل
+   m_symbol = (sym == "") ? _Symbol : sym; // تنظیم سیمبل - اگر پیش‌فرض خالی باشد، از _Symbol استفاده کن
    m_maxStructures = maxStruct;          // تنظیم حداکثر ساختارها
    m_enableGraphics = graphics;          // تنظیم فعال بودن گرافیک
 
