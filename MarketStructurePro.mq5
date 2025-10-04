@@ -1,88 +1,109 @@
 //+------------------------------------------------------------------+
-//|                                              MarketStructurePro.mq5 |
+//|                                     MarketStructurePro_v4.0.mq5 |
 //|                                  Copyright 2025, Khajavi & Gemini |
-//|                                        Powerd by Gemini AI        |
+//|                                             Powerd by Gemini AI |
 //|------------------------------------------------------------------|
-//| توضیح: این ماژول ساختار بازار را بر اساس SMC و با تمرکز بر مدیریت  |
-//|       سقف/کف (Swing Point) و شکست‌ها (BoS/CHoCH) تحلیل می‌کند.    |
-//|       **منطق تشخیص Swing Point جدید** با استفاده از **اصلاح 35٪ فیبوناچی**|
-//|       (بر مبنای کلوز کندل) پیاده‌سازی شده است.                    |
-//|       **فیبوناچی صرفاً ابزار محاسباتی است و به هیچ عنوان رسم نمی‌شود.**|
+//| نسخه 4.0 - بازنویسی کامل با تمرکز بر:                           |
+//| 1. رفع کامل هشدارهای کامپایلر                                   |
+//| 2. سیستم لاگ پیشرفته و هوشمند فارسی                              |
+//| 3. کامنت‌گذاری جامع فارسی برای تمام بخش‌ها                      |
+//| 4. بهینه‌سازی عملکرد و پایداری اکسپرت                            |
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2025, Khajavi & Gemini"
 #property link      "https://www.google.com"
-#property version   "3.05" // ورژن به روز شد
+#property version   "4.00"
 
 //+------------------------------------------------------------------+
-//| ساختار داده‌ها و شمارنده‌ها (Enums & Structs)                     |
+//| ورودی‌های اکسپرت (Inputs)                                        |
+//+------------------------------------------------------------------+
+input bool enableLogging = true; // [فعال/غیرفعال کردن] سیستم لاگ برای گزارش‌دهی مراحل
+
+//+------------------------------------------------------------------+
+//| ساختارهای داده و شمارنده‌ها (Structs & Enums)                     |
 //+------------------------------------------------------------------+
 
-//--- ساختار برای نگهداری اطلاعات یک نقطه سقف یا کف (Swing Point)
+//--- ساختار داده برای نگهداری اطلاعات یک نقطه محوری سقف یا کف (Swing Point)
 struct SwingPoint
 {
-   double   price;      // قیمت سقف یا کف
-   datetime time;       // زمان کندلی که سقف یا کف در آن تشکیل شده
-   int      bar_index;  // اندیس کندلی از دید متاتریدر
+   double   price;      // قیمت دقیق سقف یا کف
+   datetime time;       // زمان کندلی که نقطه محوری در آن تشکیل شده
+   int      bar_index;  // اندیس (شماره) کندل از دید متاتریدر
 };
 
-//--- ساختار برای نگهداری اطلاعات یک ناحیه شکاف ارزش منصفانه (FVG)
+//--- ساختار داده برای نگهداری اطلاعات یک ناحیه شکاف ارزش منصفانه (Fair Value Gap - FVG)
 struct FVG 
 {
-   bool     isBullish;  // نوع FVG: True برای صعودی، False برای نزولی
-   double   highPrice;  // بالاترین قیمت زون FVG
-   double   lowPrice;   // پایین‌ترین قیمت زون FVG
-   datetime time;       // زمان کندل شروع زون
-   bool     consumed;   // وضعیت ابطال/مصرف
+   bool     isBullish;  // نوع FVG: صعودی (true) یا نزولی (false)
+   double   highPrice;  // بالاترین قیمت ناحیه FVG
+   double   lowPrice;   // پایین‌ترین قیمت ناحیه FVG
+   datetime time;       // زمان کندل شروع ناحیه
+   bool     consumed;   // وضعیت مصرف شدگی: آیا قیمت به ناحیه بازگشته است؟
 };
 
-//--- شمارنده برای نگهداری وضعیت فعلی روند بازار
+//--- شمارنده (Enum) برای نگهداری وضعیت فعلی روند بازار
 enum TREND_TYPE 
 {
-   TREND_BULLISH,  // روند صعودی
-   TREND_BEARISH,  // روند نزولی
-   TREND_NONE      // بدون روند مشخص
+   TREND_BULLISH,  // روند صعودی (سقف‌ها و کف‌های بالاتر)
+   TREND_BEARISH,  // روند نزولی (سقف‌ها و کف‌های پایین‌تر)
+   TREND_NONE      // بدون روند مشخص یا در حالت رنج
 };
 
 //+------------------------------------------------------------------+
 //| متغیرهای سراسری (Global Variables)                               |
 //+------------------------------------------------------------------+
-SwingPoint swingHighs_Array[];   // آرایه سقف‌ها ([0] جدید، [1] قدیمی)
-SwingPoint swingLows_Array[];    // آرایه کف‌ها ([0] جدید، [1] قدیمی)
-FVG        fvgArray[];           // آرایه ناحیه‌های FVG ([0] جدیدترین)
+SwingPoint swingHighs_Array[];     // آرایه داینامیک برای نگهداری 2 سقف آخر ([0]=جدید، [1]=قدیمی)
+SwingPoint swingLows_Array[];      // آرایه داینامیک برای نگهداری 2 کف آخر ([0]=جدید، [1]=قدیمی)
+FVG        fvgArray[];             // آرایه داینامیک برای نگهداری نواحی FVG شناسایی شده
 
-TREND_TYPE currentTrend = TREND_NONE;    // وضعیت روند فعلی بازار
-string     trendObjectName = "TrendLabel"; // نام شیء متنی برای نمایش وضعیت روند
+TREND_TYPE currentTrend    = TREND_NONE;    // متغیر نگهداری وضعیت فعلی روند
+string     trendObjectName = "TrendLabel";  // نام ثابت برای شیء متنی نمایش‌دهنده روند
 
-//--- متغیرهای ردیابی موج جدید برای منطق فیبوناچی
-// این نقاط، Swing Point ای هستند که به محض شکست پیدا شده و نقش نقطه 100% فیبو را دارند.
-SwingPoint pivotHighForTracking; // نقطه 100% فیبو در موج نزولی (سقف)
-SwingPoint pivotLowForTracking;  // نقطه 100% فیبو در موج صعودی (کف)
-bool       isTrackingHigh = false; // آیا در حال ردیابی سقف جدید (HH/LH) هستیم؟
-bool       isTrackingLow = false;  // آیا در حال ردیابی کف جدید (LL/HL) هستیم؟
+//--- متغیرهای کلیدی برای ردیابی موج جدید بر اساس منطق فیبوناچی
+SwingPoint pivotHighForTracking; // در یک شکست نزولی، این متغیر آخرین سقف (نقطه 100% فیبو) را نگه می‌دارد
+SwingPoint pivotLowForTracking;  // در یک شکست صعودی، این متغیر آخرین کف (نقطه 100% فیبو) را نگه می‌دارد
+bool       isTrackingHigh = false; // فلگ وضعیت: آیا در فاز "شکار سقف جدید" هستیم؟
+bool       isTrackingLow  = false; // فلگ وضعیت: آیا در فاز "شکار کف جدید" هستیم؟
 
+//+------------------------------------------------------------------+
+//| تابع کمکی برای لاگ‌گیری (Helper Function for Logging)             |
+//+------------------------------------------------------------------+
+void LogEvent(string message)
+{
+   // فقط در صورتی لاگ ثبت کن که در ورودی اکسپرت فعال شده باشد
+   if(enableLogging)
+   {
+      Print(message);
+   }
+}
 
 //+------------------------------------------------------------------+
 //| تابع مقداردهی اولیه اکسپرت (OnInit)                               |
 //+------------------------------------------------------------------+
 int OnInit() 
 {
-   //--- پاکسازی چارت و تنظیم آرایه‌ها به صورت سری زمانی (جدیدترین در اندیس 0)
+   LogEvent("اکسپرت MarketStructurePro v4.0 با موفقیت آغاز به کار کرد.");
+   
+   //--- پاکسازی چارت از اشیاء قدیمی در شروع کار
    ObjectsDeleteAll(0, 0, -1);
+   
+   //--- تنظیم آرایه‌ها به صورت سری زمانی (داده جدید در اندیس 0 قرار می‌گیرد)
    ArraySetAsSeries(swingHighs_Array, true);
    ArraySetAsSeries(swingLows_Array, true);
    ArraySetAsSeries(fvgArray, true); 
+   
+   //--- اطمینان از خالی بودن آرایه‌ها در ابتدای کار
    ArrayResize(swingHighs_Array, 0);
    ArrayResize(swingLows_Array, 0);
    ArrayResize(fvgArray, 0);
    
-   //--- مقداردهی اولیه متغیرهای ردیابی
+   //--- مقداردهی اولیه متغیرهای ردیابی وضعیت
    isTrackingHigh = false;
    isTrackingLow = false;
    
-   //--- شناسایی ساختار اولیه بازار (سقف/کف‌های اولیه)
+   //--- شناسایی ساختار اولیه بازار برای داشتن نقطه شروع
    IdentifyInitialStructure();
    
-   //--- به‌روزرسانی و نمایش برچسب روند 
+   //--- به‌روزرسانی و نمایش اولیه برچسب روند 
    UpdateTrendLabel();
    
    return(INIT_SUCCEEDED);
@@ -93,7 +114,8 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason) 
 {
-   //--- پاکسازی کامل اشیاء گرافیکی
+   LogEvent("اکسپرت متوقف شد. تمام اشیاء از روی چارت پاکسازی می‌شوند.");
+   //--- پاکسازی کامل اشیاء گرافیکی در زمان حذف اکسپرت از چارت
    ObjectsDeleteAll(0, 0, -1);
    ArrayFree(swingHighs_Array);
    ArrayFree(swingLows_Array);
@@ -105,100 +127,115 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTick() 
 {
-   //--- منطق تشخیص کندل جدید (فقط یک بار اجرا در هر کندل بسته شده)
+   //--- منطق استاندارد برای اجرای کد فقط یک بار در هر کندل جدید
    static datetime prevTime = 0;
    datetime currentTime = iTime(_Symbol, _Period, 0);
    
    if(currentTime != prevTime) 
    {
       prevTime = currentTime;
+      bool chartNeedsRedraw = false; // فلگ بهینه‌سازی برای جلوگیری از رفرش مکرر چارت
+
+      //--- شرط پایداری: اگر تعداد کندل‌ها کم است، برای جلوگیری از خطا هیچ کاری نکن
+      if(iBars(_Symbol, _Period) < 50)
+      {
+         return;
+      }
       
-      //--- 1. بررسی شکست ساختار (باید قبل از تشخیص Swing Point جدید باشد)
+      //--- گام ۱: بررسی شکست ساختار (این گام باید قبل از تشخیص نقاط جدید باشد)
       if(ArraySize(swingHighs_Array) >= 1 && ArraySize(swingLows_Array) >= 1)
       {
+         // اگر شکستی رخ دهد، این تابع فلگ ردیابی را فعال می‌کند
          CheckForBreakout(); 
       }
       
-      //--- 2. ردیابی و تایید Swing Point جدید با منطق فیبوناچی (فقط زمانی که ردیابی فعال است)
-      CheckForNewSwingPoint();
+      //--- گام ۲: ردیابی و تایید نقطه محوری جدید (فقط زمانی که یک فلگ ردیابی فعال باشد)
+      if(isTrackingHigh || isTrackingLow)
+      {
+         if(CheckForNewSwingPoint())
+         {
+            chartNeedsRedraw = true; // اگر نقطه جدیدی تایید شد، چارت نیاز به رفرش دارد
+         }
+      }
 
-      //--- 3. شناسایی، ابطال و مدیریت FVG ها
-      IdentifyFVG();
-      CheckConsumedFVGs();
+      //--- گام ۳: شناسایی، ابطال و مدیریت نواحی FVG
+      if(IdentifyFVG()) chartNeedsRedraw = true;
+      if(CheckConsumedFVGs()) chartNeedsRedraw = true;
       
-      //--- 4. به‌روزرسانی نمایش روند
-      UpdateTrendLabel();
+      //--- گام ۴: به‌روزرسانی نمایش روند
+      if(UpdateTrendLabel()) chartNeedsRedraw = true;
+      
+      //--- بهینه‌سازی: فقط در صورت نیاز، چارت را یک بار در انتهای تیک رفرش کن
+      if(chartNeedsRedraw)
+      {
+         ChartRedraw(0);
+      }
    }
 }
 
 //+------------------------------------------------------------------+
-//| تابع شناسایی ساختار اولیه بازار (سقف/کف اولیه بر مبنای فرکتال)   |
+//| شناسایی ساختار اولیه بازار (بر مبنای فرکتال ساده)                  |
 //+------------------------------------------------------------------+
 void IdentifyInitialStructure()
 {
-   // این منطق ثابت برای پیدا کردن 2 سقف و 2 کف اولیه برای شروع سیستم است.
-   bool highFound = false;
-   bool lowFound = false;
    int fractalLength = 10; 
    int barsCount = iBars(_Symbol, _Period);
 
+   // اطمینان از وجود کندل کافی برای تحلیل اولیه
+   if(barsCount < fractalLength * 2) return;
+
+   //--- جستجو برای یافتن اولین سقف معتبر
    for(int i = fractalLength; i < barsCount - fractalLength; i++)
    {
-      if(highFound && lowFound) break;
-
       bool isSwingHigh = true;
-      bool isSwingLow = true;
-      
-      if(!highFound)
+      for(int j = 1; j <= fractalLength; j++)
       {
-         for(int j = 1; j <= fractalLength; j++)
+         if(iHigh(_Symbol, _Period, i) < iHigh(_Symbol, _Period, i - j) || iHigh(_Symbol, _Period, i) < iHigh(_Symbol, _Period, i + j))
          {
-            if(iHigh(_Symbol, _Period, i) < iHigh(_Symbol, _Period, i - j) || 
-               iHigh(_Symbol, _Period, i) < iHigh(_Symbol, _Period, i + j))
-            {
-               isSwingHigh = false;
-               break;
-            }
+            isSwingHigh = false;
+            break;
          }
       }
-
-      if(!lowFound)
-      {
-         for(int j = 1; j <= fractalLength; j++)
-         {
-            if(iLow(_Symbol, _Period, i) > iLow(_Symbol, _Period, i - j) || 
-               iLow(_Symbol, _Period, i) > iLow(_Symbol, _Period, i + j))
-            {
-               isSwingLow = false;
-               break;
-            }
-         }
-      }
-
-      if(isSwingHigh && !highFound)
+      if(isSwingHigh)
       {
          AddSwingHigh(iHigh(_Symbol, _Period, i), iTime(_Symbol, _Period, i), i);
-         highFound = true; 
+         LogEvent("ساختار اولیه: اولین سقف در قیمت " + DoubleToString(iHigh(_Symbol, _Period, i), _Digits) + " شناسایی شد.");
+         break; 
       }
-      
-      if(isSwingLow && !lowFound)
+   }
+   
+   //--- جستجو برای یافتن اولین کف معتبر
+   for(int i = fractalLength; i < barsCount - fractalLength; i++)
+   {
+      bool isSwingLow = true;
+      for(int j = 1; j <= fractalLength; j++)
+      {
+         if(iLow(_Symbol, _Period, i) > iLow(_Symbol, _Period, i - j) || iLow(_Symbol, _Period, i) > iLow(_Symbol, _Period, i + j))
+         {
+            isSwingLow = false;
+            break;
+         }
+      }
+      if(isSwingLow)
       {
          AddSwingLow(iLow(_Symbol, _Period, i), iTime(_Symbol, _Period, i), i);
-         lowFound = true;
+         LogEvent("ساختار اولیه: اولین کف در قیمت " + DoubleToString(iLow(_Symbol, _Period, i), _Digits) + " شناسایی شد.");
+         break;
       }
-      
-      if(highFound && lowFound) break;
    }
 }
 
+
 //+------------------------------------------------------------------+
-//| تابع بررسی شکست سقف یا کف (Breakout)                             |
+//| بررسی شکست سقف یا کف (Breakout) و فعال‌سازی فاز ردیابی           |
 //+------------------------------------------------------------------+
 void CheckForBreakout()
 {
+   // اگر هنوز در فاز ردیابی هستیم، به دنبال شکست جدید نباش
+   if(isTrackingHigh || isTrackingLow) return;
    if(ArraySize(swingHighs_Array) < 1 || ArraySize(swingLows_Array) < 1) return;
 
-   double close_1 = iClose(_Symbol, _Period, 1); // کلوز کندل قبل
+   double close_1 = iClose(_Symbol, _Period, 1); // قیمت بسته شدن کندل تکمیل شده قبلی
    SwingPoint lastHigh = swingHighs_Array[0];
    SwingPoint lastLow = swingLows_Array[0];
 
@@ -207,53 +244,61 @@ void CheckForBreakout()
    {
       bool isCHoCH = (currentTrend == TREND_BEARISH);
       string breakType = isCHoCH ? "CHoCH" : "BoS";
-      Print("شکست سقف (", breakType, ") در قیمت ", close_1);
+      LogEvent(">>> رویداد: شکست سقف (" + breakType + ") در قیمت " + DoubleToString(close_1, _Digits) + " رخ داد. (سقف شکسته شده: " + DoubleToString(lastHigh.price, _Digits) + ")");
       
       drawBreak(lastHigh, iTime(_Symbol, _Period, 1), close_1, true, isCHoCH);
 
-      //--- گام 1: نقطه مقابل (پیوت/Low متناظر) را در بازه شکست پیدا کن و **فوری ثبت کن**
-      // این Low جدید، نقطه 100% فیبوی ما برای لگ صعودی بعدی خواهد بود.
+      // گام ۱: پیدا کردن کفِ موجی که باعث شکست شده و ثبت فوری آن
       FindOppositeSwingAndAddNew(lastHigh.bar_index, 1, false); // false = یافتن Low
       
-      //--- گام 2: ردیابی برای سقف جدید را فعال کن و Low جدید را به عنوان 100% فیبو ذخیره کن
-      pivotLowForTracking = swingLows_Array[0]; // **آخرین Low ثبت شده**
+      // گام ۲: فعال کردن فاز "شکار سقف جدید"
+      pivotLowForTracking = swingLows_Array[0]; // این کف جدید، نقطه 100% فیبوی ماست
       isTrackingHigh = true; 
       isTrackingLow = false; 
+      
+      // لاگ ورود به فاز جدید با جزئیات کامل
+      LogEvent("--> فاز جدید: [شکار سقف] فعال شد. منتظر اصلاح ۳۵٪ هستیم.\n" +
+               "    - نقطه ۱۰۰٪ فیبو (کف پیوت): " + DoubleToString(pivotLowForTracking.price, _Digits) + "\n" +
+               "    - نقطه ۰٪ فیبو (سقف اولیه شکست): " + DoubleToString(lastHigh.price, _Digits));
    }
    //--- بررسی شکست کف (Breakout Low)
    else if(close_1 < lastLow.price)
    {
       bool isCHoCH = (currentTrend == TREND_BULLISH);
       string breakType = isCHoCH ? "CHoCH" : "BoS";
-      Print("شکست کف (", breakType, ") در قیمت ", close_1);
+      LogEvent(">>> رویداد: شکست کف (" + breakType + ") در قیمت " + DoubleToString(close_1, _Digits) + " رخ داد. (کف شکسته شده: " + DoubleToString(lastLow.price, _Digits) + ")");
       
       drawBreak(lastLow, iTime(_Symbol, _Period, 1), close_1, false, isCHoCH);
 
-      //--- گام 1: نقطه مقابل (پیوت/High متناظر) را در بازه شکست پیدا کن و **فوری ثبت کن**
-      // این High جدید، نقطه 100% فیبوی ما برای لگ نزولی بعدی خواهد بود.
+      // گام ۱: پیدا کردن سقفِ موجی که باعث شکست شده و ثبت فوری آن
       FindOppositeSwingAndAddNew(lastLow.bar_index, 1, true); // true = یافتن High
       
-      //--- گام 2: ردیابی برای کف جدید را فعال کن و High جدید را به عنوان 100% فیبو ذخیره کن
-      pivotHighForTracking = swingHighs_Array[0]; // **آخرین High ثبت شده**
+      // گام ۲: فعال کردن فاز "شکار کف جدید"
+      pivotHighForTracking = swingHighs_Array[0]; // این سقف جدید، نقطه 100% فیبوی ماست
       isTrackingLow = true;
       isTrackingHigh = false; 
+
+      // لاگ ورود به فاز جدید با جزئیات کامل
+      LogEvent("--> فاز جدید: [شکار کف] فعال شد. منتظر اصلاح ۳۵٪ هستیم.\n" +
+               "    - نقطه ۱۰۰٪ فیبو (سقف پیوت): " + DoubleToString(pivotHighForTracking.price, _Digits) + "\n" +
+               "    - نقطه ۰٪ فیبو (کف اولیه شکست): " + DoubleToString(lastLow.price, _Digits));
    }
 }
 
+
 //+------------------------------------------------------------------+
-//| تابع یافتن نقطه مقابل (پیوت) پس از شکست و افزودن آن به آرایه     |
-//| این تابع Low/High درگیر در شکست را پیدا کرده و به عنوان Swing Point ثبت می‌کند. |
+//| یافتن نقطه محوری مقابل (پیوت) پس از شکست و افزودن آن به آرایه     |
 //+------------------------------------------------------------------+
 void FindOppositeSwingAndAddNew(int brokenSwingIndex, int breakBarIndex, bool findHigh)
 {
     double extremePrice = findHigh ? 0 : DBL_MAX; 
-    datetime extremeTime;
+    datetime extremeTime = 0; // رفع هشدار: مقداردهی اولیه
     int extremeIndex = -1;
 
-    // جستجو از کندل شکست (index=1) تا کندل شکسته شده (brokenSwingIndex)
+    // جستجو از کندل شکست (breakBarIndex) تا کندل ساختار شکسته شده (brokenSwingIndex)
     for (int i = breakBarIndex; i <= brokenSwingIndex; i++)
     {
-        if (findHigh) // یافتن بالاترین High
+        if (findHigh) // در جستجوی بالاترین قیمت (سقف)
         {
             double currentHigh = iHigh(_Symbol, _Period, i);
             if (currentHigh > extremePrice)
@@ -263,7 +308,7 @@ void FindOppositeSwingAndAddNew(int brokenSwingIndex, int breakBarIndex, bool fi
                 extremeIndex = i;
             }
         }
-        else // یافتن پایین‌ترین Low
+        else // در جستجوی پایین‌ترین قیمت (کف)
         {
             double currentLow = iLow(_Symbol, _Period, i);
             if (currentLow < extremePrice)
@@ -275,36 +320,36 @@ void FindOppositeSwingAndAddNew(int brokenSwingIndex, int breakBarIndex, bool fi
         }
     }
 
+    // اگر نقطه معتبری پیدا شد، آن را به آرایه مربوطه اضافه کن
     if (extremeIndex != -1)
     {
         if (findHigh)
         {
             AddSwingHigh(extremePrice, extremeTime, extremeIndex);
+            LogEvent("   - پیوت مقابل (سقف) در قیمت " + DoubleToString(extremePrice, _Digits) + " برای موج نزولی جدید ثبت شد.");
         }
         else
         {
             AddSwingLow(extremePrice, extremeTime, extremeIndex);
+            LogEvent("   - پیوت مقابل (کف) در قیمت " + DoubleToString(extremePrice, _Digits) + " برای موج صعودی جدید ثبت شد.");
         }
     }
 }
 
 
 //+------------------------------------------------------------------+
-//| تابع: بررسی Swing Point جدید با منطق فیبوناچی 35٪ (نقطه 0% متحرک) |
-//| تنها در صورت فعال بودن isTrackingHigh/Low اجرا می‌شود.          |
-//| شرط تایید: کلوز کندل 1، حداقل 35٪ اصلاح کند.                      |
+//| ردیابی و تایید Swing Point جدید با منطق اصلاح ۳۵٪ فیبوناچی        |
 //+------------------------------------------------------------------+
-void CheckForNewSwingPoint()
+bool CheckForNewSwingPoint()
 {
-    //--- 1. ردیابی سقف جدید (HH/LH) بعد از شکست صعودی
+    //--- ۱. ردیابی سقف جدید (HH/LH) بعد از شکست صعودی
     if (isTrackingHigh)
     {
         double currentHigh = 0;
-        datetime highTime;
+        datetime highTime = 0;   // رفع هشدار: مقداردهی اولیه
         int highIndex = -1;
         
-        // پیدا کردن **High متحرک (نقطه 0% فیبو)** در بازه Low Pivot (100%) تا کندل 1
-        // بازه جستجو: از کندل 1 تا اندیس Low Pivot (pivotLowForTracking.bar_index)
+        // جستجو برای یافتن بالاترین قیمت در محدوده موج فعلی (این نقطه 0% فیبوی متحرک ماست)
         for (int i = 1; i <= pivotLowForTracking.bar_index; i++)
         {
             if (iHigh(_Symbol, _Period, i) > currentHigh)
@@ -315,37 +360,34 @@ void CheckForNewSwingPoint()
             }
         }
 
-        // اگر هنوز موجی تشکیل نشده یا High جدیدی بالاتر از High قبلی ثبت نشده
-        if (highIndex == -1 || currentHigh <= pivotLowForTracking.price) return;
+        // اگر هنوز موج معناداری تشکیل نشده، از تابع خارج شو
+        if (highIndex == -1 || currentHigh <= pivotLowForTracking.price) return false;
         
-        // Low Pivot: 100% فیبو. Current High: 0% فیبو
         double range = currentHigh - pivotLowForTracking.price;
-        // سطح 35٪ اصلاح (از 0% به سمت 100%)
-        double fib35Level = currentHigh - (range * 0.35); 
-
+        double fib35Level = currentHigh - (range * 0.35); // سطح ۳۵٪ اصلاح از سقف به سمت کف
         double close_1 = iClose(_Symbol, _Period, 1);
 
-        //--- شرط تایید: اگر کلوز کندل 1، پایین‌تر از سطح 35٪ اصلاح باشد
+        //--- شرط تایید: آیا کلوز کندل قبلی به اندازه کافی (۳۵٪) اصلاح کرده است؟
         if (close_1 < fib35Level)
         {
-            // High متحرک پیدا شده، سقف جدید ماست.
-            Print("سقف جدید (HH/LH) بر اساس اصلاح 35٪ فیبوناچی (کلوز) شناسایی شد: ", currentHigh);
-            AddSwingHigh(currentHigh, highTime, highIndex);
+            LogEvent("<<< تایید شد: شرط اصلاح ۳۵٪ برای سقف جدید برقرار شد.\n" +
+                     "    - کلوز کندل (" + DoubleToString(close_1, _Digits) + ") پایین‌تر از سطح اصلاحی (" + DoubleToString(fib35Level, _Digits) + ") است.");
+            LogEvent("    - سقف جدید در قیمت " + DoubleToString(currentHigh, _Digits) + " تایید و ثبت می‌شود.");
             
-            // توقف ردیابی و تنظیم سقف جدید (HH/LH) به عنوان High Array[0]
-            isTrackingHigh = false;
+            AddSwingHigh(currentHigh, highTime, highIndex);
+            isTrackingHigh = false; // توقف فاز ردیابی
+            return true;
         }
     }
 
-    //--- 2. ردیابی کف جدید (LL/HL) بعد از شکست نزولی
+    //--- ۲. ردیابی کف جدید (LL/HL) بعد از شکست نزولی
     if (isTrackingLow)
     {
         double currentLow = DBL_MAX;
-        datetime lowTime;
+        datetime lowTime = 0; // رفع هشدار: مقداردهی اولیه
         int lowIndex = -1;
         
-        // پیدا کردن **Low متحرک (نقطه 0% فیبو)** در بازه High Pivot (100%) تا کندل 1
-        // بازه جستجو: از کندل 1 تا اندیس High Pivot (pivotHighForTracking.bar_index)
+        // جستجو برای یافتن پایین‌ترین قیمت در محدوده موج فعلی (این نقطه 0% فیبوی متحرک ماست)
         for (int i = 1; i <= pivotHighForTracking.bar_index; i++)
         {
             if (iLow(_Symbol, _Period, i) < currentLow)
@@ -356,103 +398,108 @@ void CheckForNewSwingPoint()
             }
         }
 
-        // اگر هنوز موجی تشکیل نشده یا Low جدیدی پایین‌تر از Low قبلی ثبت نشده
-        if (lowIndex == -1 || currentLow >= pivotHighForTracking.price) return;
+        // اگر هنوز موج معناداری تشکیل نشده، از تابع خارج شو
+        if (lowIndex == -1 || currentLow >= pivotHighForTracking.price) return false;
 
-        // High Pivot: 100% فیبو. Current Low: 0% فیبو
         double range = pivotHighForTracking.price - currentLow;
-        // سطح 35٪ اصلاح از Low به بالا (معادل 65٪ فیبوی استاندارد)
-        double fib65Level = currentLow + (range * 0.35); 
-
+        double fib35Level = currentLow + (range * 0.35); // سطح ۳۵٪ اصلاح از کف به سمت سقف
         double close_1 = iClose(_Symbol, _Period, 1);
 
-        //--- شرط تایید: اگر کلوز کندل 1، بالاتر از سطح 65٪ (35٪ اصلاح) باشد
-        if (close_1 > fib65Level)
+        //--- شرط تایید: آیا کلوز کندل قبلی به اندازه کافی (۳۵٪) اصلاح کرده است؟
+        if (close_1 > fib35Level)
         {
-            // Low متحرک پیدا شده، کف جدید ماست.
-            Print("کف جدید (LL/HL) بر اساس اصلاح 35٪ فیبوناچی (کلوز) شناسایی شد: ", currentLow);
+            LogEvent("<<< تایید شد: شرط اصلاح ۳۵٪ برای کف جدید برقرار شد.\n" +
+                     "    - کلوز کندل (" + DoubleToString(close_1, _Digits) + ") بالاتر از سطح اصلاحی (" + DoubleToString(fib35Level, _Digits) + ") است.");
+            LogEvent("    - کف جدید در قیمت " + DoubleToString(currentLow, _Digits) + " تایید و ثبت می‌شود.");
+
             AddSwingLow(currentLow, lowTime, lowIndex);
-            
-            // توقف ردیابی و تنظیم کف جدید (LL/HL) به عنوان Low Array[0]
-            isTrackingLow = false;
+            isTrackingLow = false; // توقف فاز ردیابی
+            return true;
         }
     }
+    return false; // هیچ نقطه جدیدی در این تیک تایید نشد
 }
 
 
 //+------------------------------------------------------------------+
-//| توابع مدیریت آرایه (AddSwingHigh/Low) - بهینه و تمیز              |
+//| توابع مدیریت آرایه‌ها (افزودن سقف/کف جدید)                       |
 //+------------------------------------------------------------------+
 void AddSwingHigh(double price, datetime time, int bar_index) 
 {
+   // برای حفظ سایز آرایه روی ۲، قدیمی‌ترین داده حذف می‌شود
    if(ArraySize(swingHighs_Array) >= 2) 
    {
-      // حذف شیء قدیمی و حذف عنصر آخر آرایه (چون AsSeries است، قدیمی در آخر است)
       ObjectDelete(0, "High_" + TimeToString(swingHighs_Array[1].time)); 
       ObjectDelete(0, "High_" + TimeToString(swingHighs_Array[1].time) + "_Text");
       ArrayRemove(swingHighs_Array, ArraySize(swingHighs_Array) - 1, 1); 
    }
    
-   // افزایش سایز و مقداردهی مستقیم به اندیس 0 (جدیدترین)
+   // افزودن داده جدید به ابتدای آرایه (اندیس 0)
    int newSize = ArraySize(swingHighs_Array) + 1;
    ArrayResize(swingHighs_Array, newSize); 
-   
    swingHighs_Array[0].price = price;
    swingHighs_Array[0].time = time;
    swingHighs_Array[0].bar_index = bar_index;
    
-   //--- رسم روی چارت
    drawSwingPoint(swingHighs_Array[0], true);
 }
 
 void AddSwingLow(double price, datetime time, int bar_index) 
 {
+   // برای حفظ سایز آرایه روی ۲، قدیمی‌ترین داده حذف می‌شود
    if(ArraySize(swingLows_Array) >= 2) 
    {
-      // حذف شیء قدیمی و حذف عنصر آخر آرایه
       ObjectDelete(0, "Low_" + TimeToString(swingLows_Array[1].time)); 
       ObjectDelete(0, "Low_" + TimeToString(swingLows_Array[1].time) + "_Text");
       ArrayRemove(swingLows_Array, ArraySize(swingLows_Array) - 1, 1); 
    }
    
-   // افزایش سایز و مقداردهی مستقیم به اندیس 0 (جدیدترین)
+   // افزودن داده جدید به ابتدای آرایه (اندیس 0)
    int newSize = ArraySize(swingLows_Array) + 1;
    ArrayResize(swingLows_Array, newSize); 
-
    swingLows_Array[0].price = price;
    swingLows_Array[0].time = time;
    swingLows_Array[0].bar_index = bar_index;
 
-   //--- رسم روی چارت
    drawSwingPoint(swingLows_Array[0], false);
 }
 
 
 //+------------------------------------------------------------------+
-//| توابع FVG، Trend Label و Draw (بدون تغییر منطقی)                  |
+//| توابع مدیریت نواحی FVG                                          |
 //+------------------------------------------------------------------+
-void IdentifyFVG() 
+bool IdentifyFVG() 
 {
-   if(iBars(_Symbol, _Period) < 23) return;
-   int i = 1; 
+   if(iBars(_Symbol, _Period) < 23) return false;
+   int i = 1; // بررسی سه کندل اخیر (1, 2, 3)
    double high1 = iHigh(_Symbol, _Period, i);
    double low1  = iLow(_Symbol, _Period, i);
    double high3 = iHigh(_Symbol, _Period, i + 2);
    double low3  = iLow(_Symbol, _Period, i + 2);
+   
+   // فیلتر: FVG فقط در کندل‌های قوی شناسایی شود
    double avgRange = 0;
    for (int j = i; j < i + 20; j++) avgRange += iHigh(_Symbol, _Period, j) - iLow(_Symbol, _Period, j);
    avgRange /= 20.0;
    bool isStrong1 = (high1 - low1) > avgRange * 0.8; 
-   bool isStrong3 = (high3 - low3) > avgRange * 0.8; 
+   bool isStrong3 = (iHigh(_Symbol, _Period, i+2) - iLow(_Symbol, _Period, i+2)) > avgRange * 0.8; 
+
    if (isStrong1 && isStrong3) 
    {
-      if (low1 > high3) AddFVG(true, low1, high3, iTime(_Symbol, _Period, i));
-      if (high1 < low3) AddFVG(false, low3, high1, iTime(_Symbol, _Period, i));
+      // FVG صعودی: کف کندل 1 بالاتر از سقف کندل 3
+      if (low1 > high3) { AddFVG(true, low1, high3, iTime(_Symbol, _Period, i)); return true; }
+      // FVG نزولی: سقف کندل 1 پایین‌تر از کف کندل 3
+      if (high1 < low3) { AddFVG(false, low3, high1, iTime(_Symbol, _Period, i)); return true; }
    }
+   return false;
 }
 
 void AddFVG(bool isBullish, double highPrice, double lowPrice, datetime time) 
 {
+   // جلوگیری از ثبت FVG تکراری
+   for(int i=0; i<ArraySize(fvgArray); i++) { if(fvgArray[i].time == time) return; }
+
+   // مدیریت سایز آرایه FVG (حداکثر 30 عدد)
    if(ArraySize(fvgArray) >= 30) 
    {
       int lastIndex = ArraySize(fvgArray) - 1;
@@ -462,8 +509,8 @@ void AddFVG(bool isBullish, double highPrice, double lowPrice, datetime time)
       ObjectDelete(0, objNameOld + "_Text");
       ArrayRemove(fvgArray, lastIndex, 1); 
    }
-   int newSize = ArraySize(fvgArray) + 1;
-   ArrayResize(fvgArray, newSize); 
+   // افزودن FVG جدید به ابتدای آرایه
+   ArrayResize(fvgArray, ArraySize(fvgArray) + 1); 
    fvgArray[0].isBullish = isBullish;
    fvgArray[0].highPrice = highPrice;
    fvgArray[0].lowPrice = lowPrice;
@@ -472,23 +519,19 @@ void AddFVG(bool isBullish, double highPrice, double lowPrice, datetime time)
    drawFVG(fvgArray[0]);
 }
 
-void CheckConsumedFVGs() 
+bool CheckConsumedFVGs() 
 {
    double high1 = iHigh(_Symbol, _Period, 1);
    double low1 = iLow(_Symbol, _Period, 1);
+   bool consumedNow = false;
    for(int i = 0; i < ArraySize(fvgArray); i++) 
    {
       if(!fvgArray[i].consumed) 
       {
          bool isConsumed = false;
-         if(fvgArray[i].isBullish) 
-         {
-             if(low1 <= fvgArray[i].highPrice) isConsumed = true;
-         } 
-         else 
-         {
-             if(high1 >= fvgArray[i].lowPrice) isConsumed = true;
-         }
+         if(fvgArray[i].isBullish && low1 <= fvgArray[i].highPrice) isConsumed = true;
+         if(!fvgArray[i].isBullish && high1 >= fvgArray[i].lowPrice) isConsumed = true;
+         
          if(isConsumed)
          {
             fvgArray[i].consumed = true;
@@ -496,13 +539,19 @@ void CheckConsumedFVGs()
             string objName = "FVG_" + TimeToString(fvgArray[i].time) + "_" + typeStr;
             ObjectDelete(0, objName);
             ObjectDelete(0, objName + "_Text");
+            consumedNow = true;
          }
       }
    }
+   return consumedNow;
 }
 
-void UpdateTrendLabel() 
+//+------------------------------------------------------------------+
+//| توابع ترسیمی و نمایش اطلاعات روی چارت (Drawings)                  |
+//+------------------------------------------------------------------+
+bool UpdateTrendLabel() 
 {
+   TREND_TYPE oldTrend = currentTrend;
    if(ArraySize(swingHighs_Array) >= 2 && ArraySize(swingLows_Array) >= 2) 
    {
       SwingPoint lastHigh = swingHighs_Array[0];
@@ -515,56 +564,60 @@ void UpdateTrendLabel()
    } 
    else currentTrend = TREND_NONE;
    
-   ObjectDelete(0, trendObjectName);
-   string trendText;
-   color trendColor;
-   switch(currentTrend) 
+   // فقط در صورت تغییر وضعیت، لاگ و شیء را آپدیت کن
+   if(oldTrend != currentTrend)
    {
-      case TREND_BULLISH:
-         trendText = "Bullish Trend (HH/HL)";
-         trendColor = clrDeepSkyBlue;
-         break;
-      case TREND_BEARISH:
-         trendText = "Bearish Trend (LL/LH)";
-         trendColor = clrOrangeRed;
-         break;
-      default:
-         trendText = "No Trend";
-         trendColor = clrGray;
+      ObjectDelete(0, trendObjectName);
+      string trendText;
+      color trendColor;
+      switch(currentTrend) 
+      {
+         case TREND_BULLISH:
+            trendText = "Bullish Trend (HH/HL)"; trendColor = clrDeepSkyBlue;
+            LogEvent("وضعیت روند به صعودی (Bullish) تغییر یافت.");
+            break;
+         case TREND_BEARISH:
+            trendText = "Bearish Trend (LL/LH)"; trendColor = clrOrangeRed;
+            LogEvent("وضعیت روند به نزولی (Bearish) تغییر یافت.");
+            break;
+         default:
+            trendText = "No Trend / Ranging"; trendColor = clrGray;
+            LogEvent("وضعیت روند به بدون روند (Ranging) تغییر یافت.");
+      }
+      ObjectCreate(0, trendObjectName, OBJ_LABEL, 0, 0, 0);
+      ObjectSetString(0, trendObjectName, OBJPROP_TEXT, trendText);
+      ObjectSetInteger(0, trendObjectName, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+      ObjectSetInteger(0, trendObjectName, OBJPROP_XDISTANCE, 10);
+      ObjectSetInteger(0, trendObjectName, OBJPROP_YDISTANCE, 20);
+      ObjectSetInteger(0, trendObjectName, OBJPROP_COLOR, trendColor);
+      ObjectSetInteger(0, trendObjectName, OBJPROP_FONTSIZE, 12);
+      ObjectSetString(0, trendObjectName, OBJPROP_FONT, "Arial");
+      return true;
    }
-   ObjectCreate(0, trendObjectName, OBJ_LABEL, 0, 0, 0);
-   ObjectSetString(0, trendObjectName, OBJPROP_TEXT, trendText);
-   ObjectSetInteger(0, trendObjectName, OBJPROP_CORNER, CORNER_LEFT_UPPER);
-   ObjectSetInteger(0, trendObjectName, OBJPROP_XDISTANCE, 10);
-   ObjectSetInteger(0, trendObjectName, OBJPROP_YDISTANCE, 20);
-   ObjectSetInteger(0, trendObjectName, OBJPROP_COLOR, trendColor);
-   ObjectSetInteger(0, trendObjectName, OBJPROP_FONTSIZE, 12);
-   ObjectSetString(0, trendObjectName, OBJPROP_FONT, "Arial");
-   ChartRedraw(0);
+   return false;
 }
 
-//--- توابع ترسیم (Drawings)
 void drawSwingPoint(const SwingPoint &sp, bool isHigh) 
 {
    string objName = (isHigh ? "High_" : "Low_") + TimeToString(sp.time);
-   if(ObjectFind(0, objName) >= 0) ObjectDelete(0, objName); 
+   string textName = objName + "_Text";
+   ObjectDelete(0, objName); 
+   ObjectDelete(0, textName);
+
    ObjectCreate(0, objName, OBJ_ARROW, 0, sp.time, sp.price);
    ObjectSetInteger(0, objName, OBJPROP_ARROWCODE, 77); 
    ObjectSetInteger(0, objName, OBJPROP_COLOR, isHigh ? clrDodgerBlue : clrRed);
    ObjectSetInteger(0, objName, OBJPROP_WIDTH, 1);
    ObjectSetInteger(0, objName, OBJPROP_ANCHOR, isHigh ? ANCHOR_BOTTOM : ANCHOR_TOP);
    ObjectSetInteger(0, objName, OBJPROP_SELECTABLE, false); 
-   string text = isHigh ? "H" : "L";
-   string textName = objName + "_Text";
-   if(ObjectFind(0, textName) >= 0) ObjectDelete(0, textName);
+   
    ObjectCreate(0, textName, OBJ_TEXT, 0, sp.time, sp.price);
-   ObjectSetString(0, textName, OBJPROP_TEXT, text);
+   ObjectSetString(0, textName, OBJPROP_TEXT, isHigh ? "H" : "L");
    ObjectSetInteger(0, textName, OBJPROP_COLOR, isHigh ? clrDodgerBlue : clrRed);
    ObjectSetInteger(0, textName, OBJPROP_FONTSIZE, 10);
    ObjectSetInteger(0, textName, OBJPROP_ANCHOR, isHigh ? ANCHOR_LEFT_LOWER : ANCHOR_LEFT_UPPER);
    ObjectSetInteger(0, textName, OBJPROP_XDISTANCE, 5);
    ObjectSetInteger(0, textName, OBJPROP_SELECTABLE, false);
-   ChartRedraw(0);
 }
 
 void drawBreak(const SwingPoint &brokenSwing, datetime breakTime, double breakPrice, bool isHighBreak, bool isCHoCH)
@@ -572,13 +625,17 @@ void drawBreak(const SwingPoint &brokenSwing, datetime breakTime, double breakPr
     string breakType = isCHoCH ? "CHoCH" : "BoS";
     color breakColor = isCHoCH ? clrCrimson : (isHighBreak ? clrSeaGreen : clrOrange);
     string objName = "Break_" + TimeToString(brokenSwing.time);
+    string textName = objName + "_Text";
+    ObjectDelete(0, objName);
+    ObjectDelete(0, textName);
+
     ObjectCreate(0, objName, OBJ_TREND, 0, brokenSwing.time, brokenSwing.price, breakTime, brokenSwing.price);
     ObjectSetInteger(0, objName, OBJPROP_COLOR, breakColor);
     ObjectSetInteger(0, objName, OBJPROP_WIDTH, 1);
     ObjectSetInteger(0, objName, OBJPROP_STYLE, STYLE_DOT);
     ObjectSetInteger(0, objName, OBJPROP_RAY_RIGHT, false);
     ObjectSetInteger(0, objName, OBJPROP_SELECTABLE, false);
-    string textName = objName + "_Text";
+
     ObjectCreate(0, textName, OBJ_TEXT, 0, breakTime, breakPrice);
     ObjectSetString(0, textName, OBJPROP_TEXT, breakType);
     ObjectSetInteger(0, textName, OBJPROP_COLOR, breakColor);
@@ -586,29 +643,25 @@ void drawBreak(const SwingPoint &brokenSwing, datetime breakTime, double breakPr
     ObjectSetInteger(0, textName, OBJPROP_ANCHOR, isHighBreak ? ANCHOR_LEFT_LOWER : ANCHOR_LEFT_UPPER);
     ObjectSetInteger(0, textName, OBJPROP_XDISTANCE, 5);
     ObjectSetInteger(0, textName, OBJPROP_SELECTABLE, false);
-    ChartRedraw(0);
 }
 
 void drawFVG(const FVG &fvg) 
 {
    string typeStr = fvg.isBullish ? "Bullish" : "Bearish";
    string objName = "FVG_" + TimeToString(fvg.time) + "_" + typeStr;
-   if(ObjectFind(0, objName) >= 0) return; 
-   color fvgColor = fvg.isBullish ? C'173,216,230' : C'255,192,203'; 
+   string textName = objName + "_Text";
+
    ObjectCreate(0, objName, OBJ_RECTANGLE, 0, fvg.time, fvg.highPrice, iTime(_Symbol, _Period, 0) + PeriodSeconds()*10, fvg.lowPrice);
-   ObjectSetInteger(0, objName, OBJPROP_COLOR, fvgColor);
+   ObjectSetInteger(0, objName, OBJPROP_COLOR, fvg.isBullish ? C'173,216,230' : C'255,192,203');
    ObjectSetInteger(0, objName, OBJPROP_FILL, true);
    ObjectSetInteger(0, objName, OBJPROP_BACK, true); 
-   ObjectSetInteger(0, objName, OBJPROP_STYLE, STYLE_SOLID);
-   ObjectSetInteger(0, objName, OBJPROP_WIDTH, 1);
    ObjectSetInteger(0, objName, OBJPROP_SELECTABLE, false);
-   string textName = objName + "_Text";
+
    ObjectCreate(0, textName, OBJ_TEXT, 0, fvg.time, fvg.isBullish ? fvg.highPrice : fvg.lowPrice);
    ObjectSetString(0, textName, OBJPROP_TEXT, "FVG");
    ObjectSetInteger(0, textName, OBJPROP_COLOR, clrDimGray);
    ObjectSetInteger(0, textName, OBJPROP_FONTSIZE, 8);
    ObjectSetInteger(0, textName, OBJPROP_ANCHOR, fvg.isBullish ? ANCHOR_RIGHT_UPPER : ANCHOR_RIGHT_LOWER);
    ObjectSetInteger(0, textName, OBJPROP_SELECTABLE, false);
-   ChartRedraw(0);
 }
 //+------------------------------------------------------------------+
