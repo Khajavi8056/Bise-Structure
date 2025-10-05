@@ -4,10 +4,11 @@
 //|                                             Powerd by Gemini AI |
 //|------------------------------------------------------------------|
 //| نسخه 5.3 - انطباق کامل منطق FVG (ابطال با شدو و شرط بدنه قوی)   |
-//| 1. اصلاح منطق ابطال FVG: مصرف شدن توسط High/Low کندل 1          |
+//| 1. اصلاح منطق ابطال FVG: ابطال با قیمت ASK/BID در لحظه          |
 //| 2. بهبود شرط شناسایی FVG: تایید بادی قوی‌تر در هر سه کندل        |
 //| 3. ترسیم FVG به صورت شیشه‌ای (Transparent) و امتداد یافته        |
-//| 4. حفظ تمامی منطق ساختار بازار و فیبوناچی قبلی                  |
+//| 4. رفع باگ اسکن تاریخچه FVG و ساختار اولیه (فقط داده‌های جدید)  |
+//| 5. تفکیک توابع شناسایی (IdentifyFVG) و ابطال (CheckFVGInvalidation) |
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2025, Khajavi & Gemini"
 #property link      "https://www.google.com"
@@ -38,7 +39,7 @@ struct FVG
    bool     isBullish;  // نوع FVG: صعودی (true) یا نزولی (false)
    double   highPrice;  // بالاترین قیمت ناحیه FVG (خط سقف)
    double   lowPrice;   // پایین‌ترین قیمت ناحیه FVG (خط کف)
-   datetime time;       // زمان کندل شروع ناحیه (کندل 1)
+   datetime time;       // زمان کندل میانی FVG (کندل 2)
    bool     consumed;   // وضعیت مصرف شدگی: آیا قیمت به ناحیه بازگشته است؟
 };
 
@@ -65,6 +66,9 @@ SwingPoint pivotHighForTracking; // نقطه 100% فیبو (ثابت) در فا�
 SwingPoint pivotLowForTracking;  // نقطه 100% فیبو (ثابت) در فاز صعودی
 bool       isTrackingHigh = false; // فلگ وضعیت: آیا در فاز "شکار سقف جدید" هستیم؟
 bool       isTrackingLow  = false; // فلگ وضعیت: آیا در فاز "شکار کف جدید" هستیم؟
+
+//--- متغیر استاتیک برای جلوگیری از اجرای تکراری FVG روی یک کندل
+static datetime lastFVGCheckTime = 0;
 
 //+------------------------------------------------------------------+
 //| تابع کمکی برای لاگ‌گیری (Helper Function for Logging)             |
@@ -101,7 +105,8 @@ int OnInit()
    pivotHighForTracking.price = 0; pivotHighForTracking.time = 0; pivotHighForTracking.bar_index = -1;
    pivotLowForTracking.price = 0; pivotLowForTracking.time = 0; pivotLowForTracking.bar_index = -1;
 
-   IdentifyInitialStructure();
+   // ✨ اصلاح: جستجوی ساختار اولیه از داده‌های جدید شروع می‌شود (IdentifyInitialStructure اصلاح شد)
+   IdentifyInitialStructure(); 
    UpdateTrendLabel();
    
    return(INIT_SUCCEEDED);
@@ -124,20 +129,25 @@ void OnTick()
    static datetime prevTime = 0;
    datetime currentTime = iTime(_Symbol, _Period, 0);
    
+   bool chartNeedsRedraw = false; 
+
+   if(iBars(_Symbol, _Period) < 50) return;
+   
+   //--- گام ۱: بررسی ابطال FVG در لحظه (با ASK/BID)
+   if(CheckFVGInvalidation()) chartNeedsRedraw = true;
+   
+   // اجرای منطق ساختار و FVG فقط در کندل جدید
    if(currentTime != prevTime) 
    {
       prevTime = currentTime;
-      bool chartNeedsRedraw = false; 
-
-      if(iBars(_Symbol, _Period) < 50) return;
       
-      //--- گام ۱: بررسی شکست ساختار 
+      //--- گام ۲: بررسی شکست ساختار 
       if(ArraySize(swingHighs_Array) >= 1 && ArraySize(swingLows_Array) >= 1)
       {
          CheckForBreakout(); 
       }
       
-      //--- گام ۲: ردیابی و تایید نقطه محوری جدید با منطق آپدیت 0% فیبو
+      //--- گام ۳: ردیابی و تایید نقطه محوری جدید با منطق آپدیت 0% فیبو
       if(isTrackingHigh || isTrackingLow)
       {
          if(CheckForNewSwingPoint())
@@ -152,11 +162,10 @@ void OnTick()
          }
       }
 
-      //--- گام ۳: شناسایی، ابطال و مدیریت نواحی FVG (منطق اصلاح شده)
+      //--- گام ۴: شناسایی FVG جدید (فقط یک بار با کلوز کندل جدید)
       if(IdentifyFVG()) chartNeedsRedraw = true;
-      if(CheckConsumedFVGs()) chartNeedsRedraw = true;
       
-      //--- گام ۴: به‌روزرسانی نمایش روند
+      //--- گام ۵: به‌روزرسانی نمایش روند
       if(UpdateTrendLabel()) chartNeedsRedraw = true;
       
       if(chartNeedsRedraw)
@@ -175,19 +184,23 @@ void IdentifyInitialStructure()
 
    if(barsCount < fractalLength * 2 + 1) return;
 
-   //--- جستجو برای یافتن سقف و کف معتبر (فرکتال)
-   for(int i = fractalLength; i < barsCount - fractalLength; i++)
+   // ✨ اصلاح: حلقه جستجو از جدیدترین کندل‌های ممکن شروع و به سمت قدیم می‌رود.
+   // ما فقط به دنبال اولین سقف و کف معتبر نزدیک به حال می‌گردیم تا ساختار اولیه شکل بگیرد.
+   
+   for(int i = fractalLength; i < barsCount - fractalLength; i++) 
    {
       bool isSwingHigh = true;
       bool isSwingLow = true;
       
       for(int j = 1; j <= fractalLength; j++)
       {
+         // برای سقف
          if(iHigh(_Symbol, _Period, i) < iHigh(_Symbol, _Period, i - j) || iHigh(_Symbol, _Period, i) < iHigh(_Symbol, _Period, i + j))
          {
             isSwingHigh = false;
          }
          
+         // برای کف
          if(iLow(_Symbol, _Period, i) > iLow(_Symbol, _Period, i - j) || iLow(_Symbol, _Period, i) > iLow(_Symbol, _Period, i + j))
          {
             isSwingLow = false;
@@ -207,7 +220,7 @@ void IdentifyInitialStructure()
       
       if(ArraySize(swingHighs_Array) > 0 && ArraySize(swingLows_Array) > 0)
       {
-          break;
+          break; // پس از یافتن هر دو، جستجو را متوقف کن
       }
    }
 }
@@ -279,6 +292,7 @@ SwingPoint FindOppositeSwing(datetime brokenSwingTime, datetime breakTime, bool 
         return errorResult;
     }
 
+    // ✨ اصلاح: جستجو باید از جدیدترین کندل (startBar + 1) به سمت قدیم (endBar) حرکت کند
     for (int i = startBar + 1; i <= endBar; i++)
     {
         if (findHigh) 
@@ -334,7 +348,8 @@ SwingPoint FindExtremePrice(int startBar, int endBar, bool findHigh)
     datetime extremeTime = 0; 
     int extremeIndex = -1;
 
-    for (int i = startBar; i <= endBar; i++)
+    // ✨ اصلاح: جستجو باید از جدیدترین کندل (startBar) به سمت قدیم (endBar) حرکت کند
+    for (int i = startBar; i <= endBar; i++) 
     {
         if (findHigh) 
         {
@@ -376,6 +391,7 @@ bool CheckForNewSwingPoint()
         
         SwingPoint current0Per; 
         int startBar = iBarShift(_Symbol, _Period, pivotLowForTracking.time, false);
+        // ✨ اصلاح: جستجو برای 0% فیبو از کندل 1 (بسته شده) تا نقطه 100% فیبو 
         current0Per = FindExtremePrice(1, startBar, true); 
 
         if (current0Per.bar_index == -1 || current0Per.price <= pivotLowForTracking.price) return false;
@@ -402,6 +418,7 @@ bool CheckForNewSwingPoint()
         
         SwingPoint current0Per; 
         int startBar = iBarShift(_Symbol, _Period, pivotHighForTracking.time, false);
+        // ✨ اصلاح: جستجو برای 0% فیبو از کندل 1 (بسته شده) تا نقطه 100% فیبو 
         current0Per = FindExtremePrice(1, startBar, false); 
         
         if (current0Per.bar_index == -1 || current0Per.price >= pivotHighForTracking.price) return false;
@@ -488,38 +505,48 @@ bool IsStrongBody(int index)
     return (body > shadow); 
 }
 
+//+------------------------------------------------------------------+
+//| تابع: شناسایی FVG جدید (بررسی کندل‌های 1، 2، 3)                  |
+//+------------------------------------------------------------------+
 bool IdentifyFVG() 
 {
-   if(iBars(_Symbol, _Period) < 3) return false;
-   int i = 1; // کندل وسط (برای تعیین کندل 0, 1, 2)
+   // ✨ اصلاح: FVG فقط با کلوز کندل جدید چک می‌شود (یک بار اجرا برای هر کندل جدید)
+   if(lastFVGCheckTime == iTime(_Symbol, _Period, 1)) return false; 
+   lastFVGCheckTime = iTime(_Symbol, _Period, 1);
    
-   //--- ۱. بررسی شرط بدنه‌های قوی در هر سه کندل
-   if (!IsStrongBody(i-1) || !IsStrongBody(i) || !IsStrongBody(i+1)) return false;
-
-   double high0 = iHigh(_Symbol, _Period, i - 1); // سقف کندل 0
-   double low0  = iLow(_Symbol, _Period, i - 1);  // کف کندل 0
-   double high2 = iHigh(_Symbol, _Period, i + 1); // سقف کندل 2
-   double low2  = iLow(_Symbol, _Period, i + 1);  // کف کندل 2
+   if(iBars(_Symbol, _Period) < 4) return false; // برای دسترسی به کندل 1، 2 و 3، به 4 کندل (0 تا 3) نیاز داریم.
    
-   // FVG صعودی: کف کندل 2 بالاتر از سقف کندل 0
-   if (low2 > high0) 
+   // ✨ اصلاح اساسی: اندیس شروع را روی 2 تنظیم می‌کنیم (کندل 2، میانی است)
+   int i = 2; 
+   
+   //--- ۱. بررسی شرط بدنه‌های قوی در هر سه کندل (کندل‌های 1، 2 و 3 چک می‌شوند)
+   if (!IsStrongBody(i-1) || !IsStrongBody(i) || !IsStrongBody(i+1)) return false; 
+   
+   // High/Low کندل 1 (جدیدترین) و High/Low کندل 3 (قدیمی‌ترین)
+   double high1 = iHigh(_Symbol, _Period, i - 1); // High کندل 1 (جدیدترین)
+   double low1  = iLow(_Symbol, _Period, i - 1);  // Low کندل 1
+   double high3 = iHigh(_Symbol, _Period, i + 1); // High کندل 3 (قدیمی‌ترین)
+   double low3  = iLow(_Symbol, _Period, i + 1);  // Low کندل 3
+   
+   // FVG صعودی: کف کندل 1 بالاتر از سقف کندل 3
+   if (low1 > high3) 
    { 
-       // جلوگیری از ثبت FVG تکراری
-       for(int j=0; j<ArraySize(fvgArray); j++) { if(fvgArray[j].time == iTime(_Symbol, _Period, i+1) && fvgArray[j].isBullish) return false; }
+       // جلوگیری از ثبت FVG تکراری (برای یک زمان کندل)
+       for(int j=0; j<ArraySize(fvgArray); j++) { if(fvgArray[j].time == iTime(_Symbol, _Period, i) && fvgArray[j].isBullish) return false; }
        
-       // ناحیه FVG بین High کندل 0 و Low کندل 2
-       AddFVG(true, high0, low2, iTime(_Symbol, _Period, i+1)); 
+       // ناحیه FVG بین High کندل 3 و Low کندل 1. زمان FVG روی کندل میانی (کندل 2) ثبت می‌شود.
+       AddFVG(true, high3, low1, iTime(_Symbol, _Period, i)); 
        return true; 
    }
    
-   // FVG نزولی: سقف کندل 2 پایین‌تر از کف کندل 0
-   if (high2 < low0) 
+   // FVG نزولی: سقف کندل 1 پایین‌تر از کف کندل 3
+   if (high1 < low3) 
    { 
        // جلوگیری از ثبت FVG تکراری
-       for(int j=0; j<ArraySize(fvgArray); j++) { if(fvgArray[j].time == iTime(_Symbol, _Period, i+1) && !fvgArray[j].isBullish) return false; }
+       for(int j=0; j<ArraySize(fvgArray); j++) { if(fvgArray[j].time == iTime(_Symbol, _Period, i) && !fvgArray[j].isBullish) return false; }
        
-       // ناحیه FVG بین Low کندل 0 و High کندل 2
-       AddFVG(false, low0, high2, iTime(_Symbol, _Period, i+1)); 
+       // ناحیه FVG بین Low کندل 3 و High کندل 1. زمان FVG روی کندل میانی (کندل 2) ثبت می‌شود.
+       AddFVG(false, low3, high1, iTime(_Symbol, _Period, i)); 
        return true; 
    }
 
@@ -546,44 +573,59 @@ void AddFVG(bool isBullish, double highPrice, double lowPrice, datetime time)
    fvgArray[0].time = time;
    fvgArray[0].consumed = false;
    drawFVG(fvgArray[0]);
+   
+   string typeStr = isBullish ? "Bullish" : "Bearish";
+   LogEvent("FVG جدید از نوع " + typeStr + " در زمان " + TimeToString(time) + " شناسایی شد.");
 }
 
-bool CheckConsumedFVGs() 
+//+------------------------------------------------------------------+
+//| تابع: بررسی ابطال FVG در لحظه (با قیمت‌های ASK/BID)              |
+//+------------------------------------------------------------------+
+bool CheckFVGInvalidation() 
 {
-   // بررسی مصرف شدگی توسط کندل قبلی (اندیس 1) - ابطال با شدو (High/Low)
-   double high1 = iHigh(_Symbol, _Period, 1);
-   double low1 = iLow(_Symbol, _Period, 1);
-   bool consumedNow = false;
+   double currentAsk = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+   double currentBid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   bool invalidatedNow = false;
    
    for(int i = 0; i < ArraySize(fvgArray); i++) 
    {
       if(!fvgArray[i].consumed) 
       {
-         bool isConsumed = false;
+         bool isInvalidated = false;
+         string typeStr = fvgArray[i].isBullish ? "Bullish" : "Bearish";
          
-         // FVG صعودی (ناحیه بین highPrice و lowPrice): اگر Low کندل 1 به lowPrice یا پایین‌تر رسید (عبور کند)
-         if(fvgArray[i].isBullish && low1 <= fvgArray[i].lowPrice) isConsumed = true;
-         
-         // FVG نزولی (ناحیه بین highPrice و lowPrice): اگر High کندل 1 به highPrice یا بالاتر رسید (عبور کند)
-         if(!fvgArray[i].isBullish && high1 >= fvgArray[i].highPrice) isConsumed = true;
-         
-         if(isConsumed)
+         // FVG صعودی: اگر قیمت Bid به زیر خط پایین FVG برسد (باطل می‌شود)
+         // چون قیمت فروش (Bid) به خط حمایت رسیده است.
+         if(fvgArray[i].isBullish && currentBid < fvgArray[i].lowPrice) 
          {
-            fvgArray[i].consumed = true;
-            string typeStr = fvgArray[i].isBullish ? "Bullish" : "Bearish";
+             isInvalidated = true;
+             LogEvent("FVG صعودی در زمان " + TimeToString(fvgArray[i].time) + " توسط قیمت BID ابطال شد (Bid < FVG Low).");
+         }
+         
+         // FVG نزولی: اگر قیمت Ask به بالای خط بالای FVG برسد (باطل می‌شود)
+         // چون قیمت خرید (Ask) به خط مقاومت رسیده است.
+         if(!fvgArray[i].isBullish && currentAsk > fvgArray[i].highPrice) 
+         {
+             isInvalidated = true;
+             LogEvent("FVG نزولی در زمان " + TimeToString(fvgArray[i].time) + " توسط قیمت ASK ابطال شد (Ask > FVG High).");
+         }
+         
+         if(isInvalidated)
+         {
+            fvgArray[i].consumed = true; // علامت‌گذاری به‌عنوان مصرف‌شده/باطل
             string objName = "FVG_" + TimeToString(fvgArray[i].time) + "_" + typeStr;
             
             // پاک کردن FVG از روی چارت
             ObjectDelete(0, objName);
             ObjectDelete(0, objName + "_Text");
-            LogEvent("FVG از نوع " + typeStr + " در زمان " + TimeToString(fvgArray[i].time) + " توسط شدو کندل 1 مصرف (Consumed) شد و پاک گردید.");
-            consumedNow = true;
+            invalidatedNow = true;
          }
       }
    }
-   return consumedNow;
+   return invalidatedNow;
 }
 
+// تابع CheckConsumedFVGs قدیمی حذف و با CheckFVGInvalidation جایگزین شد
 
 //+------------------------------------------------------------------+
 //| توابع مدیریت و ترسیم نقاط محوری (AddSwingHigh, AddSwingLow)       |
