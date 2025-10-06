@@ -1,6 +1,6 @@
 //+------------------------------------------------------------------+
 //|                                MarketStructureLibrary.mqh       |
-//|                                  Copyright 2025, Khajavi |
+//|                                  Copyright 2025, Khajavi  |
 //|                                             Powerd by HIPOALGORITM |
 //|------------------------------------------------------------------|
 //| راهنمای اجرا و استفاده (Blueprint for Memento Project):          |
@@ -25,9 +25,9 @@
 //| ۴. مدیریت نمایش: با پارامتر 'showDrawing' در سازنده، می توانید   |
 //|    نمایش ترسیمات کلاس را روی چارت خاموش یا روشن کنید.             |
 //+------------------------------------------------------------------+
-#property copyright "Copyright 2025, Khajavi & Gemini"
-#property link      "https://www.google.com"
-#property version   "5.70" // نسخه نهایی رفع تمام اخطارها
+#property copyright "Copyright 2025, Khajavi _ HipoAlgoritm"
+#property link      "https://www.HipoAlgoritm.com"
+#property version   "1.61" // نسخه اصلاح خطاها
 
 //+------------------------------------------------------------------+
 //| ساختارهای داده و شمارنده‌ها (Structs & Enums)                     |
@@ -81,14 +81,12 @@ string TimeFrameToStringShort(ENUM_TIMEFRAMES tf)
     }
 }
 
-//--- تابع کمکی برای لاگ‌گیری (با تبدیل صریح برای رفع اخطار)
+//--- تابع کمکی برای لاگ‌گیری (با رفع خطای تبدیل نوع)
 void LogEvent(const string message, const bool enabled, const string prefix = "")
 {
    if(enabled)
    {
-      // تبدیل صریح symbol به string در صورت نیاز، اگرچه Print برای string مشکلی ندارد.
-      // اما برای اطمینان و دیباگ بیشتر:
-      Print(prefix, message); 
+      Print(prefix, message);
    }
 }
 
@@ -132,9 +130,19 @@ public:
       m_lastFVGCheckTime = 0;
       
       // پاکسازی اشیاء قبلی مربوط به این تایم فریم روی چارت
-      if (m_showDrawing) ObjectsDeleteAll(m_chartId, 0, -1, m_timeframeSuffix);
+      if (m_showDrawing)
+      {
+         int total = ObjectsTotal(m_chartId, 0, -1);
+         for(int i = total - 1; i >= 0; i--)
+         {
+            string name = ObjectName(m_chartId, i);
+            if(StringFind(name, m_timeframeSuffix) != -1)
+            {
+               ObjectDelete(m_chartId, name);
+            }
+         }
+      }
       
-      // تبدیل صریح EnumToString برای رفع اخطار احتمالی تبدیل ضمنی
       LogEvent("کلاس FVGManager برای نماد " + m_symbol + " و تایم فریم " + EnumToString(m_timeframe) + " آغاز به کار کرد.", m_enableLogging, "[FVG]");
    }
 
@@ -144,7 +152,18 @@ public:
    ~FVGManager()
    {
       // پاک کردن اشیاء هنگام از بین رفتن آبجکت
-      if (m_showDrawing) ObjectsDeleteAll(m_chartId, 0, -1, m_timeframeSuffix);
+      if (m_showDrawing)
+      {
+         int total = ObjectsTotal(m_chartId, 0, -1);
+         for(int i = total - 1; i >= 0; i--)
+         {
+            string name = ObjectName(m_chartId, i);
+            if(StringFind(name, m_timeframeSuffix) != -1)
+            {
+               ObjectDelete(m_chartId, name);
+            }
+         }
+      }
       LogEvent("کلاس FVGManager متوقف شد.", m_enableLogging, "[FVG]");
    }
    
@@ -177,16 +196,8 @@ public:
             if (m_showDrawing)
             {
                 string objName = "FVG_" + TimeToString(m_fvgArray[i].time) + "_" + typeStr + m_timeframeSuffix;
-                // رفع اخطار: ObjectDelete انتظار (long chart_id, int sub_window, const string name) دارد.
-                // تبدیل صریح m_chartId به long و 0 به int:
-                if (!ObjectDelete(m_chartId, 0, objName)) 
-                {
-                    LogEvent("خطا در حذف FVG: " + objName, m_enableLogging, "[FVG]");
-                }
-                if (!ObjectDelete(m_chartId, 0, objName + "_Text"))
-                {
-                    LogEvent("خطا در حذف متن FVG: " + objName + "_Text", m_enableLogging, "[FVG]");
-                }
+                ObjectDelete(m_chartId, objName);
+                ObjectDelete(m_chartId, objName + "_Text");
             }
             LogEvent("FVG از نوع " + typeStr + " در زمان " + TimeToString(m_fvgArray[i].time) + " ابطال و حذف شد.", m_enableLogging, "[FVG]");
 
@@ -291,15 +302,8 @@ private:
          if (m_showDrawing)
          {
              string objNameOld = "FVG_" + TimeToString(m_fvgArray[lastIndex].time) + "_" + typeStrOld + m_timeframeSuffix;
-             // رفع اخطار: ObjectDelete انتظار (long chart_id, int sub_window, const string name) دارد.
-             if (!ObjectDelete(m_chartId, 0, objNameOld)) 
-             {
-                 LogEvent("خطا در حذف FVG قدیمی: " + objNameOld, m_enableLogging, "[FVG]");
-             }
-             if (!ObjectDelete(m_chartId, 0, objNameOld + "_Text")) 
-             {
-                 LogEvent("خطا در حذف متن FVG قدیمی: " + objNameOld + "_Text", m_enableLogging, "[FVG]");
-             }
+             ObjectDelete(m_chartId, objNameOld);
+             ObjectDelete(m_chartId, objNameOld + "_Text");
          }
          ArrayRemove(m_fvgArray, lastIndex, 1);
       }
@@ -342,9 +346,7 @@ private:
          datetime midTime = m_fvgArray[i].time + (currentTime - m_fvgArray[i].time) / 2;
          double midPrice = (m_fvgArray[i].highPrice + m_fvgArray[i].lowPrice) / 2;
 
-         // جابجایی متن (ObjectMove)
-         // ObjectMove انتظار (long chart_id, string name, int point_index, datetime time, double price)
-         // چون ObjectMove در MQL5 دقیقاً بر اساس سینتکسش صدا زده میشه، تبدیل ضمنی برای string name/long chartId رخ نمیده.
+         // جابجایی متن (رفع خطای تبدیل نوع ضمنی)
          ObjectMove(m_chartId, textName, 0, midTime, midPrice);
       }
    }
@@ -371,10 +373,10 @@ private:
       datetime midTime = fvg.time + (currentTime - fvg.time) / 2;
       double midPrice = (fvg.highPrice + fvg.lowPrice) / 2;
 
-      // ایجاد متن FVG با پسوند تایم فریم 
+      // ایجاد متن FVG با پسوند تایم فریم (رفع خطای تبدیل نوع ضمنی)
       ObjectCreate(m_chartId, textName, OBJ_TEXT, 0, midTime, midPrice);
       ObjectSetString(m_chartId, textName, OBJPROP_TEXT, "FVG" + m_timeframeSuffix); 
-      ObjectSetInteger(m_chartId, textName, OBJPROP_COLOR, clrDimGray);
+      ObjectSetInteger(m_chartId, textName, OBJPROP_COLOR, clrAliceBlue);
       ObjectSetInteger(m_chartId, textName, OBJPROP_FONTSIZE, 8);
       ObjectSetInteger(m_chartId, textName, OBJPROP_ANCHOR, ANCHOR_CENTER);
    }
@@ -452,7 +454,18 @@ public:
       m_pivotLowForTracking.price = 0; m_pivotLowForTracking.time = 0; m_pivotLowForTracking.bar_index = -1;
       
       // پاکسازی اشیاء قبلی
-      if (m_showDrawing) ObjectsDeleteAll(m_chartId, 0, -1, m_timeframeSuffix);
+      if (m_showDrawing)
+      {
+         int total = ObjectsTotal(m_chartId, 0, -1);
+         for(int i = total - 1; i >= 0; i--)
+         {
+            string name = ObjectName(m_chartId, i);
+            if(StringFind(name, m_timeframeSuffix) != -1)
+            {
+               ObjectDelete(m_chartId, name);
+            }
+         }
+      }
       
       // شناسایی ساختار اولیه
       IdentifyInitialStructure();
@@ -467,7 +480,18 @@ public:
    ~MarketStructure()
    {
       // پاک کردن اشیاء هنگام از بین رفتن آبجکت
-      if (m_showDrawing) ObjectsDeleteAll(m_chartId, 0, -1, m_timeframeSuffix);
+      if (m_showDrawing)
+      {
+         int total = ObjectsTotal(m_chartId, 0, -1);
+         for(int i = total - 1; i >= 0; i--)
+         {
+            string name = ObjectName(m_chartId, i);
+            if(StringFind(name, m_timeframeSuffix) != -1)
+            {
+               ObjectDelete(m_chartId, name);
+            }
+         }
+      }
       LogEvent("کلاس MarketStructure متوقف شد.", m_enableLogging, "[SMC]");
    }
    
@@ -490,8 +514,7 @@ public:
          if(CheckForNewSwingPoint())
          {
             structureChanged = true;
-            // رفع اخطار: ObjectDelete انتظار (long chart_id, int sub_window, const string name) دارد.
-            if (m_showDrawing) ObjectDelete(m_chartId, 0, "Tracking_Fib" + m_timeframeSuffix);
+            if (m_showDrawing) ObjectDelete(m_chartId, "Tracking_Fib" + m_timeframeSuffix);
          }
          else
          {
@@ -696,34 +719,30 @@ private:
            p100 = m_pivotLowForTracking;
            int startBar = iBarShift(m_symbol, m_timeframe, p100.time, false);
            p0 = FindExtremePrice(1, startBar, true);
-           // رفع اخطار: ObjectDelete انتظار (long chart_id, int sub_window, const string name) دارد.
-           if (p0.bar_index == -1 || p0.price <= p100.price) { ObjectDelete(m_chartId, 0, "Tracking_Fib" + m_timeframeSuffix); return; }
+           if (p0.bar_index == -1 || p0.price <= p100.price) { ObjectDelete(m_chartId, "Tracking_Fib" + m_timeframeSuffix); return; }
        }
        else if (m_isTrackingLow)
        {
            p100 = m_pivotHighForTracking;
            int startBar = iBarShift(m_symbol, m_timeframe, p100.time, false);
            p0 = FindExtremePrice(1, startBar, false);
-           // رفع اخطار: ObjectDelete انتظار (long chart_id, int sub_window, const string name) دارد.
-           if (p0.bar_index == -1 || p0.price >= p100.price) { ObjectDelete(m_chartId, 0, "Tracking_Fib" + m_timeframeSuffix); return; }
+           if (p0.bar_index == -1 || p0.price >= p100.price) { ObjectDelete(m_chartId, "Tracking_Fib" + m_timeframeSuffix); return; }
        }
-       // رفع اخطار: ObjectDelete انتظار (long chart_id, int sub_window, const string name) دارد.
-       else { ObjectDelete(m_chartId, 0, "Tracking_Fib" + m_timeframeSuffix); return; }
+       else { ObjectDelete(m_chartId, "Tracking_Fib" + m_timeframeSuffix); return; }
 
        string objName = "Tracking_Fib" + m_timeframeSuffix;
-       ObjectDelete(m_chartId, 0, objName);
+       ObjectDelete(m_chartId, objName);
 
        ObjectCreate(m_chartId, objName, OBJ_FIBO, 0, p100.time, p100.price, p0.time, p0.price);
        ObjectSetInteger(m_chartId, objName, OBJPROP_COLOR, isBullish ? clrDodgerBlue : clrOrangeRed);
        ObjectSetInteger(m_chartId, objName, OBJPROP_RAY_RIGHT, true);
        ObjectSetInteger(m_chartId, objName, OBJPROP_WIDTH, 1);
 
-       // تنظیم سطوح
+       // تنظیم سطوح (با رفع خطای تبدیل نوع ضمنی)
        ObjectSetDouble(m_chartId, objName, OBJPROP_LEVELVALUE, 0, 0.0);
        ObjectSetString(m_chartId, objName, OBJPROP_LEVELTEXT, 0, "0% (Movable)" + m_timeframeSuffix);
 
        ObjectSetDouble(m_chartId, objName, OBJPROP_LEVELVALUE, 1, (double)m_fibUpdateLevel / 100.0);
-       // استفاده از IntegerToString برای تبدیل صریح
        ObjectSetString(m_chartId, objName, OBJPROP_LEVELTEXT, 1, IntegerToString(m_fibUpdateLevel) + "% (Confirmation)" + m_timeframeSuffix);
 
        ObjectSetDouble(m_chartId, objName, OBJPROP_LEVELVALUE, 2, 1.0);
@@ -739,10 +758,8 @@ private:
       {
          if (m_showDrawing)
          {
-             string objNameOld = "H_" + TimeToString(m_swingHighs_Array[1].time) + m_timeframeSuffix;
-             // رفع اخطار: ObjectDelete انتظار (long chart_id, int sub_window, const string name) دارد.
-             ObjectDelete(m_chartId, 0, objNameOld);
-             ObjectDelete(m_chartId, 0, objNameOld + "_Text");
+             ObjectDelete(m_chartId, "H_" + TimeToString(m_swingHighs_Array[1].time) + m_timeframeSuffix);
+             ObjectDelete(m_chartId, "H_" + TimeToString(m_swingHighs_Array[1].time) + m_timeframeSuffix + "_Text");
          }
          ArrayRemove(m_swingHighs_Array, ArraySize(m_swingHighs_Array) - 1, 1);
       }
@@ -764,10 +781,8 @@ private:
       {
          if (m_showDrawing)
          {
-             string objNameOld = "L_" + TimeToString(m_swingLows_Array[1].time) + m_timeframeSuffix;
-             // رفع اخطار: ObjectDelete انتظار (long chart_id, int sub_window, const string name) دارد.
-             ObjectDelete(m_chartId, 0, objNameOld);
-             ObjectDelete(m_chartId, 0, objNameOld + "_Text");
+             ObjectDelete(m_chartId, "L_" + TimeToString(m_swingLows_Array[1].time) + m_timeframeSuffix);
+             ObjectDelete(m_chartId, "L_" + TimeToString(m_swingLows_Array[1].time) + m_timeframeSuffix + "_Text");
          }
          ArrayRemove(m_swingLows_Array, ArraySize(m_swingLows_Array) - 1, 1);
       }
@@ -799,8 +814,7 @@ private:
       // آپدیت گرافیکی لیبل روند (فقط در صورت تغییر و اگر نمایش فعال باشد)
       if(m_showDrawing && oldTrend != m_currentTrend)
       {
-         // رفع اخطار: ObjectDelete انتظار (long chart_id, int sub_window, const string name) دارد.
-         ObjectDelete(m_chartId, 0, m_trendObjectName);
+         ObjectDelete(m_chartId, m_trendObjectName);
          string trendText; color trendColor;
          switch(m_currentTrend)
          {
@@ -809,19 +823,23 @@ private:
             default: trendText = "No Trend / Ranging"; trendColor = clrGray; LogEvent("وضعیت روند به بدون روند تغییر یافت.", m_enableLogging, "[SMC]");
          }
          
-         // محاسبه موقعیت نمایش لیبل بر اساس تایم فریم 
+         // محاسبه موقعیت نمایش لیبل بر اساس تایم فریم (اصلاح خطای سینتکسی)
+         int tf_index = (int)m_timeframe;
+         // هر تایم فریم یک شیفت ثابت در YDITANCE دارد
          int y_offset = 20; 
-         // استفاده از switch/case به جای if/else پیچیده
-         switch(m_timeframe)
-         {
-             case PERIOD_M1:  case PERIOD_M5:  case PERIOD_M15: case PERIOD_M30: y_offset = 20; break;
-             case PERIOD_H1: y_offset = 40; break;
-             case PERIOD_H4: y_offset = 60; break;
-             case PERIOD_D1: y_offset = 80; break;
-             default: y_offset = 100;
-         }
+         if (tf_index == 1 || tf_index == 5 || tf_index == 15 || tf_index == 30) y_offset = 20; // M1-M30
+         else if (tf_index == 60) y_offset = 40; // H1
+         else if (tf_index == 240) y_offset = 60; // H4
+         else if (tf_index == 1440) y_offset = 80; // D1
+         else y_offset = 100;
+         
+         // جابجایی هر تایم فریم نسبت به تایم فریم‌های دیگر
+         int y_distance_base = 20;
+         int y_distance_per_tf = 18;
+         int y_position = y_distance_base + ((int)m_timeframe - (int)PERIOD_M1) * y_distance_per_tf;
 
          ObjectCreate(m_chartId, m_trendObjectName, OBJ_LABEL, 0, 0, 0);
+         // (اصلاح خطای تبدیل نوع ضمنی)
          ObjectSetString(m_chartId, m_trendObjectName, OBJPROP_TEXT, trendText + m_timeframeSuffix); 
          ObjectSetInteger(m_chartId, m_trendObjectName, OBJPROP_CORNER, CORNER_LEFT_UPPER);
          ObjectSetInteger(m_chartId, m_trendObjectName, OBJPROP_XDISTANCE, 10);
@@ -839,10 +857,8 @@ private:
    {
       string objName = (isHigh ? "H_" : "L_") + TimeToString(sp.time) + m_timeframeSuffix;
       string textName = objName + "_Text";
-      
-      // رفع اخطار: ObjectDelete انتظار (long chart_id, int sub_window, const string name) دارد.
-      ObjectDelete(m_chartId, 0, objName);
-      ObjectDelete(m_chartId, 0, textName);
+      ObjectDelete(m_chartId, objName);
+      ObjectDelete(m_chartId, textName);
 
       ObjectCreate(m_chartId, objName, OBJ_ARROW, 0, sp.time, sp.price);
       ObjectSetInteger(m_chartId, objName, OBJPROP_ARROWCODE, 77);
@@ -863,16 +879,14 @@ private:
        color breakColor = isCHoCH ? clrCrimson : (isHighBreak ? clrSeaGreen : clrOrange);
        string objName = "Break_" + TimeToString(brokenSwing.time) + m_timeframeSuffix;
        string textName = objName + "_Text";
-       
-       // رفع اخطار: ObjectDelete انتظار (long chart_id, int sub_window, const string name) دارد.
-       ObjectDelete(m_chartId, 0, objName);
-       ObjectDelete(m_chartId, 0, textName);
+       ObjectDelete(m_chartId, objName);
+       ObjectDelete(m_chartId, textName);
 
        ObjectCreate(m_chartId, objName, OBJ_TREND, 0, brokenSwing.time, brokenSwing.price, breakTime, brokenSwing.price);
        ObjectSetInteger(m_chartId, objName, OBJPROP_COLOR, breakColor);
        ObjectSetInteger(m_chartId, objName, OBJPROP_STYLE, STYLE_DOT);
 
-       // شیفت زمانی برای فاصله بیشتر از کندل (20% عرض کندل) 
+       // شیفت زمانی برای فاصله بیشتر از کندل (20% عرض کندل) - رفع خطای تبدیل نوع ضمنی
        datetime textTime = breakTime + (datetime)(PeriodSeconds(m_timeframe) * 0.2);
 
        ObjectCreate(m_chartId, textName, OBJ_TEXT, 0, textTime, breakPrice);
