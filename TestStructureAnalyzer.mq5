@@ -5,18 +5,17 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2025, Khajavi & Gemini"
 #property link      "https://www.google.com"
-#property version   "1.00"
+#property version   "1.01"
 #property description "تست کتابخانه MarketStructureLibrary با قابلیت MTF"
-#property indicator_separate_window
 
 #include <MarketStructureLibrary.mqh> // ایمپورت کتابخانه کلاس‌بندی شده
 
 //+------------------------------------------------------------------+
-//| ورودی‌های اکسپرت (Inputs)                                        |
+//| ورودی‌های اکسپرت (Inputs) - نامگذاری جدید برای جلوگیری از تداخل  |
 //+------------------------------------------------------------------+
-input bool enableLogging = true;    // [فعال/غیرفعال کردن] سیستم لاگ
-input int  fibUpdateLevel = 35;     // سطح اصلاح فیبو برای تایید
-input int  fractalLength = 10;      // طول فرکتال
+input bool Input_EnableLogging = true;    // [فعال/غیرفعال کردن] سیستم لاگ
+input int  Input_FibUpdateLevel = 35;     // سطح اصلاح فیبو برای تایید
+input int  Input_FractalLength = 10;      // طول فرکتال
 
 input ENUM_TIMEFRAMES MTF_Timeframe = PERIOD_H4; // تایم فریم دوم برای تحلیل MTF
 input bool ShowMTFDrawing = true;                 // نمایش ترسیمات تایم فریم دوم (MTF) روی چارت فعلی
@@ -52,12 +51,14 @@ bool IsNewBar()
 int OnInit()
 {
    // ۱. ساخت آبجکت‌های مربوط به تایم فریم چارت فعلی
-   Chart_Structure = new MarketStructure(_Symbol, _Period, ChartID(), enableLogging, true, fibUpdateLevel, fractalLength);
-   Chart_FVG = new FVGManager(_Symbol, _Period, ChartID(), enableLogging, true);
+   // (تنظیم نمایش Chart_Structure روی true و Chart_FVG روی true)
+   Chart_Structure = new MarketStructure(_Symbol, _Period, ChartID(), Input_EnableLogging, true, Input_FibUpdateLevel, Input_FractalLength);
+   Chart_FVG = new FVGManager(_Symbol, _Period, ChartID(), Input_EnableLogging, true);
    
    // ۲. ساخت آبجکت‌های مربوط به تایم فریم MTF
-   MTF_Structure = new MarketStructure(_Symbol, MTF_Timeframe, ChartID(), enableLogging, ShowMTFDrawing, fibUpdateLevel, fractalLength);
-   MTF_FVG = new FVGManager(_Symbol, MTF_Timeframe, ChartID(), enableLogging, ShowMTFDrawing);
+   // (تنظیم نمایش MTF بر اساس ورودی ShowMTFDrawing)
+   MTF_Structure = new MarketStructure(_Symbol, MTF_Timeframe, ChartID(), Input_EnableLogging, ShowMTFDrawing, Input_FibUpdateLevel, Input_FractalLength);
+   MTF_FVG = new FVGManager(_Symbol, MTF_Timeframe, ChartID(), Input_EnableLogging, ShowMTFDrawing);
    
    return(INIT_SUCCEEDED);
 }
@@ -67,7 +68,7 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
 {
-   // حذف آبجکت‌ها هنگام خاتمه اکسپرت (فراخوانی Destructor ها)
+   // حذف ایمن آبجکت‌ها 
    if (Chart_Structure != NULL) delete Chart_Structure;
    if (Chart_FVG != NULL) delete Chart_FVG;
    if (MTF_Structure != NULL) delete MTF_Structure;
@@ -82,27 +83,30 @@ void OnTick()
    bool chartRedrawNeeded = false;
    
    //--- ۱. اجرای منطق FVG در هر تیک (برای ابطال لحظه‌ای)
+   // این پردازش برای هر دو آبجکت اجرا می‌شود
    if (Chart_FVG != NULL && Chart_FVG.ProcessNewTick()) chartRedrawNeeded = true;
    if (MTF_FVG != NULL && MTF_FVG.ProcessNewTick()) chartRedrawNeeded = true;
    
    //--- ۲. اجرای منطق ساختار و FVG فقط در کلوز کندل جدید چارت فعلی
    if (IsNewBar())
    {
-      // پردازش ساختار و FVG برای تایم فریم چارت فعلی
+      // پردازش ساختار و FVG برای تایم فریم چارت فعلی (PERIOD_CURRENT)
       if (Chart_Structure != NULL && Chart_Structure.ProcessNewBar()) chartRedrawNeeded = true;
       if (Chart_FVG != NULL && Chart_FVG.ProcessNewBar()) chartRedrawNeeded = true;
 
-      // پردازش ساختار و FVG برای تایم فریم MTF (باید چک کنیم که کندل آن تایم فریم هم بسته شده باشد)
-      if (MTF_Structure != NULL && iTime(_Symbol, MTF_Timeframe, 1) > MTF_Structure.GetLastSwingHigh().time)
+      // پردازش ساختار و FVG برای تایم فریم MTF (مثلاً H4)
+      // شرط: اگر کندل جدیدی در تایم فریم MTF بسته شده باشد.
+      if (MTF_Structure != NULL && iTime(_Symbol, MTF_Timeframe, 1) > MTF_Structure.GetLastSwingLow().time && iTime(_Symbol, MTF_Timeframe, 1) > MTF_Structure.GetLastSwingHigh().time)
       {
          if (MTF_Structure.ProcessNewBar()) chartRedrawNeeded = true;
          if (MTF_FVG.ProcessNewBar()) chartRedrawNeeded = true;
       }
       
-      // مثال: استفاده از داده‌های MTF در اکسپرت
+      // مثال: دسترسی به اطلاعات ساختار H4
       if (MTF_Structure != NULL && MTF_Structure.GetCurrentTrend() == TREND_BULLISH)
       {
          // اینجا منطق معاملاتی بر اساس روند H4 (MTF) نوشته می‌شود.
+         // SwingPoint lastH4High = MTF_Structure.GetLastSwingHigh();
       }
    }
    
