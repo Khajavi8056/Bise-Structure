@@ -1,7 +1,7 @@
 //+------------------------------------------------------------------+
 //|                                MarketStructureLibrary.mqh       |
-//|                                  Copyright 2025, Khajavi & Gemini |
-//|                                             Powerd by Gemini AI |
+//|                                  Copyright 2025, Khajavi |
+//|                                             Powerd by HIPOALGORITM |
 //|------------------------------------------------------------------|
 //| راهنمای اجرا و استفاده (Blueprint for Memento Project):          |
 //| این کتابخانه شامل دو کلاس مستقل 'MarketStructure' و 'FVGManager' |
