@@ -1,3 +1,12 @@
+خطای زیر اصلاج و کد کامل را بازنویسی کنید
+
+variable expected	test structur.mq5	571	29
+   built-in: bool ArrayInsert(T&[...],const T&[...],uint,uint,uint)	test structur.mq5	571	7
+
+
+
+:code
+```mq5
 //+------------------------------------------------------------------+
 //|                                     MarketStructurePro_v5.4.mq5 |
 //|                                  Copyright 2025, Khajavi & Gemini |
@@ -823,3 +832,4 @@ void drawFVG(const FVG &fvg)
    ObjectSetInteger(0, textName, OBJPROP_SELECTABLE, false);
 }
 //+------------------------------------------------------------------+
+```
