@@ -3,8 +3,8 @@
 //|                             Copyright © 2010-2025, EarnForex.com |
 //|                                       https://www.earnforex.com/ |
 //+------------------------------------------------------------------+
-#property copyright "EarnForex.com"
-#property link      "https://www.earnforex.com/indicators/MarketProfile/"
+#property copyright "hipoalgorithm _khajavi"
+#property link      "indicator market profile hipoalgorithm"
 #property version   "1.24"
 
 #property description "Displays the Market Profile indicator. Supports the following sessions:"
@@ -3972,3 +3972,4 @@ int OnCalculateMain(const int rates_total, const int prev_calculated)
 }
 
 //+------------------------------------------------------------------+
+
