@@ -3970,4 +3970,5 @@ int OnCalculateMain(const int rates_total, const int prev_calculated)
 
     return rates_total;
 }
+
 //+------------------------------------------------------------------+
