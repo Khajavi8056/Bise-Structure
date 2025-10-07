@@ -1,3 +1,119 @@
+
+کدی نوشتی کامل نیست تمام پارا متر های ورودی وجود ندارد پس خطا میدهد
+'NULL' - expression of 'void' type is illegal	test structur.mq5	150	8
+من لیست تمام ورودی های اندیکاور اوردم انهارا به درستی در کد پیادهکن 
+
+
+
+
+input group "Main"
+input session_period Session                 = Daily;
+input datetime       StartFromDate           = __DATE__;        // StartFromDate: lower priority.
+input bool           StartFromCurrentSession = true;            // StartFromCurrentSession: higher priority.
+input int            SessionsToCount         = 2;               // SessionsToCount: Number of sessions to count Market Profile.
+input bool           SeamlessScrollingMode   = false;           // SeamlessScrollingMode: Show sessions on current screen.
+input bool           EnableDevelopingPOC     = false;           // Enable Developing POC
+input bool           EnableDevelopingVAHVAL  = false;           // Enable Developing VAH/VAL
+input int            ValueAreaPercentage     = 70;              // ValueAreaPercentage: Percentage of TPO's inside Value Area.
+
+input group "Colors and looks"
+input color_scheme   ColorScheme              = Blue_to_Red;
+input color          SingleColor              = clrBlue;        // SingleColor: if ColorScheme is set to Single Color.
+input bool           ColorBullBear            = false;          // ColorBullBear: If true, colors are from bars' direction.
+input color          MedianColor              = clrWhite;
+input color          ValueAreaSidesColor      = clrWhite;
+input color          ValueAreaHighLowColor    = clrWhite;
+input ENUM_LINE_STYLE MedianStyle             = STYLE_SOLID;
+input ENUM_LINE_STYLE MedianRayStyle          = STYLE_DASH;
+input ENUM_LINE_STYLE ValueAreaSidesStyle     = STYLE_SOLID;
+input ENUM_LINE_STYLE ValueAreaHighLowStyle   = STYLE_SOLID;
+input ENUM_LINE_STYLE ValueAreaRayHighLowStyle= STYLE_DOT;
+input int            MedianWidth              = 1;
+input int            MedianRayWidth           = 1;
+input int            ValueAreaSidesWidth      = 1;
+input int            ValueAreaHighLowWidth    = 1;
+input int            ValueAreaRayHighLowWidth = 1;
+input sessions_to_draw_rays ShowValueAreaRays = None;           // ShowValueAreaRays: draw previous value area high/low rays.
+input sessions_to_draw_rays ShowMedianRays    = None;           // ShowMedianRays: draw previous median rays.
+input ways_to_stop_rays RaysUntilIntersection = Stop_No_Rays;   // RaysUntilIntersection: which rays stop when hit another MP.
+input bool           HideRaysFromInvisibleSessions = false;     // HideRaysFromInvisibleSessions: hide rays from behind the screen.
+input int            TimeShiftMinutes         = 0;              // TimeShiftMinutes: shift session + to the left, - to the right.
+input bool           ShowKeyValues            = true;           // ShowKeyValues: print out VAH, VAL, POC on chart.
+input color          KeyValuesColor           = clrWhite;       // KeyValuesColor: color for VAH, VAL, POC printout.
+input int            KeyValuesSize            = 8;              // KeyValuesSize: font size for VAH, VAL, POC printout.
+input single_print_type ShowSinglePrint       = No;             // ShowSinglePrint: mark Single Print profile levels.
+input bool           SinglePrintRays          = false;          // SinglePrintRays: mark Single Print edges with rays.
+input color          SinglePrintColor         = clrGold;
+input ENUM_LINE_STYLE SinglePrintRayStyle     = STYLE_SOLID;
+input int            SinglePrintRayWidth      = 1;
+input color          ProminentMedianColor     = clrYellow;
+input ENUM_LINE_STYLE ProminentMedianStyle    = STYLE_SOLID;
+input int            ProminentMedianWidth     = 4;
+input bool           ShowTPOCounts            = false;          // ShowTPOCounts: Show TPO counts above/below POC.
+input color          TPOCountAboveColor       = clrHoneydew;    // TPOCountAboveColor: Color for TPO count above POC.
+input color          TPOCountBelowColor       = clrMistyRose;   // TPOCountBelowColor: Color for TPO count below POC.
+input bool           RightToLeft              = false;          // RightToLeft: Draw histogram from right to left.
+
+input group "Performance"
+input int            PointMultiplier          = 0;      // PointMultiplier: higher value = fewer objects. 0 - adaptive.
+input int            ThrottleRedraw           = 0;      // ThrottleRedraw: delay (in seconds) for updating Market Profile.
+input bool           DisableHistogram         = false;  // DisableHistogram: do not draw profile, VAH, VAL, and POC still visible.
+
+input group "Alerts"
+input bool           AlertNative              = false;           // AlertNative: issue native pop-up alerts.
+input bool           AlertEmail               = false;           // AlertEmail: issue email alerts.
+input bool           AlertPush                = false;           // AlertPush: issue push-notification alerts.
+input bool           AlertArrows              = false;           // AlertArrows: draw chart arrows on alerts.
+input alert_check_bar AlertCheckBar           = CheckPreviousBar;// AlertCheckBar: which bar to check for alerts?
+input bool           AlertForValueArea        = false;           // AlertForValueArea: alerts for Value Area (VAH, VAL) rays.
+input bool           AlertForMedian           = false;           // AlertForMedian: alerts for POC (Median) rays' crossing.
+input bool           AlertForSinglePrint      = false;           // AlertForSinglePrint: alerts for single print rays' crossing.
+input bool           AlertOnPriceBreak        = false;           // AlertOnPriceBreak: price breaking above/below the ray.
+input bool           AlertOnCandleClose       = false;           // AlertOnCandleClose: candle closing above/below the ray.
+input bool           AlertOnGapCross          = false;           // AlertOnGapCross: bar gap above/below the ray.
+input int            AlertArrowCodePB         = 108;             // AlertArrowCodePB: arrow code for price break alerts.
+input int            AlertArrowCodeCC         = 110;             // AlertArrowCodeCC: arrow code for candle close alerts.
+input int            AlertArrowCodeGC         = 117;             // AlertArrowCodeGC: arrow code for gap crossover alerts.
+input color          AlertArrowColorPB        = clrRed;          // AlertArrowColorPB: arrow color for price break alerts.
+input color          AlertArrowColorCC        = clrBlue;         // AlertArrowColorCC: arrow color for candle close alerts.
+input color          AlertArrowColorGC        = clrYellow;       // AlertArrowColorGC: arrow color for gap crossover alerts.
+input int            AlertArrowWidthPB        = 1;               // AlertArrowWidthPB: arrow width for price break alerts.
+input int            AlertArrowWidthCC        = 1;               // AlertArrowWidthCC: arrow width for candle close alerts.
+input int            AlertArrowWidthGC        = 1;               // AlertArrowWidthGC: arrow width for gap crossover alerts.
+
+input group "Intraday settings"
+input bool           EnableIntradaySession1      = true;
+input string         IntradaySession1StartTime   = "00:00";
+input string         IntradaySession1EndTime     = "06:00";
+input color_scheme   IntradaySession1ColorScheme = Blue_to_Red;
+
+input bool           EnableIntradaySession2      = true;
+input string         IntradaySession2StartTime   = "06:00";
+input string         IntradaySession2EndTime     = "12:00";
+input color_scheme   IntradaySession2ColorScheme = Red_to_Green;
+
+input bool           EnableIntradaySession3      = true;
+input string         IntradaySession3StartTime   = "12:00";
+input string         IntradaySession3EndTime     = "18:00";
+input color_scheme   IntradaySession3ColorScheme = Green_to_Blue;
+
+input bool           EnableIntradaySession4      = true;
+input string         IntradaySession4StartTime   = "18:00";
+input string         IntradaySession4EndTime     = "00:00";
+input color_scheme   IntradaySession4ColorScheme = Yellow_to_Cyan;
+
+input group "Miscellaneous"
+input sat_sun_solution SaturdaySunday                 = Saturday_Sunday_Normal_Days;
+input bool             DisableAlertsOnWrongTimeframes = false;  // Disable alerts on wrong timeframes.
+input int              ProminentMedianPercentage      = 101;    // Percentage of Median TPOs out of total for a Prominent one.
+
+
+
+
+کد که سری قبل فرستادی رو در زیر میارم لطفا به درستی اصلاح کن تا کد بدون نقص و کامل باشد
+
+
+
 //+------------------------------------------------------------------+
 //|                                        MementoTestEA.mq5         |
 //|                                  Copyright 2025, Khajavi |
