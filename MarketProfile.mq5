@@ -1,3 +1,144 @@
+
+ProfleMarket.mqh			
+'OnTimer' - function already defined and has body	ProfleMarket.mqh	1782	22
+   see declaration of function 'CMarketProfile::OnTimer'	ProfleMarket.mqh	313	10
+'OnChartEvent' - function already defined and has body	ProfleMarket.mqh	1834	22
+   see declaration of function 'CMarketProfile::OnChartEvent'	ProfleMarket.mqh	328	10
+'SaveSettingsOnDisk' - function already defined and has body	ProfleMarket.mqh	2119	22
+   see declaration of function 'CMarketProfile::SaveSettingsOnDisk'	ProfleMarket.mqh	322	10
+'LoadSettingsFromDisk' - function already defined and has body	ProfleMarket.mqh	2146	22
+   see declaration of function 'CMarketProfile::LoadSettingsFromDisk'	ProfleMarket.mqh	323	10
+'DeleteSettingsFile' - function already defined and has body	ProfleMarket.mqh	2187	22
+   see declaration of function 'CMarketProfile::DeleteSettingsFile'	ProfleMarket.mqh	324	10
+'TimeHour' - function already defined and has body	ProfleMarket.mqh	2203	21
+   see declaration of function 'CMarketProfile::TimeHour'	ProfleMarket.mqh	294	9
+'TimeMinute' - function already defined and has body	ProfleMarket.mqh	2213	21
+   see declaration of function 'CMarketProfile::TimeMinute'	ProfleMarket.mqh	295	9
+'TimeDay' - function already defined and has body	ProfleMarket.mqh	2223	21
+   see declaration of function 'CMarketProfile::TimeDay'	ProfleMarket.mqh	296	9
+'TimeDayOfWeek' - function already defined and has body	ProfleMarket.mqh	2233	21
+   see declaration of function 'CMarketProfile::TimeDayOfWeek'	ProfleMarket.mqh	297	9
+'TimeDayOfYear' - function already defined and has body	ProfleMarket.mqh	2243	21
+   see declaration of function 'CMarketProfile::TimeDayOfYear'	ProfleMarket.mqh	298	9
+'TimeMonth' - function already defined and has body	ProfleMarket.mqh	2253	21
+   see declaration of function 'CMarketProfile::TimeMonth'	ProfleMarket.mqh	299	9
+'TimeYear' - function already defined and has body	ProfleMarket.mqh	2263	21
+   see declaration of function 'CMarketProfile::TimeYear'	ProfleMarket.mqh	300	9
+'TimeAbsoluteDay' - function already defined and has body	ProfleMarket.mqh	2273	21
+   see declaration of function 'CMarketProfile::TimeAbsoluteDay'	ProfleMarket.mqh	301	9
+'CheckRays' - function already defined and has body	ProfleMarket.mqh	2281	22
+   see declaration of function 'CMarketProfile::CheckRays'	ProfleMarket.mqh	302	10
+'DeleteArrowsByPrefix' - function already defined and has body	ProfleMarket.mqh	2533	22
+   see declaration of function 'CMarketProfile::DeleteArrowsByPrefix'	ProfleMarket.mqh	315	10
+'FindAtLeastOneArrowForRay' - function already defined and has body	ProfleMarket.mqh	2543	22
+   see declaration of function 'CMarketProfile::FindAtLeastOneArrowForRay'	ProfleMarket.mqh	316	10
+'CheckHistoricalArrowsForNonMPSP…' - function already defined and has body	ProfleMarket.mqh	2557	22
+   see declaration of function 'CMarketProfile::CheckHistoricalArrowsForNonMPSPRRays'	ProfleMarket.mqh	317	10
+'CheckAndDrawArrow' - function already defined and has body	ProfleMarket.mqh	2574	22
+   see declaration of function 'CMarketProfile::CheckAndDrawArrow'	ProfleMarket.mqh	318	10
+'CreateArrowObject' - function already defined and has body	ProfleMarket.mqh	2605	22
+   see declaration of function 'CMarketProfile::CreateArrowObject'	ProfleMarket.mqh	319	10
+'CheckRayIntersections' - function already defined and has body	ProfleMarket.mqh	2620	22
+   see declaration of function 'CMarketProfile::CheckRayIntersections'	ProfleMarket.mqh	320	10
+'DeleteArrowsByPrefix' - function already defined and has body	ProfleMarket.mqh	4290	22
+   see declaration of function 'CMarketProfile::DeleteArrowsByPrefix'	ProfleMarket.mqh	315	10
+'FindAtLeastOneArrowForRay' - function already defined and has body	ProfleMarket.mqh	4300	22
+   see declaration of function 'CMarketProfile::FindAtLeastOneArrowForRay'	ProfleMarket.mqh	316	10
+'CheckHistoricalArrowsForNonMPSP…' - function already defined and has body	ProfleMarket.mqh	4314	22
+   see declaration of function 'CMarketProfile::CheckHistoricalArrowsForNonMPSPRRays'	ProfleMarket.mqh	317	10
+'CheckAndDrawArrow' - function already defined and has body	ProfleMarket.mqh	4331	22
+   see declaration of function 'CMarketProfile::CheckAndDrawArrow'	ProfleMarket.mqh	318	10
+'CreateArrowObject' - function already defined and has body	ProfleMarket.mqh	4362	22
+   see declaration of function 'CMarketProfile::CreateArrowObject'	ProfleMarket.mqh	319	10
+'CheckRayIntersections' - function already defined and has body	ProfleMarket.mqh	4377	22
+   see declaration of function 'CMarketProfile::CheckRayIntersections'	ProfleMarket.mqh	320	10
+undeclared identifier	ProfleMarket.mqh	1946	11
+undeclared identifier	ProfleMarket.mqh	1946	50
+'m_settings' - access to non-static member or function	ProfleMarket.mqh	1946	153
+   see declaration of variable 'CMarketProfile::m_settings'	ProfleMarket.mqh	194	28
+'m_settings' - access to non-static member or function	ProfleMarket.mqh	1946	208
+   see declaration of variable 'CMarketProfile::m_settings'	ProfleMarket.mqh	194	28
+'m_settings' - access to non-static member or function	ProfleMarket.mqh	1946	247
+   see declaration of variable 'CMarketProfile::m_settings'	ProfleMarket.mqh	194	28
+cannot convert parameter 'CMarketProfile::CRectangleMP&' to 'CMarketProfile::CRectangleMP*'	ProfleMarket.mqh	1946	353
+   bool CMarketProfile::ProcessSession(const int,const int,const int,const int,CMarketProfile::CRectangleMP*)	ProfleMarket.mqh	292	10
+variable already defined	ProfleMarket.mqh	2772	13
+   see declaration of variable 'CMarketProfile::"int CMarketProfile::FindYearStart(const int,const int)"::un#ffdf80ee::un#ffdf80ef::time_x_day_of_year'	ProfleMarket.mqh	2763	13
+undeclared identifier	ProfleMarket.mqh	3557	5
+undeclared identifier	ProfleMarket.mqh	3558	9
+undeclared identifier	ProfleMarket.mqh	3559	32
+'index' - integer expression expected	ProfleMarket.mqh	3559	32
+undeclared identifier	ProfleMarket.mqh	3567	9
+undeclared identifier	ProfleMarket.mqh	3569	56
+'index' - integer expression expected	ProfleMarket.mqh	3569	56
+undeclared identifier	ProfleMarket.mqh	3571	37
+'index' - integer expression expected	ProfleMarket.mqh	3571	37
+undeclared identifier	ProfleMarket.mqh	3586	5
+undeclared identifier	ProfleMarket.mqh	3595	47
+undeclared identifier	ProfleMarket.mqh	3600	33
+undeclared identifier	ProfleMarket.mqh	3694	13
+undeclared identifier	ProfleMarket.mqh	3695	42
+'index' - integer expression expected	ProfleMarket.mqh	3695	42
+undeclared identifier	ProfleMarket.mqh	3700	13
+undeclared identifier	ProfleMarket.mqh	3701	42
+'index' - integer expression expected	ProfleMarket.mqh	3701	42
+check operator precedence for possible error; use parentheses to clarify precedence	ProfleMarket.mqh	3909	61
+';' - unexpected token	ProfleMarket.mqh	3913	39
+'{' - some operator expected	ProfleMarket.mqh	3912	21
+'(' - unbalanced left parenthesis	ProfleMarket.mqh	3908	28
+illegal 'else' without matching 'if'	ProfleMarket.mqh	3945	13
+'}' - not all control paths return a value	ProfleMarket.mqh	3955	1
+undeclared identifier	ProfleMarket.mqh	4040	25
+undeclared identifier	ProfleMarket.mqh	4042	47
+'[' - array required	ProfleMarket.mqh	4042	67
+undeclared identifier	ProfleMarket.mqh	4043	25
+'[' - array required	ProfleMarket.mqh	4043	46
+implicit conversion from 'unknown' to 'string'	ProfleMarket.mqh	4043	25
+undeclared identifier	ProfleMarket.mqh	4046	13
+'_Session' - cannot convert enum	ProfleMarket.mqh	4046	13
+undeclared identifier	ProfleMarket.mqh	4046	47
+'[' - array required	ProfleMarket.mqh	4046	56
+implicit conversion from 'unknown' to 'string'	ProfleMarket.mqh	4046	47
+undeclared identifier	ProfleMarket.mqh	4049	14
+undeclared identifier	ProfleMarket.mqh	4049	49
+undeclared identifier	ProfleMarket.mqh	4056	108
+'[' - array required	ProfleMarket.mqh	4056	128
+undeclared identifier	ProfleMarket.mqh	4060	76
+undeclared identifier	ProfleMarket.mqh	4065	15
+'ShowMedianRays' - cannot convert enum	ProfleMarket.mqh	4065	15
+undeclared identifier	ProfleMarket.mqh	4065	50
+undeclared identifier	ProfleMarket.mqh	4066	16
+'ShowMedianRays' - cannot convert enum	ProfleMarket.mqh	4066	16
+undeclared identifier	ProfleMarket.mqh	4066	48
+'ShowMedianRays' - cannot convert enum	ProfleMarket.mqh	4066	48
+undeclared identifier	ProfleMarket.mqh	4066	88
+undeclared identifier	ProfleMarket.mqh	4067	16
+'ShowMedianRays' - cannot convert enum	ProfleMarket.mqh	4067	16
+undeclared identifier	ProfleMarket.mqh	4067	47
+'ShowMedianRays' - cannot convert enum	ProfleMarket.mqh	4067	47
+undeclared identifier	ProfleMarket.mqh	4067	87
+undeclared identifier	ProfleMarket.mqh	4068	14
+'ShowMedianRays' - cannot convert enum	ProfleMarket.mqh	4068	14
+undeclared identifier	ProfleMarket.mqh	4074	20
+undeclared identifier	ProfleMarket.mqh	4079	105
+'[' - array required	ProfleMarket.mqh	4079	125
+undeclared identifier	ProfleMarket.mqh	4080	110
+undeclared identifier	ProfleMarket.mqh	4081	110
+undeclared identifier	ProfleMarket.mqh	4082	110
+undeclared identifier	ProfleMarket.mqh	4085	26
+undeclared identifier	ProfleMarket.mqh	4085	48
+undeclared identifier	ProfleMarket.mqh	4085	72
+'_Session' - cannot convert enum	ProfleMarket.mqh	4085	72
+undeclared identifier	ProfleMarket.mqh	4100	92
+'[' - array required	ProfleMarket.mqh	4100	112
+undeclared identifier	ProfleMarket.mqh	4108	16
+'ShowMedianRays' - cannot convert enum	ProfleMarket.mqh	4108	16
+105 errors, 3 warnings		99	3
+
+
+
+```mqh
+
 //+------------------------------------------------------------------+
 //|                                         MarketProfileClass.mqh   |
 //|                             Copyright © 2010-2025, EarnForex.com |
@@ -4393,3 +4534,5 @@ void CMarketProfile::CheckRayIntersections(const string object, const int start_
 //+------------------------------------------------------------------+
 //| The end of the class.                                            |
 //+------------------------------------------------------------------+
+
+```
