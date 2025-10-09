@@ -1128,28 +1128,35 @@ void CMarketProfile::InitializeOnetick()
 //| SaveSettingsOnDisk                                               |
 //+------------------------------------------------------------------+
 bool CMarketProfile::SaveSettingsOnDisk()
+
 {
     int fh = FileOpen("MP_Settings\\" + m_FileName, FILE_CSV | FILE_WRITE);
     if (fh == INVALID_HANDLE)
     {
-        Print("باز کردن فایل برای نوشتن شکست خورد: MP_Settings\\" + m_FileName + ". خطا: " + IntegerToString(GetLastError()));
+        Print("Failed to open file for writing: MP_Settings\\" + m_FileName + ". Error: " + IntegerToString(GetLastError()));
         return false;
     }
 
+    // Order does not matter.
     FileWrite(fh, "Session");
     FileWrite(fh, IntegerToString(_Session));
 
-    if (GlobalVariableGet("MP-" + IntegerToString(_ChartID) + "-Parameters") > 0)
+    // These are not part of settings but are input parameters.
+    // When the indicator is reloaded due to its input parameters change, these should be compared to the new values.
+    // If the value is changed, it should be updated in the variables too.
+    // Is the indicator reloading due to the input parameters change?
+    if (GlobalVariableGet("MP-" + IntegerToString(ChartID()) + "-Parameters") > 0)
     {
         FileWrite(fh, "Parameter_Session");
-        FileWrite(fh, IntegerToString(m_settings.Session));
+        FileWrite(fh, IntegerToString(Session));
     }
 
     FileClose(fh);
 
-    Print("تنظیمات در فایل ذخیره شد.");
+    Print("Settings saved to file.");
     return true;
 }
+
 
 //+------------------------------------------------------------------+
 //| LoadSettingsFromDisk                                             |
@@ -1658,8 +1665,8 @@ void CMarketProfile::CalculateDevelopingPOCVAHVAL(const int sessionstart, const 
 
         if (_Session == Rectangle)
         {
-            if (LocalMax > rectangle->RectanglePriceMax) LocalMax = NormalizeDouble(rectangle->RectanglePriceMax, DigitsM);
-            if (LocalMin < rectangle->RectanglePriceMin) LocalMin = NormalizeDouble(rectangle->RectanglePriceMin, DigitsM);
+            if (LocalMax > rectangle.RectanglePriceMax) LocalMax = NormalizeDouble(rectangle.RectanglePriceMax, DigitsM);
+            if (LocalMin < rectangle.RectanglePriceMin) LocalMin = NormalizeDouble(rectangle.RectanglePriceMin, DigitsM);
         }
 
         double DistanceToCenter = DBL_MAX;
@@ -1876,14 +1883,14 @@ void CMarketProfile::OnChartEvent(const int id, const long& lparam, const double
 //+------------------------------------------------------------------+
 void CMarketProfile::CRectangleMP::Process(int i, const int rates_total, CMarketProfile* parent)
 {
-    double p1 = ObjectGetDouble(parent->_ChartID, name, OBJPROP_PRICE, 0);
-    double p2 = ObjectGetDouble(parent->_ChartID, name, OBJPROP_PRICE, 1);
+    double p1 = ObjectGetDouble(parent._ChartID, name, OBJPROP_PRICE, 0);
+    double p2 = ObjectGetDouble(parent._ChartID, name, OBJPROP_PRICE, 1);
 
     if (Number == -1) Number = i;
 
     // محاسبه زمان و قیمت واقعی مرزهای جلسه مستطیل.
-    int sessionstart = iBarShift(parent->_Symbol, parent->_Timeframe, (datetime)MathMin(t1, t2), true);
-    int sessionend = iBarShift(parent->_Symbol, parent->_Timeframe, (datetime)MathMax(t1, t2), true);
+    int sessionstart = iBarShift(parent._Symbol, parent._Timeframe, (datetime)MathMin(t1, t2), true);
+    int sessionend = iBarShift(parent._Symbol, parent._Timeframe, (datetime)MathMax(t1, t2), true);
 
     bool rectangle_changed = false;
     bool rectangle_time_changed = false;
@@ -1907,11 +1914,11 @@ void CMarketProfile::CRectangleMP::Process(int i, const int rates_total, CMarket
     {
         if (rectangle_price_changed)
         {
-            int max_index = iHighest(parent->_Symbol, parent->_Timeframe, MODE_HIGH, sessionstart - sessionend, sessionend);
-            int min_index = iLowest(parent->_Symbol, parent->_Timeframe, MODE_LOW, sessionstart - sessionend, sessionend);
+            int max_index = iHighest(parent._Symbol, parent._Timeframe, MODE_HIGH, sessionstart - sessionend, sessionend);
+            int min_index = iLowest(parent._Symbol, parent._Timeframe, MODE_LOW, sessionstart - sessionend, sessionend);
             if ((max_index != -1) && (min_index != -1))
             {
-                if ((RectanglePriceMax > iHigh(parent->_Symbol, parent->_Timeframe, max_index)) && (RectanglePriceMin < iLow(parent->_Symbol, parent->_Timeframe, min_index)) && (prev_RectanglePriceMax > iHigh(parent->_Symbol, parent->_Timeframe, max_index)) && (prev_RectanglePriceMin < iLow(parent->_Symbol, parent->_Timeframe, min_index))) rectangle_changed_and_recalc_is_due = false;
+                if ((RectanglePriceMax > iHigh(parent._Symbol, parent._Timeframe, max_index)) && (RectanglePriceMin < iLow(parent._Symbol, parent._Timeframe, min_index)) && (prev_RectanglePriceMax > iHigh(parent._Symbol, parent._Timeframe, max_index)) && (prev_RectanglePriceMin < iLow(parent._Symbol, parent._Timeframe, min_index))) rectangle_changed_and_recalc_is_due = false;
                 else
                 {
                     need_to_clean_up_dots = true;
@@ -1929,14 +1936,14 @@ void CMarketProfile::CRectangleMP::Process(int i, const int rates_total, CMarket
     prev_RectanglePriceMax = RectanglePriceMax;
     prev_RectanglePriceMin = RectanglePriceMin;
 
-    if (need_to_clean_up_dots) parent->ObjectCleanup(name + "_");
+    if (need_to_clean_up_dots) parent.ObjectCleanup(name + "_");
     if (sessionstart < 0) return;
 
-    parent->RememberSessionStart[i] = RectangleTimeMin;
-    if (iTime(parent->_Symbol, parent->_Timeframe, 0) < RectangleTimeMax) parent->RememberSessionEnd[i] = iTime(parent->_Symbol, parent->_Timeframe, 0);
-    else parent->RememberSessionEnd[i] = RectangleTimeMax;
+    parent.RememberSessionStart[i] = RectangleTimeMin;
+    if (iTime(parent._Symbol, parent._Timeframe, 0) < RectangleTimeMax) parent.RememberSessionEnd[i] = iTime(parent._Symbol, parent._Timeframe, 0);
+    else parent.RememberSessionEnd[i] = RectangleTimeMax;
 
-    if ((!new_bars_are_not_within_rectangle) || (current_bar_changed_within_boundaries) || (rectangle_changed_and_recalc_is_due) || ((Number != i) && ((m_settings.RaysUntilIntersection != Stop_No_Rays) && ((m_settings.ShowMedianRays != None) || (m_settings.ShowValueAreaRays != None))))) parent->ProcessSession(sessionstart, sessionend, i, rates_total, this);
+    if ((!new_bars_are_not_within_rectangle) || (current_bar_changed_within_boundaries) || (rectangle_changed_and_recalc_is_due) || ((Number != i) && ((m_settings.RaysUntilIntersection != Stop_No_Rays) && ((m_settings.ShowMedianRays != None) || (m_settings.ShowValueAreaRays != None))))) parent.ProcessSession(sessionstart, sessionend, i, rates_total, this);
 
     Number = i;
 }
@@ -3339,9 +3346,9 @@ bool CMarketProfile::ProcessSession(const int sessionstart, const int sessionend
 
     if (_Session == Rectangle)
     {
-        rectangle_prefix = rectangle->name + "_";
-        if (SessionMax > rectangle->RectanglePriceMax) SessionMax = NormalizeDouble(rectangle->RectanglePriceMax, DigitsM);
-        if (SessionMin < rectangle->RectanglePriceMin) SessionMin = NormalizeDouble(rectangle->RectanglePriceMin, DigitsM);
+        rectangle_prefix = rectangle.name + "_";
+        if (SessionMax > rectangle.RectanglePriceMax) SessionMax = NormalizeDouble(rectangle.RectanglePriceMax, DigitsM);
+        if (SessionMin < rectangle.RectanglePriceMin) SessionMin = NormalizeDouble(rectangle.RectanglePriceMin, DigitsM);
     }
     else
     {
@@ -3424,7 +3431,7 @@ bool CMarketProfile::ProcessSession(const int sessionstart, const int sessionend
     {
         int dummy_subwindow;
         double dummy_price;
-        if (_Session == Rectangle) converted_time = rectangle->RectangleTimeMax;
+        if (_Session == Rectangle) converted_time = rectangle.RectangleTimeMax;
         else ChartXYToTimePrice(_ChartID, (int)ChartGetInteger(_ChartID, CHART_WIDTH_IN_PIXELS), 0, dummy_subwindow, converted_time, dummy_price);
     }
 
