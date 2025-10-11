@@ -27,7 +27,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2025, Khajavi _ HipoAlgoritm"
 #property link      "https://www.HipoAlgoritm.com"
-#property version   "1.61" // نسخه اصلاح خطاها
+#property version   "1.62" // نسخه بهینه‌سازی شده برای هماهنگی با PatternManager
 
 //+------------------------------------------------------------------+
 //| ساختارهای داده و شمارنده‌ها (Structs & Enums)                     |
@@ -66,22 +66,22 @@ enum TREND_TYPE
 //--- تابع تبدیل تایم فریم Enum به رشته کوتاه (مثلاً PERIOD_H4 به "4H")
 string TimeFrameToStringShort(ENUM_TIMEFRAMES tf)
 {
-    switch(tf)
-    {
-        case PERIOD_M1:  return "1M";
-        case PERIOD_M5:  return "5M";
-        case PERIOD_M15: return "15M";
-        case PERIOD_M30: return "30M";
-        case PERIOD_H1:  return "1H";
-        case PERIOD_H4:  return "4H";
-        case PERIOD_D1:  return "1D";
-        case PERIOD_W1:  return "1W";
-        case PERIOD_MN1: return "1M";
-        default: return EnumToString(tf);
-    }
+   switch(tf)
+   {
+      case PERIOD_M1:  return "1M";
+      case PERIOD_M5:  return "5M";
+      case PERIOD_M15: return "15M";
+      case PERIOD_M30: return "30M";
+      case PERIOD_H1:  return "1H";
+      case PERIOD_H4:  return "4H";
+      case PERIOD_D1:  return "1D";
+      case PERIOD_W1:  return "1W";
+      case PERIOD_MN1: return "1M";
+      default: return EnumToString(tf);
+   }
 }
 
-//--- تابع کمکی برای لاگ‌گیری (با رفع خطای تبدیل نوع)
+//--- تابع کمکی برای لاگ‌گیری
 void LogEvent(const string message, const bool enabled, const string prefix = "")
 {
    if(enabled)
@@ -89,7 +89,6 @@ void LogEvent(const string message, const bool enabled, const string prefix = ""
       Print(prefix, message);
    }
 }
-
 
 //==================================================================//
 //                   کلاس ۲: مدیریت FVG (FVGManager)                  //
@@ -118,7 +117,6 @@ public:
       m_symbol = symbol;
       m_timeframe = timeframe;
       m_chartId = chartId;
-      // اصلاح هشدار 'hiding global variable' با استفاده از نام ورودی متفاوت
       m_enableLogging = enableLogging_in;
       m_showDrawing = showDrawing;
       
@@ -195,9 +193,9 @@ public:
          {
             if (m_showDrawing)
             {
-                string objName = "FVG_" + TimeToString(m_fvgArray[i].time) + "_" + typeStr + m_timeframeSuffix;
-                ObjectDelete(m_chartId, objName);
-                ObjectDelete(m_chartId, objName + "_Text");
+               string objName = "FVG_" + TimeToString(m_fvgArray[i].time) + "_" + typeStr + m_timeframeSuffix;
+               ObjectDelete(m_chartId, objName);
+               ObjectDelete(m_chartId, objName + "_Text");
             }
             LogEvent("FVG از نوع " + typeStr + " در زمان " + TimeToString(m_fvgArray[i].time) + " ابطال و حذف شد.", m_enableLogging, "[FVG]");
 
@@ -265,27 +263,27 @@ private:
       // FVG صعودی: Low1 > High3
       if (low1 > high3)
       {
-          double fvgSize = low1 - high3;
-          if (fvgSize < 0.5 * body2) return false; // فیلتر: اندازه FVG >= 50% بدنه کندل میانی
+         double fvgSize = low1 - high3;
+         if (fvgSize < 0.5 * body2) return false; // فیلتر: اندازه FVG >= 50% بدنه کندل میانی
 
-          // فیلتر: جلوگیری از ثبت FVG تکراری
-          for(int j=0; j<ArraySize(m_fvgArray); j++) { if(m_fvgArray[j].time == iTime(m_symbol, m_timeframe, i) && m_fvgArray[j].isBullish) return false; } 
+         // فیلتر: جلوگیری از ثبت FVG تکراری
+         for(int j=0; j<ArraySize(m_fvgArray); j++) { if(m_fvgArray[j].time == iTime(m_symbol, m_timeframe, i) && m_fvgArray[j].isBullish) return false; } 
 
-          AddFVG(true, high3, low1, iTime(m_symbol, m_timeframe, i)); // Low قیمت بالا و High قیمت پایین زون FVG است
-          return true;
+         AddFVG(true, high3, low1, iTime(m_symbol, m_timeframe, i)); // Low قیمت بالا و High قیمت پایین زون FVG است
+         return true;
       }
 
       // FVG نزولی: High1 < Low3
       if (high1 < low3)
       {
-          double fvgSize = low3 - high1;
-          if (fvgSize < 0.5 * body2) return false; // فیلتر: اندازه FVG >= 50% بدنه کندل میانی
+         double fvgSize = low3 - high1;
+         if (fvgSize < 0.5 * body2) return false; // فیلتر: اندازه FVG >= 50% بدنه کندل میانی
 
-          // فیلتر: جلوگیری از ثبت FVG تکراری
-          for(int j=0; j<ArraySize(m_fvgArray); j++) { if(m_fvgArray[j].time == iTime(m_symbol, m_timeframe, i) && !m_fvgArray[j].isBullish) return false; } 
+         // فیلتر: جلوگیری از ثبت FVG تکراری
+         for(int j=0; j<ArraySize(m_fvgArray); j++) { if(m_fvgArray[j].time == iTime(m_symbol, m_timeframe, i) && !m_fvgArray[j].isBullish) return false; } 
 
-          AddFVG(false, low3, high1, iTime(m_symbol, m_timeframe, i)); // Low قیمت بالا و High قیمت پایین زون FVG است
-          return true;
+         AddFVG(false, low3, high1, iTime(m_symbol, m_timeframe, i)); // Low قیمت بالا و High قیمت پایین زون FVG است
+         return true;
       }
 
       return false;
@@ -301,9 +299,9 @@ private:
          string typeStrOld = m_fvgArray[lastIndex].isBullish ? "Bullish" : "Bearish";
          if (m_showDrawing)
          {
-             string objNameOld = "FVG_" + TimeToString(m_fvgArray[lastIndex].time) + "_" + typeStrOld + m_timeframeSuffix;
-             ObjectDelete(m_chartId, objNameOld);
-             ObjectDelete(m_chartId, objNameOld + "_Text");
+            string objNameOld = "FVG_" + TimeToString(m_fvgArray[lastIndex].time) + "_" + typeStrOld + m_timeframeSuffix;
+            ObjectDelete(m_chartId, objNameOld);
+            ObjectDelete(m_chartId, objNameOld + "_Text");
          }
          ArrayRemove(m_fvgArray, lastIndex, 1);
       }
@@ -325,7 +323,7 @@ private:
       }
       else
       {
-          LogEvent("خطا: نتوانست FVG جدید را در آرایه درج کند.", m_enableLogging, "[FVG]");
+         LogEvent("خطا: نتوانست FVG جدید را در آرایه درج کند.", m_enableLogging, "[FVG]");
       }
    }
    
@@ -346,7 +344,6 @@ private:
          datetime midTime = m_fvgArray[i].time + (currentTime - m_fvgArray[i].time) / 2;
          double midPrice = (m_fvgArray[i].highPrice + m_fvgArray[i].lowPrice) / 2;
 
-         // جابجایی متن (رفع خطای تبدیل نوع ضمنی)
          ObjectMove(m_chartId, textName, 0, midTime, midPrice);
       }
    }
@@ -373,7 +370,7 @@ private:
       datetime midTime = fvg.time + (currentTime - fvg.time) / 2;
       double midPrice = (fvg.highPrice + fvg.lowPrice) / 2;
 
-      // ایجاد متن FVG با پسوند تایم فریم (رفع خطای تبدیل نوع ضمنی)
+      // ایجاد متن FVG با پسوند تایم فریم
       ObjectCreate(m_chartId, textName, OBJ_TEXT, 0, midTime, midPrice);
       ObjectSetString(m_chartId, textName, OBJPROP_TEXT, "FVG" + m_timeframeSuffix); 
       ObjectSetInteger(m_chartId, textName, OBJPROP_COLOR, clrAliceBlue);
@@ -428,7 +425,6 @@ public:
       m_symbol = symbol;
       m_timeframe = timeframe;
       m_chartId = chartId;
-      // اصلاح هشدار 'hiding global variable'
       m_enableLogging = enableLogging_in;
       m_showDrawing = showDrawing;
       m_fibUpdateLevel = fibUpdateLevel_in;
@@ -503,7 +499,7 @@ public:
       bool structureChanged = false;
       
       //--- ۱. بررسی شکست ساختار
-      if(ArraySize(m_swingHighs_Array) >= 1 && ArraySize(m_swingLows_Array) >= 1)
+      if(GetSwingHighsCount() >= 1 && GetSwingLowsCount() >= 1)
       {
          CheckForBreakout();
       }
@@ -544,14 +540,14 @@ private:
 
          for(int j = 1; j <= m_fractalLength; j++)
          {
-             if(iHigh(m_symbol, m_timeframe, i) < iHigh(m_symbol, m_timeframe, i - j) || iHigh(m_symbol, m_timeframe, i) < iHigh(m_symbol, m_timeframe, i + j)) isSwingHigh = false;
-             if(iLow(m_symbol, m_timeframe, i) > iLow(m_symbol, m_timeframe, i - j) || iLow(m_symbol, m_timeframe, i) > iLow(m_symbol, m_timeframe, i + j)) isSwingLow = false;
+            if(iHigh(m_symbol, m_timeframe, i) < iHigh(m_symbol, m_timeframe, i - j) || iHigh(m_symbol, m_timeframe, i) < iHigh(m_symbol, m_timeframe, i + j)) isSwingHigh = false;
+            if(iLow(m_symbol, m_timeframe, i) > iLow(m_symbol, m_timeframe, i - j) || iLow(m_symbol, m_timeframe, i) > iLow(m_symbol, m_timeframe, i + j)) isSwingLow = false;
          }
 
-         if(isSwingHigh && ArraySize(m_swingHighs_Array) == 0) AddSwingHigh(iHigh(m_symbol, m_timeframe, i), iTime(m_symbol, m_timeframe, i), i);
-         if(isSwingLow && ArraySize(m_swingLows_Array) == 0) AddSwingLow(iLow(m_symbol, m_timeframe, i), iTime(m_symbol, m_timeframe, i), i);
+         if(isSwingHigh && GetSwingHighsCount() == 0) AddSwingHigh(iHigh(m_symbol, m_timeframe, i), iTime(m_symbol, m_timeframe, i), i);
+         if(isSwingLow && GetSwingLowsCount() == 0) AddSwingLow(iLow(m_symbol, m_timeframe, i), iTime(m_symbol, m_timeframe, i), i);
 
-         if(ArraySize(m_swingHighs_Array) > 0 && ArraySize(m_swingLows_Array) > 0) break;
+         if(GetSwingHighsCount() > 0 && GetSwingLowsCount() > 0) break;
       }
    }
    
@@ -561,8 +557,8 @@ private:
       if(m_isTrackingHigh || m_isTrackingLow) return;
       
       double close_1 = iClose(m_symbol, m_timeframe, 1);
-      SwingPoint lastHigh = m_swingHighs_Array[0];
-      SwingPoint lastLow = m_swingLows_Array[0];
+      SwingPoint lastHigh = GetLastSwingHigh();
+      SwingPoint lastLow = GetLastSwingLow();
 
       //--- شکست سقف (BoS/CHoCH صعودی)
       if(close_1 > lastHigh.price)
@@ -594,172 +590,168 @@ private:
       }
    }
    
-   //--- یافتن نقطه محوری مقابل (پیوت - 100% فیبو)
-   SwingPoint FindOppositeSwing(const datetime brokenSwingTime, const datetime breakTime, const bool findHigh)
+   //--- یافتن نقطه محوری مقابل (پیوت - 100% فیبو) - اکنون public برای دسترسی PatternManager
+public:
+   SwingPoint FindOppositeSwing(const datetime brokenSwingTime, const datetime breakTime, const bool findHigh) const
    {
-       double extremePrice = findHigh ? 0 : DBL_MAX;
-       datetime extremeTime = 0;
-       int extremeIndex = -1;
+      double extremePrice = findHigh ? 0 : DBL_MAX;
+      datetime extremeTime = 0;
+      int extremeIndex = -1;
 
-       int startBar = iBarShift(m_symbol, m_timeframe, breakTime, false);
-       int endBar = iBarShift(m_symbol, m_timeframe, brokenSwingTime, false);
+      int startBar = iBarShift(m_symbol, m_timeframe, breakTime, false);
+      int endBar = iBarShift(m_symbol, m_timeframe, brokenSwingTime, false);
 
-       SwingPoint errorResult; errorResult.price = 0; errorResult.time = 0; errorResult.bar_index = -1;
+      SwingPoint errorResult; errorResult.price = 0; errorResult.time = 0; errorResult.bar_index = -1;
 
-       if(startBar == -1 || endBar == -1 || startBar >= endBar) return errorResult;
+      if(startBar == -1 || endBar == -1 || startBar >= endBar) return errorResult;
 
-       for (int i = startBar + 1; i <= endBar; i++)
-       {
-           if (findHigh)
-           {
-               if (iHigh(m_symbol, m_timeframe, i) > extremePrice) { extremePrice = iHigh(m_symbol, m_timeframe, i); extremeTime = iTime(m_symbol, m_timeframe, i); extremeIndex = i; }
-           }
-           else
-           {
-               if (iLow(m_symbol, m_timeframe, i) < extremePrice) { extremePrice = iLow(m_symbol, m_timeframe, i); extremeTime = iTime(m_symbol, m_timeframe, i); extremeIndex = i; }
-           }
-       }
+      for (int i = startBar + 1; i <= endBar; i++)
+      {
+         if (findHigh)
+         {
+            if (iHigh(m_symbol, m_timeframe, i) > extremePrice) { extremePrice = iHigh(m_symbol, m_timeframe, i); extremeTime = iTime(m_symbol, m_timeframe, i); extremeIndex = i; }
+         }
+         else
+         {
+            if (iLow(m_symbol, m_timeframe, i) < extremePrice) { extremePrice = iLow(m_symbol, m_timeframe, i); extremeTime = iTime(m_symbol, m_timeframe, i); extremeIndex = i; }
+         }
+      }
 
-       SwingPoint result; result.price = extremePrice; result.time = extremeTime; result.bar_index = extremeIndex;
+      SwingPoint result; result.price = extremePrice; result.time = extremeTime; result.bar_index = extremeIndex;
 
-       if (extremeIndex != -1)
-       {
-           // ثبت نقطه 100% فیبو به عنوان Swing Point جدید
-           if (findHigh) AddSwingHigh(extremePrice, extremeTime, extremeIndex); else AddSwingLow(extremePrice, extremeTime, extremeIndex);
-           return result;
-       }
-       return errorResult;
+      return result;
    }
    
+private:
    //--- یافتن سقف/کف مطلق در یک محدوده زمانی (برای 0% فیبو)
    SwingPoint FindExtremePrice(const int startBar, const int endBar, const bool findHigh) const
    {
-       double extremePrice = findHigh ? 0 : DBL_MAX;
-       datetime extremeTime = 0;
-       int extremeIndex = -1;
+      double extremePrice = findHigh ? 0 : DBL_MAX;
+      datetime extremeTime = 0;
+      int extremeIndex = -1;
 
-       for (int i = startBar; i <= endBar; i++)
-       {
-           if (findHigh)
-           {
-               if (iHigh(m_symbol, m_timeframe, i) > extremePrice) { extremePrice = iHigh(m_symbol, m_timeframe, i); extremeTime = iTime(m_symbol, m_timeframe, i); extremeIndex = i; }
-           }
-           else
-           {
-               if (iLow(m_symbol, m_timeframe, i) < extremePrice) { extremePrice = iLow(m_symbol, m_timeframe, i); extremeTime = iTime(m_symbol, m_timeframe, i); extremeIndex = i; }
-           }
-       }
+      for (int i = startBar; i <= endBar; i++)
+      {
+         if (findHigh)
+         {
+            if (iHigh(m_symbol, m_timeframe, i) > extremePrice) { extremePrice = iHigh(m_symbol, m_timeframe, i); extremeTime = iTime(m_symbol, m_timeframe, i); extremeIndex = i; }
+         }
+         else
+         {
+            if (iLow(m_symbol, m_timeframe, i) < extremePrice) { extremePrice = iLow(m_symbol, m_timeframe, i); extremeTime = iTime(m_symbol, m_timeframe, i); extremeIndex = i; }
+         }
+      }
 
-       SwingPoint result; result.price = extremePrice; result.time = extremeTime; result.bar_index = extremeIndex;
-       return result;
+      SwingPoint result; result.price = extremePrice; result.time = extremeTime; result.bar_index = extremeIndex;
+      return result;
    }
    
    //--- ردیابی و تایید Swing Point جدید با آپدیت 0% فیبو (منطق ۳۵٪ اصلاح)
    bool CheckForNewSwingPoint()
    {
-       //--- ۱. ردیابی سقف جدید (HH/LH)
-       if (m_isTrackingHigh)
-       {
-           if (m_pivotLowForTracking.bar_index == -1) return false;
-           
-           SwingPoint current0Per;
-           int startBar = iBarShift(m_symbol, m_timeframe, m_pivotLowForTracking.time, false);
-           current0Per = FindExtremePrice(1, startBar, true); // 0% فیبو فعلی
+      //--- ۱. ردیابی سقف جدید (HH/LH)
+      if (m_isTrackingHigh)
+      {
+         if (m_pivotLowForTracking.bar_index == -1) return false;
+         
+         SwingPoint current0Per;
+         int startBar = iBarShift(m_symbol, m_timeframe, m_pivotLowForTracking.time, false);
+         current0Per = FindExtremePrice(1, startBar, true); // 0% فیبو فعلی
 
-           if (current0Per.bar_index == -1 || current0Per.price <= m_pivotLowForTracking.price) return false;
+         if (current0Per.bar_index == -1 || current0Per.price <= m_pivotLowForTracking.price) return false;
 
-           double range = current0Per.price - m_pivotLowForTracking.price;
-           double fibLevel = current0Per.price - (range * (m_fibUpdateLevel / 100.0));
-           double close_1 = iClose(m_symbol, m_timeframe, 1);
+         double range = current0Per.price - m_pivotLowForTracking.price;
+         double fibLevel = current0Per.price - (range * (m_fibUpdateLevel / 100.0));
+         double close_1 = iClose(m_symbol, m_timeframe, 1);
 
-           if (close_1 <= fibLevel) // شرط تایید (بسته شدن در 35% یا پایین‌تر)
-           {
-               LogEvent("<<< تایید شد: شرط اصلاح " + IntegerToString(m_fibUpdateLevel) + "٪ برای سقف جدید برقرار شد.", m_enableLogging, "[SMC]");
-               AddSwingHigh(current0Per.price, current0Per.time, current0Per.bar_index);
-               m_isTrackingHigh = false;
-               return true;
-           }
-       }
+         if (close_1 <= fibLevel) // شرط تایید (بسته شدن در 35% یا پایین‌تر)
+         {
+            LogEvent("<<< تایید شد: شرط اصلاح " + IntegerToString(m_fibUpdateLevel) + "٪ برای سقف جدید برقرار شد.", m_enableLogging, "[SMC]");
+            AddSwingHigh(current0Per.price, current0Per.time, current0Per.bar_index);
+            m_isTrackingHigh = false;
+            return true;
+         }
+      }
 
-       //--- ۲. ردیابی کف جدید (LL/HL)
-       else if (m_isTrackingLow)
-       {
-           if (m_pivotHighForTracking.bar_index == -1) return false;
+      //--- ۲. ردیابی کف جدید (LL/HL)
+      else if (m_isTrackingLow)
+      {
+         if (m_pivotHighForTracking.bar_index == -1) return false;
 
-           SwingPoint current0Per;
-           int startBar = iBarShift(m_symbol, m_timeframe, m_pivotHighForTracking.time, false);
-           current0Per = FindExtremePrice(1, startBar, false); // 0% فیبو فعلی
+         SwingPoint current0Per;
+         int startBar = iBarShift(m_symbol, m_timeframe, m_pivotHighForTracking.time, false);
+         current0Per = FindExtremePrice(1, startBar, false); // 0% فیبو فعلی
 
-           if (current0Per.bar_index == -1 || current0Per.price >= m_pivotHighForTracking.price) return false;
+         if (current0Per.bar_index == -1 || current0Per.price >= m_pivotHighForTracking.price) return false;
 
-           double range = m_pivotHighForTracking.price - current0Per.price;
-           double fibLevel = current0Per.price + (range * (m_fibUpdateLevel / 100.0));
-           double close_1 = iClose(m_symbol, m_timeframe, 1);
+         double range = m_pivotHighForTracking.price - current0Per.price;
+         double fibLevel = current0Per.price + (range * (m_fibUpdateLevel / 100.0));
+         double close_1 = iClose(m_symbol, m_timeframe, 1);
 
-           if (close_1 >= fibLevel) // شرط تایید (بسته شدن در 35% یا بالاتر)
-           {
-               LogEvent("<<< تایید شد: شرط اصلاح " + IntegerToString(m_fibUpdateLevel) + "٪ برای کف جدید برقرار شد.", m_enableLogging, "[SMC]");
-               AddSwingLow(current0Per.price, current0Per.time, current0Per.bar_index);
-               m_isTrackingLow = false;
-               return true;
-           }
-       }
-       return false;
+         if (close_1 >= fibLevel) // شرط تایید (بسته شدن در 35% یا بالاتر)
+         {
+            LogEvent("<<< تایید شد: شرط اصلاح " + IntegerToString(m_fibUpdateLevel) + "٪ برای کف جدید برقرار شد.", m_enableLogging, "[SMC]");
+            AddSwingLow(current0Per.price, current0Per.time, current0Per.bar_index);
+            m_isTrackingLow = false;
+            return true;
+         }
+      }
+      return false;
    }
 
    //--- تابع: ترسیم فیبوناچی متحرک (ردیابی)
    void DrawTrackingFibonacci()
    {
-       SwingPoint p100, p0;
-       bool isBullish = m_isTrackingHigh;
+      SwingPoint p100, p0;
+      bool isBullish = m_isTrackingHigh;
 
-       // تعیین نقاط 100% و 0%
-       if (m_isTrackingHigh)
-       {
-           p100 = m_pivotLowForTracking;
-           int startBar = iBarShift(m_symbol, m_timeframe, p100.time, false);
-           p0 = FindExtremePrice(1, startBar, true);
-           if (p0.bar_index == -1 || p0.price <= p100.price) { ObjectDelete(m_chartId, "Tracking_Fib" + m_timeframeSuffix); return; }
-       }
-       else if (m_isTrackingLow)
-       {
-           p100 = m_pivotHighForTracking;
-           int startBar = iBarShift(m_symbol, m_timeframe, p100.time, false);
-           p0 = FindExtremePrice(1, startBar, false);
-           if (p0.bar_index == -1 || p0.price >= p100.price) { ObjectDelete(m_chartId, "Tracking_Fib" + m_timeframeSuffix); return; }
-       }
-       else { ObjectDelete(m_chartId, "Tracking_Fib" + m_timeframeSuffix); return; }
+      // تعیین نقاط 100% و 0%
+      if (m_isTrackingHigh)
+      {
+         p100 = m_pivotLowForTracking;
+         int startBar = iBarShift(m_symbol, m_timeframe, p100.time, false);
+         p0 = FindExtremePrice(1, startBar, true);
+         if (p0.bar_index == -1 || p0.price <= p100.price) { ObjectDelete(m_chartId, "Tracking_Fib" + m_timeframeSuffix); return; }
+      }
+      else if (m_isTrackingLow)
+      {
+         p100 = m_pivotHighForTracking;
+         int startBar = iBarShift(m_symbol, m_timeframe, p100.time, false);
+         p0 = FindExtremePrice(1, startBar, false);
+         if (p0.bar_index == -1 || p0.price >= p100.price) { ObjectDelete(m_chartId, "Tracking_Fib" + m_timeframeSuffix); return; }
+      }
+      else { ObjectDelete(m_chartId, "Tracking_Fib" + m_timeframeSuffix); return; }
 
-       string objName = "Tracking_Fib" + m_timeframeSuffix;
-       ObjectDelete(m_chartId, objName);
+      string objName = "Tracking_Fib" + m_timeframeSuffix;
+      ObjectDelete(m_chartId, objName);
 
-       ObjectCreate(m_chartId, objName, OBJ_FIBO, 0, p100.time, p100.price, p0.time, p0.price);
-       ObjectSetInteger(m_chartId, objName, OBJPROP_COLOR, isBullish ? clrDodgerBlue : clrOrangeRed);
-       ObjectSetInteger(m_chartId, objName, OBJPROP_RAY_RIGHT, true);
-       ObjectSetInteger(m_chartId, objName, OBJPROP_WIDTH, 1);
+      ObjectCreate(m_chartId, objName, OBJ_FIBO, 0, p100.time, p100.price, p0.time, p0.price);
+      ObjectSetInteger(m_chartId, objName, OBJPROP_COLOR, isBullish ? clrDodgerBlue : clrOrangeRed);
+      ObjectSetInteger(m_chartId, objName, OBJPROP_RAY_RIGHT, true);
+      ObjectSetInteger(m_chartId, objName, OBJPROP_WIDTH, 1);
 
-       // تنظیم سطوح (با رفع خطای تبدیل نوع ضمنی)
-       ObjectSetDouble(m_chartId, objName, OBJPROP_LEVELVALUE, 0, 0.0);
-       ObjectSetString(m_chartId, objName, OBJPROP_LEVELTEXT, 0, "0% (Movable)" + m_timeframeSuffix);
+      // تنظیم سطوح
+      ObjectSetDouble(m_chartId, objName, OBJPROP_LEVELVALUE, 0, 0.0);
+      ObjectSetString(m_chartId, objName, OBJPROP_LEVELTEXT, 0, "0% (Movable)" + m_timeframeSuffix);
 
-       ObjectSetDouble(m_chartId, objName, OBJPROP_LEVELVALUE, 1, (double)m_fibUpdateLevel / 100.0);
-       ObjectSetString(m_chartId, objName, OBJPROP_LEVELTEXT, 1, IntegerToString(m_fibUpdateLevel) + "% (Confirmation)" + m_timeframeSuffix);
+      ObjectSetDouble(m_chartId, objName, OBJPROP_LEVELVALUE, 1, (double)m_fibUpdateLevel / 100.0);
+      ObjectSetString(m_chartId, objName, OBJPROP_LEVELTEXT, 1, IntegerToString(m_fibUpdateLevel) + "% (Confirmation)" + m_timeframeSuffix);
 
-       ObjectSetDouble(m_chartId, objName, OBJPROP_LEVELVALUE, 2, 1.0);
-       ObjectSetString(m_chartId, objName, OBJPROP_LEVELTEXT, 2, "100% (Fixed Pivot)" + m_timeframeSuffix);
+      ObjectSetDouble(m_chartId, objName, OBJPROP_LEVELVALUE, 2, 1.0);
+      ObjectSetString(m_chartId, objName, OBJPROP_LEVELTEXT, 2, "100% (Fixed Pivot)" + m_timeframeSuffix);
 
-       for(int i = 3; i < 10; i++) ObjectSetDouble(m_chartId, objName, OBJPROP_LEVELVALUE, i, 0.0);
+      for(int i = 3; i < 10; i++) ObjectSetDouble(m_chartId, objName, OBJPROP_LEVELVALUE, i, 0.0);
    }
 
    //--- اضافه کردن سقف جدید و ترسیم آن 
    void AddSwingHigh(const double price, const datetime time, const int bar_index)
    {
-      if(ArraySize(m_swingHighs_Array) >= 2)
+      if(GetSwingHighsCount() >= 2)
       {
          if (m_showDrawing)
          {
-             ObjectDelete(m_chartId, "H_" + TimeToString(m_swingHighs_Array[1].time) + m_timeframeSuffix);
-             ObjectDelete(m_chartId, "H_" + TimeToString(m_swingHighs_Array[1].time) + m_timeframeSuffix + "_Text");
+            ObjectDelete(m_chartId, "H_" + TimeToString(GetSwingHigh(1).time) + m_timeframeSuffix);
+            ObjectDelete(m_chartId, "H_" + TimeToString(GetSwingHigh(1).time) + m_timeframeSuffix + "_Text");
          }
          ArrayRemove(m_swingHighs_Array, ArraySize(m_swingHighs_Array) - 1, 1);
       }
@@ -777,12 +769,12 @@ private:
    //--- اضافه کردن کف جدید و ترسیم آن 
    void AddSwingLow(const double price, const datetime time, const int bar_index)
    {
-      if(ArraySize(m_swingLows_Array) >= 2)
+      if(GetSwingLowsCount() >= 2)
       {
          if (m_showDrawing)
          {
-             ObjectDelete(m_chartId, "L_" + TimeToString(m_swingLows_Array[1].time) + m_timeframeSuffix);
-             ObjectDelete(m_chartId, "L_" + TimeToString(m_swingLows_Array[1].time) + m_timeframeSuffix + "_Text");
+            ObjectDelete(m_chartId, "L_" + TimeToString(GetSwingLow(1).time) + m_timeframeSuffix);
+            ObjectDelete(m_chartId, "L_" + TimeToString(GetSwingLow(1).time) + m_timeframeSuffix + "_Text");
          }
          ArrayRemove(m_swingLows_Array, ArraySize(m_swingLows_Array) - 1, 1);
       }
@@ -802,11 +794,11 @@ private:
    {
       TREND_TYPE oldTrend = m_currentTrend;
 
-      if(ArraySize(m_swingHighs_Array) >= 2 && ArraySize(m_swingLows_Array) >= 2)
+      if(GetSwingHighsCount() >= 2 && GetSwingLowsCount() >= 2)
       {
          // منطق تشخیص روند بر اساس HH/HL و LL/LH
-         if(m_swingHighs_Array[0].price > m_swingHighs_Array[1].price && m_swingLows_Array[0].price > m_swingLows_Array[1].price) m_currentTrend = TREND_BULLISH;
-         else if(m_swingHighs_Array[0].price < m_swingHighs_Array[1].price && m_swingLows_Array[0].price < m_swingLows_Array[1].price) m_currentTrend = TREND_BEARISH;
+         if(GetSwingHigh(0).price > GetSwingHigh(1).price && GetSwingLow(0).price > GetSwingLow(1).price) m_currentTrend = TREND_BULLISH;
+         else if(GetSwingHigh(0).price < GetSwingHigh(1).price && GetSwingLow(0).price < GetSwingLow(1).price) m_currentTrend = TREND_BEARISH;
          else m_currentTrend = TREND_NONE;
       }
       else m_currentTrend = TREND_NONE;
@@ -823,9 +815,8 @@ private:
             default: trendText = "No Trend / Ranging"; trendColor = clrGray; LogEvent("وضعیت روند به بدون روند تغییر یافت.", m_enableLogging, "[SMC]");
          }
          
-         // محاسبه موقعیت نمایش لیبل بر اساس تایم فریم (اصلاح خطای سینتکسی)
+         // محاسبه موقعیت نمایش لیبل بر اساس تایم فریم
          int tf_index = (int)m_timeframe;
-         // هر تایم فریم یک شیفت ثابت در YDITANCE دارد
          int y_offset = 20; 
          if (tf_index == 1 || tf_index == 5 || tf_index == 15 || tf_index == 30) y_offset = 20; // M1-M30
          else if (tf_index == 60) y_offset = 40; // H1
@@ -839,11 +830,10 @@ private:
          int y_position = y_distance_base + ((int)m_timeframe - (int)PERIOD_M1) * y_distance_per_tf;
 
          ObjectCreate(m_chartId, m_trendObjectName, OBJ_LABEL, 0, 0, 0);
-         // (اصلاح خطای تبدیل نوع ضمنی)
          ObjectSetString(m_chartId, m_trendObjectName, OBJPROP_TEXT, trendText + m_timeframeSuffix); 
          ObjectSetInteger(m_chartId, m_trendObjectName, OBJPROP_CORNER, CORNER_LEFT_UPPER);
          ObjectSetInteger(m_chartId, m_trendObjectName, OBJPROP_XDISTANCE, 10);
-         ObjectSetInteger(m_chartId, m_trendObjectName, OBJPROP_YDISTANCE, y_offset); // استفاده از محاسبه ساده شده و شیفت منطقی
+         ObjectSetInteger(m_chartId, m_trendObjectName, OBJPROP_YDISTANCE, y_offset); 
 
          ObjectSetInteger(m_chartId, m_trendObjectName, OBJPROP_COLOR, trendColor);
          ObjectSetInteger(m_chartId, m_trendObjectName, OBJPROP_FONTSIZE, 12);
@@ -875,24 +865,24 @@ private:
    //--- ترسیم شکست (BoS/CHoCH) (با پسوند تایم فریم و شیفت زمانی)
    void drawBreak(const SwingPoint &brokenSwing, const datetime breakTime, const double breakPrice, const bool isHighBreak, const bool isCHoCH)
    {
-       string breakType = isCHoCH ? "CHoCH" : "BoS";
-       color breakColor = isCHoCH ? clrCrimson : (isHighBreak ? clrSeaGreen : clrOrange);
-       string objName = "Break_" + TimeToString(brokenSwing.time) + m_timeframeSuffix;
-       string textName = objName + "_Text";
-       ObjectDelete(m_chartId, objName);
-       ObjectDelete(m_chartId, textName);
+      string breakType = isCHoCH ? "CHoCH" : "BoS";
+      color breakColor = isCHoCH ? clrCrimson : (isHighBreak ? clrSeaGreen : clrOrange);
+      string objName = "Break_" + TimeToString(brokenSwing.time) + m_timeframeSuffix;
+      string textName = objName + "_Text";
+      ObjectDelete(m_chartId, objName);
+      ObjectDelete(m_chartId, textName);
 
-       ObjectCreate(m_chartId, objName, OBJ_TREND, 0, brokenSwing.time, brokenSwing.price, breakTime, brokenSwing.price);
-       ObjectSetInteger(m_chartId, objName, OBJPROP_COLOR, breakColor);
-       ObjectSetInteger(m_chartId, objName, OBJPROP_STYLE, STYLE_DOT);
+      ObjectCreate(m_chartId, objName, OBJ_TREND, 0, brokenSwing.time, brokenSwing.price, breakTime, brokenSwing.price);
+      ObjectSetInteger(m_chartId, objName, OBJPROP_COLOR, breakColor);
+      ObjectSetInteger(m_chartId, objName, OBJPROP_STYLE, STYLE_DOT);
 
-       // شیفت زمانی برای فاصله بیشتر از کندل (20% عرض کندل) - رفع خطای تبدیل نوع ضمنی
-       datetime textTime = breakTime + (datetime)(PeriodSeconds(m_timeframe) * 0.2);
+      // شیفت زمانی برای فاصله بیشتر از کندل (20% عرض کندل)
+      datetime textTime = breakTime + (datetime)(PeriodSeconds(m_timeframe) * 0.2);
 
-       ObjectCreate(m_chartId, textName, OBJ_TEXT, 0, textTime, breakPrice);
-       ObjectSetString(m_chartId, textName, OBJPROP_TEXT, breakType + m_timeframeSuffix); // اضافه کردن پسوند
-       ObjectSetInteger(m_chartId, textName, OBJPROP_COLOR, breakColor);
-       ObjectSetInteger(m_chartId, textName, OBJPROP_ANCHOR, isHighBreak ? ANCHOR_LEFT_LOWER : ANCHOR_LEFT_UPPER);
+      ObjectCreate(m_chartId, textName, OBJ_TEXT, 0, textTime, breakPrice);
+      ObjectSetString(m_chartId, textName, OBJPROP_TEXT, breakType + m_timeframeSuffix); // اضافه کردن پسوند
+      ObjectSetInteger(m_chartId, textName, OBJPROP_COLOR, breakColor);
+      ObjectSetInteger(m_chartId, textName, OBJPROP_ANCHOR, isHighBreak ? ANCHOR_LEFT_LOWER : ANCHOR_LEFT_UPPER);
    }
    
 public:
@@ -905,11 +895,16 @@ public:
    datetime GetLastBoSTime() const { return m_lastBoSTime; }
    
    //--- آخرین سقف و کف ساختاری (به صورت ساختار کامل SwingPoint)
-   // (بررسی اندازه آرایه برای جلوگیری از خطای دسترسی)
-   SwingPoint GetLastSwingHigh() const { return (ArraySize(m_swingHighs_Array) > 0) ? m_swingHighs_Array[0] : SwingPoint(); } 
-   SwingPoint GetLastSwingLow() const { return (ArraySize(m_swingLows_Array) > 0) ? m_swingLows_Array[0] : SwingPoint(); }
+   SwingPoint GetLastSwingHigh() const { return (GetSwingHighsCount() > 0) ? m_swingHighs_Array[0] : SwingPoint(); } 
+   SwingPoint GetLastSwingLow() const { return (GetSwingLowsCount() > 0) ? m_swingLows_Array[0] : SwingPoint(); }
    
    //--- وضعیت روند فعلی
    TREND_TYPE GetCurrentTrend() const { return m_currentTrend; }
+   
+   //--- Getterهای جدید برای دسترسی به آرایه سوینگ‌ها (برای هماهنگی با PatternManager)
+   int GetSwingHighsCount() const { return ArraySize(m_swingHighs_Array); }
+   int GetSwingLowsCount() const { return ArraySize(m_swingLows_Array); }
+   SwingPoint GetSwingHigh(const int index) const { return (index < GetSwingHighsCount()) ? m_swingHighs_Array[index] : SwingPoint(); }
+   SwingPoint GetSwingLow(const int index) const { return (index < GetSwingLowsCount()) ? m_swingLows_Array[index] : SwingPoint(); }
 };
 //+------------------------------------------------------------------+
