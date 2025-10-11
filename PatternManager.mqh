@@ -149,7 +149,7 @@ public:
    ~PatternManager()
    {
       //--- حذف نمونه داخلی MarketStructure برای جلوگیری از نشت حافظه
-      if(CheckPointer(m_structure_instance) == POINTER_INVALID)
+      if(CheckPointer(m_structure_instance) != POINTER_INVALID)
       {
          delete m_structure_instance;
       }
@@ -166,7 +166,7 @@ public:
    //+------------------------------------------------------------------+
    void ProcessNewBar()
    {
-      if(CheckPointer(m_structure_instance) != POINTER_INVALID) return;
+      if(CheckPointer(m_structure_instance) == POINTER_INVALID) return;
 
       //--- ۱. آپدیت ساختار بازار داخلی
       m_structure_instance.ProcessNewBar();
