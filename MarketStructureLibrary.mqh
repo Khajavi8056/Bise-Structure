@@ -4,8 +4,8 @@
 //|                                             Powerd by HIPOALGORITM |
 //|------------------------------------------------------------------|
 //| راهنمای اجرا و استفاده (Blueprint for Memento Project):          |
-//| این کتابخانه شامل دو کلاس مستقل 'MarketStructure' و 'FVGManager' |
-//| است که قابلیت اجرای چندگانه (Multi-Timeframe/Multi-Symbol) را   |
+//| این کتابخانه شامل سه کلاس مستقل 'MarketStructure'، 'FVGManager' |
+//| و 'MinorStructure' است که قابلیت اجرای چندگانه (Multi-Timeframe/Multi-Symbol) را   |
 //| فراهم می کنند.                                                   |
 //|                                                                  |
 //| ۱. ایجاد آبجکت: در تابع OnInit() اکسپرت، نمونه‌هایی از این کلاس‌ها|
@@ -911,5 +911,325 @@ public:
    
    //--- وضعیت روند فعلی
    TREND_TYPE GetCurrentTrend() const { return m_currentTrend; }
+};
+
+//==================================================================//
+//             کلاس ۳: مدیریت ساختار مینور بازار (MinorStructure)    //
+//==================================================================//
+class MinorStructure
+{
+private:
+   //--- متغیرهای تنظیمات و محیط اجرا
+   string           m_symbol;               // نماد جفت ارز
+   ENUM_TIMEFRAMES  m_timeframe;            // تایم فریم اختصاصی این آبجکت
+   long             m_chartId;              // ID چارت اجرایی اکسپرت
+   bool             m_enableLogging;        // فعال/غیرفعال بودن لاگ
+   string           m_timeframeSuffix;      // پسوند تایم‌فریم کوتاه شده برای نامگذاری اشیاء
+   bool             m_showDrawing;          // کنترل نمایش ترسیمات مینور روی چارت
+   int              m_aoFractalLength;      // طول فرکتال AO (تعداد میله‌های اطراف)
+
+   //--- هندل اندیکاتور
+   int              m_ao_handle;            // هندل اندیکاتور Awesome Oscillator
+
+   //--- متغیرهای حالت
+   SwingPoint       m_minorSwingHighs_Array[]; // آرایه سقف‌های مینور (سری، ظرفیت حداکثر ۱۰)
+   SwingPoint       m_minorSwingLows_Array[];  // آرایه کف‌های مینور (سری، ظرفیت حداکثر ۱۰)
+   datetime         m_lastScanTime;            // زمان آخرین اسکن برای بهینه‌سازی و جلوگیری از تکرار
+
+public:
+   //+------------------------------------------------------------------+
+   //| سازنده کلاس (Constructor)                                       |
+   //+------------------------------------------------------------------+
+   MinorStructure(const string symbol, const ENUM_TIMEFRAMES timeframe, const long chartId, const bool enableLogging_in, const bool showDrawing, const int aoFractalLength_in)
+   {
+      m_symbol = symbol;
+      m_timeframe = timeframe;
+      m_chartId = chartId;
+      m_enableLogging = enableLogging_in;
+      m_showDrawing = showDrawing;
+      m_aoFractalLength = aoFractalLength_in;
+      
+      // تنظیم پسوند تایم فریم برای نمایش MTF (کوتاه شده)
+      m_timeframeSuffix = " (" + TimeFrameToStringShort(timeframe) + ")";
+
+      // ایجاد هندل اندیکاتور AO (فقط محاسباتی، بدون نمایش روی چارت)
+      m_ao_handle = iAO(m_symbol, m_timeframe);
+
+      ArraySetAsSeries(m_minorSwingHighs_Array, true);
+      ArraySetAsSeries(m_minorSwingLows_Array, true);
+      ArrayResize(m_minorSwingHighs_Array, 0);
+      ArrayResize(m_minorSwingLows_Array, 0);
+      
+      m_lastScanTime = 0;
+
+      // پاکسازی اشیاء قبلی مربوط به این کلاس روی چارت
+      if (m_showDrawing)
+      {
+         int total = ObjectsTotal(m_chartId, 0, -1);
+         for(int i = total - 1; i >= 0; i--)
+         {
+            string name = ObjectName(m_chartId, i);
+            if(StringFind(name, "Minor_" + m_timeframeSuffix) != -1)
+            {
+               ObjectDelete(m_chartId, name);
+            }
+         }
+      }
+      
+      LogEvent("کلاس MinorStructure برای نماد " + m_symbol + " و تایم فریم " + EnumToString(m_timeframe) + " آغاز به کار کرد.", m_enableLogging, "[MINOR]");
+   }
+
+   //+------------------------------------------------------------------+
+   //| مخرب کلاس (Destructor) - برای پاک کردن اشیاء هنگام حذف آبجکت     |
+   //+------------------------------------------------------------------+
+   ~MinorStructure()
+   {
+      // پاک کردن اشیاء هنگام از بین رفتن آبجکت
+      if (m_showDrawing)
+      {
+         int total = ObjectsTotal(m_chartId, 0, -1);
+         for(int i = total - 1; i >= 0; i--)
+         {
+            string name = ObjectName(m_chartId, i);
+            if(StringFind(name, "Minor_" + m_timeframeSuffix) != -1)
+            {
+               ObjectDelete(m_chartId, name);
+            }
+         }
+      }
+      LogEvent("کلاس MinorStructure متوقف شد.", m_enableLogging, "[MINOR]");
+   }
+   
+   //+------------------------------------------------------------------+
+   //| تابع اصلی: پردازش کندل بسته شده (در OnTick با شرط NewBar فراخوانی شود) |
+   //+------------------------------------------------------------------+
+   bool ProcessNewBar()
+   {
+      bool newMinorFound = false;
+      
+      //--- ۱. تعیین بازه اسکن
+      int barsCount = iBars(m_symbol, m_timeframe);
+      if (barsCount < m_aoFractalLength * 2 + 1) return false;
+
+      // <<< اصلاح شد: منطق تعیین بازه اسکن کمی خواناتر و امن‌تر شد
+      int endBarIndex = (m_lastScanTime == 0) ? barsCount - 1 : iBarShift(m_symbol, m_timeframe, m_lastScanTime, false);
+      if(endBarIndex < 0) endBarIndex = barsCount - 1; // اگر شیفت ناموفق بود، از کل تاریخچه استفاده کن
+
+      int barsToCopy = (m_lastScanTime == 0) ? MathMin(200, barsCount - 1) : endBarIndex;
+      if(barsToCopy <= 0) return false;
+      
+      //--- ۲. کپی بافرها
+      double ao_buffer[];
+      ArraySetAsSeries(ao_buffer, true);
+      // <<< اصلاح شد: اندیس‌دهی CopyBuffer تصحیح شد تا دقیقاً از کندل ۱ شروع شود
+      if (CopyBuffer(m_ao_handle, 0, 1, barsToCopy, ao_buffer) <= 0) 
+      {
+          LogEvent("خطا در کپی کردن بافر AO.", m_enableLogging, "[MINOR]");
+          return false;
+      }
+      
+      double high_buffer[];
+      ArraySetAsSeries(high_buffer, true);
+      if (CopyHigh(m_symbol, m_timeframe, 1, barsToCopy, high_buffer) <= 0) return false;
+      
+      double low_buffer[];
+      ArraySetAsSeries(low_buffer, true);
+      if (CopyLow(m_symbol, m_timeframe, 1, barsToCopy, low_buffer) <= 0) return false;
+      
+      datetime time_buffer[];
+      ArraySetAsSeries(time_buffer, true);
+      if (CopyTime(m_symbol, m_timeframe, 1, barsToCopy, time_buffer) <= 0) return false;
+      
+      //--- ۳. حلقه اسکن از جدید به قدیمی
+      // <<< اصلاح شد: حلقه از ۰ شروع می‌شود چون بافرها سری هستند و اندیس ۰ جدیدترین داده است
+      for (int i = 0; i < ArraySize(ao_buffer) - (m_aoFractalLength * 2); i++)
+      {
+         int centerIndex = i + m_aoFractalLength;
+
+         //--- شناسایی فرکتال AO برای سقف مینور
+         bool isMinorHigh = true;
+         for (int j = 1; j <= m_aoFractalLength; j++)
+         {
+            if (ao_buffer[centerIndex] <= ao_buffer[centerIndex - j] || ao_buffer[centerIndex] <= ao_buffer[centerIndex + j])
+            {
+               isMinorHigh = false;
+               break;
+            }
+         }
+         if (isMinorHigh)
+         {
+            // کالیبراسیون با قیمت: یافتن max High در بازه
+            double maxHigh = 0;
+            datetime maxTime = 0;
+            for (int k = i; k < i + (m_aoFractalLength * 2) + 1; k++)
+            {
+               if (high_buffer[k] > maxHigh)
+               {
+                  maxHigh = high_buffer[k];
+                  maxTime = time_buffer[k];
+               }
+            }
+            
+            if(AddMinorPoint(maxHigh, maxTime, true))
+            {
+               newMinorFound = true;
+               m_lastScanTime = time_buffer[0]; // <<< اصلاح شد: زمان اسکن به جدیدترین کندلِ اسکن شده آپدیت می‌شود
+               return newMinorFound; // <<< اصلاح شد: خروج فوری از تابع بعد از یافتن اولین نقطه
+            }
+         }
+         
+         //--- شناسایی فرکتال AO برای کف مینور
+         bool isMinorLow = true;
+         for (int j = 1; j <= m_aoFractalLength; j++)
+         {
+            if (ao_buffer[centerIndex] >= ao_buffer[centerIndex - j] || ao_buffer[centerIndex] >= ao_buffer[centerIndex + j])
+            {
+               isMinorLow = false;
+               break;
+            }
+         }
+         if (isMinorLow)
+         {
+            // کالیبراسیون با قیمت: یافتن min Low در بازه
+            double minLow = DBL_MAX;
+            datetime minTime = 0;
+            for (int k = i; k < i + (m_aoFractalLength * 2) + 1; k++)
+            {
+               if (low_buffer[k] < minLow)
+               {
+                  minLow = low_buffer[k];
+                  minTime = time_buffer[k];
+               }
+            }
+            
+            if(AddMinorPoint(minLow, minTime, false))
+            {
+               newMinorFound = true;
+               m_lastScanTime = time_buffer[0]; // <<< اصلاح شد: زمان اسکن به جدیدترین کندلِ اسکن شده آپدیت می‌شود
+               return newMinorFound; // <<< اصلاح شد: خروج فوری از تابع بعد از یافتن اولین نقطه
+            }
+         }
+      }
+      
+      if(!newMinorFound && ArraySize(time_buffer) > 0)
+      {
+         m_lastScanTime = time_buffer[0]; // اگر چیزی پیدا نشد، باز هم زمان زمان اسکن را آپدیت کن
+      }
+      
+      return newMinorFound;
+   }
+
+private:
+   //--- تابع ترسیمی: رسم نقطه مینور (با فلش کوچک و آفست)
+   void drawMinorSwingPoint(const SwingPoint &sp, const bool isHigh)
+   {
+      string objName = (isHigh ? "Minor_H_" : "Minor_L_") + TimeToString(sp.time) + m_timeframeSuffix;
+      ObjectDelete(m_chartId, objName);
+
+      double offset = _Point * 10; // آفست کوچک برای قرارگیری بهتر
+      double drawPrice = isHigh ? sp.price + offset : sp.price - offset;
+
+      ObjectCreate(m_chartId, objName, OBJ_ARROW, 0, sp.time, drawPrice);
+      ObjectSetInteger(m_chartId, objName, OBJPROP_ARROWCODE, isHigh ? 217 : 218); // 217: فلش رو به پایین (سقف)، 218: فلش رو به بالا (کف)
+      ObjectSetInteger(m_chartId, objName, OBJPROP_COLOR, clrBlue);
+      ObjectSetInteger(m_chartId, objName, OBJPROP_WIDTH, 1);
+      ObjectSetInteger(m_chartId, objName, OBJPROP_ANCHOR, isHigh ? ANCHOR_TOP : ANCHOR_BOTTOM);
+   }
+   
+   // <<< جدید: یک تابع کمکی برای جلوگیری از تکرار کد اضافه شد
+//+------------------------------------------------------------------+
+//| تابع کمکی: اضافه کردن نقطه مینور (با مدیریت تکرار و ظرفیت)       |
+//+------------------------------------------------------------------+
+bool AddMinorPoint(const double price, const datetime time, const bool isHigh)
+{
+   // انتخاب آرایه مناسب بر اساس isHigh
+   SwingPoint arr[];
+   if (isHigh)
+      ArrayCopy(arr, m_minorSwingHighs_Array);
+   else
+      ArrayCopy(arr, m_minorSwingLows_Array);
+      
+   // چک تکرار
+   for (int j = 0; j < ArraySize(arr); j++)
+   {
+      if (arr[j].time == time)
+         return false; // نقطه تکراری است
+   }
+
+   SwingPoint newPoint;
+   newPoint.price = price;
+   newPoint.time = time;
+   newPoint.bar_index = iBarShift(m_symbol, m_timeframe, time, false);
+
+   SwingPoint temp[1]; 
+   temp[0] = newPoint;
+   
+   // افزودن به آرایه مناسب
+   if (isHigh)
+   {
+      if (ArrayInsert(m_minorSwingHighs_Array, temp, 0))
+      {
+         // مدیریت ظرفیت
+         if (ArraySize(m_minorSwingHighs_Array) > 10)
+         {
+            int lastIndex = ArraySize(m_minorSwingHighs_Array) - 1;
+            if (m_showDrawing)
+            {
+               string objNameOld = "Minor_H_" + TimeToString(m_minorSwingHighs_Array[lastIndex].time) + m_timeframeSuffix;
+               ObjectDelete(m_chartId, objNameOld);
+            }
+            ArrayRemove(m_minorSwingHighs_Array, lastIndex, 1);
+         }
+         
+         if (m_showDrawing) drawMinorSwingPoint(newPoint, true);
+         LogEvent("سقف مینور جدید در قیمت " + DoubleToString(price, _Digits) + " شناسایی شد.", m_enableLogging, "[MINOR]");
+         return true;
+      }
+   }
+   else
+   {
+      if (ArrayInsert(m_minorSwingLows_Array, temp, 0))
+      {
+         // مدیریت ظرفیت
+         if (ArraySize(m_minorSwingLows_Array) > 10)
+         {
+            int lastIndex = ArraySize(m_minorSwingLows_Array) - 1;
+            if (m_showDrawing)
+            {
+               string objNameOld = "Minor_L_" + TimeToString(m_minorSwingLows_Array[lastIndex].time) + m_timeframeSuffix;
+               ObjectDelete(m_chartId, objNameOld);
+            }
+            ArrayRemove(m_minorSwingLows_Array, lastIndex, 1);
+         }
+         
+         if (m_showDrawing) drawMinorSwingPoint(newPoint, false);
+         LogEvent("کف مینور جدید در قیمت " + DoubleToString(price, _Digits) + " شناسایی شد.", m_enableLogging, "[MINOR]");
+         return true;
+      }
+   }
+   
+   return false;
+}
+
+public:
+   //+------------------------------------------------------------------+
+   //| توابع دسترسی عمومی (Accessors)                                  |
+   //+------------------------------------------------------------------+
+   SwingPoint GetMinorSwingHigh(const int index) const 
+   { 
+      if (index >= 0 && index < ArraySize(m_minorSwingHighs_Array)) return m_minorSwingHighs_Array[index]; 
+      SwingPoint empty; empty.price = 0; empty.time = 0; empty.bar_index = -1; 
+      return empty; 
+   }
+   
+   SwingPoint GetMinorSwingLow(const int index) const 
+   { 
+      if (index >= 0 && index < ArraySize(m_minorSwingLows_Array)) return m_minorSwingLows_Array[index]; 
+      SwingPoint empty; empty.price = 0; empty.time = 0; empty.bar_index = -1; 
+      return empty; 
+   }
+   
+   int GetMinorHighsCount() const { return ArraySize(m_minorSwingHighs_Array); }
+   int GetMinorLowsCount() const { return ArraySize(m_minorSwingLows_Array); }
 };
 //+------------------------------------------------------------------+
