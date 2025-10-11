@@ -1,32 +1,3 @@
-undeclared identifier	PatternManager.mqh	152	48
-undeclared identifier	PatternManager.mqh	169	48
-cannot access to private member 'm_swingHighs_Array' declared in class 'MarketStructure'	PatternManager.mqh	233	41
-   see declaration of variable 'MarketStructure::m_swingHighs_Array'	MarketStructureLibrary.mqh	411	21
-cannot access to private member 'm_swingHighs_Array' declared in class 'MarketStructure'	PatternManager.mqh	235	49
-   see declaration of variable 'MarketStructure::m_swingHighs_Array'	MarketStructureLibrary.mqh	411	21
-cannot access to private member 'm_swingHighs_Array' declared in class 'MarketStructure'	PatternManager.mqh	236	58
-   see declaration of variable 'MarketStructure::m_swingHighs_Array'	MarketStructureLibrary.mqh	411	21
-cannot access to private member 'm_swingLows_Array' declared in class 'MarketStructure'	PatternManager.mqh	293	41
-   see declaration of variable 'MarketStructure::m_swingLows_Array'	MarketStructureLibrary.mqh	412	21
-cannot access to private member 'm_swingLows_Array' declared in class 'MarketStructure'	PatternManager.mqh	295	49
-   see declaration of variable 'MarketStructure::m_swingLows_Array'	MarketStructureLibrary.mqh	412	21
-cannot access to private member 'm_swingLows_Array' declared in class 'MarketStructure'	PatternManager.mqh	296	58
-   see declaration of variable 'MarketStructure::m_swingLows_Array'	MarketStructureLibrary.mqh	412	21
-'MarketStructure::FindOppositeSw…' - cannot access private member function	PatternManager.mqh	465	53
-   see declaration of function 'MarketStructure::FindOppositeSwing'	MarketStructureLibrary.mqh	598	15
-'MarketStructure::FindOppositeSw…' - cannot access private member function	PatternManager.mqh	469	53
-   see declaration of function 'MarketStructure::FindOppositeSwing'	MarketStructureLibrary.mqh	598	15
-'MarketStructure::FindOppositeSw…' - cannot access private member function	PatternManager.mqh	470	53
-   see declaration of function 'MarketStructure::FindOppositeSwing'	MarketStructureLibrary.mqh	598	15
-11 errors, 0 warnings		11	0
-
-
-
-
-
-
-
-
 //+------------------------------------------------------------------+
 //|                                           PatternManager.mqh       |
 //|                                  Copyright 2025, Khajavi         |
@@ -53,7 +24,7 @@ cannot access to private member 'm_swingLows_Array' declared in class 'MarketStr
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2025, Khajavi _ HipoAlgoritm"
 #property link      "https://www.HipoAlgoritm.com"
-#property version   "2.0" // نسخه منطبق بر بلوپرینت نهایی
+#property version   "2.1" // نسخه بهینه‌سازی شده برای هماهنگی کامل با MarketStructureLibrary
 
 #include "MarketStructureLibrary.mqh"
 
@@ -178,7 +149,7 @@ public:
    ~PatternManager()
    {
       //--- حذف نمونه داخلی MarketStructure برای جلوگیری از نشت حافظه
-      if(CheckPointer(m_structure_instance) == POINTER_VALID)
+      if(CheckPointer(m_structure_instance) == POINTER_INVALID)
       {
          delete m_structure_instance;
       }
@@ -195,7 +166,7 @@ public:
    //+------------------------------------------------------------------+
    void ProcessNewBar()
    {
-      if(CheckPointer(m_structure_instance) != POINTER_VALID) return;
+      if(CheckPointer(m_structure_instance) != POINTER_INVALID) return;
 
       //--- ۱. آپدیت ساختار بازار داخلی
       m_structure_instance.ProcessNewBar();
@@ -259,10 +230,10 @@ private:
       }
       
       //--- ۲. ایجاد فرضیه Head and Shoulders (نیاز به دو سقف دارد)
-      if(ArraySize(m_structure_instance.m_swingHighs_Array) >= 2)
+      if(m_structure_instance.GetSwingHighsCount() >= 2)
       {
-         SwingPoint head = m_structure_instance.m_swingHighs_Array[0];
-         SwingPoint left_shoulder = m_structure_instance.m_swingHighs_Array[1];
+         SwingPoint head = m_structure_instance.GetSwingHigh(0);
+         SwingPoint left_shoulder = m_structure_instance.GetSwingHigh(1);
          
          // شرط اصلی H&S: سر باید بالاتر از شانه چپ باشد
          if(head.price > left_shoulder.price)
@@ -319,10 +290,10 @@ private:
       }
       
       //--- ۲. ایجاد فرضیه Inverse Head and Shoulders (نیاز به دو کف دارد)
-      if(ArraySize(m_structure_instance.m_swingLows_Array) >= 2)
+      if(m_structure_instance.GetSwingLowsCount() >= 2)
       {
-         SwingPoint head = m_structure_instance.m_swingLows_Array[0];
-         SwingPoint left_shoulder = m_structure_instance.m_swingLows_Array[1];
+         SwingPoint head = m_structure_instance.GetSwingLow(0);
+         SwingPoint left_shoulder = m_structure_instance.GetSwingLow(1);
          
          // شرط اصلی I-H&S: سر باید پایین‌تر از شانه چپ باشد
          if(head.price < left_shoulder.price)
@@ -583,4 +554,3 @@ public:
    ConfirmedPattern GetLastHeadAndShoulders() const { return m_last_hns; }
 };
 //+------------------------------------------------------------------+
-
