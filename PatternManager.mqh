@@ -1,3 +1,32 @@
+undeclared identifier	PatternManager.mqh	152	48
+undeclared identifier	PatternManager.mqh	169	48
+cannot access to private member 'm_swingHighs_Array' declared in class 'MarketStructure'	PatternManager.mqh	233	41
+   see declaration of variable 'MarketStructure::m_swingHighs_Array'	MarketStructureLibrary.mqh	411	21
+cannot access to private member 'm_swingHighs_Array' declared in class 'MarketStructure'	PatternManager.mqh	235	49
+   see declaration of variable 'MarketStructure::m_swingHighs_Array'	MarketStructureLibrary.mqh	411	21
+cannot access to private member 'm_swingHighs_Array' declared in class 'MarketStructure'	PatternManager.mqh	236	58
+   see declaration of variable 'MarketStructure::m_swingHighs_Array'	MarketStructureLibrary.mqh	411	21
+cannot access to private member 'm_swingLows_Array' declared in class 'MarketStructure'	PatternManager.mqh	293	41
+   see declaration of variable 'MarketStructure::m_swingLows_Array'	MarketStructureLibrary.mqh	412	21
+cannot access to private member 'm_swingLows_Array' declared in class 'MarketStructure'	PatternManager.mqh	295	49
+   see declaration of variable 'MarketStructure::m_swingLows_Array'	MarketStructureLibrary.mqh	412	21
+cannot access to private member 'm_swingLows_Array' declared in class 'MarketStructure'	PatternManager.mqh	296	58
+   see declaration of variable 'MarketStructure::m_swingLows_Array'	MarketStructureLibrary.mqh	412	21
+'MarketStructure::FindOppositeSw…' - cannot access private member function	PatternManager.mqh	465	53
+   see declaration of function 'MarketStructure::FindOppositeSwing'	MarketStructureLibrary.mqh	598	15
+'MarketStructure::FindOppositeSw…' - cannot access private member function	PatternManager.mqh	469	53
+   see declaration of function 'MarketStructure::FindOppositeSwing'	MarketStructureLibrary.mqh	598	15
+'MarketStructure::FindOppositeSw…' - cannot access private member function	PatternManager.mqh	470	53
+   see declaration of function 'MarketStructure::FindOppositeSwing'	MarketStructureLibrary.mqh	598	15
+11 errors, 0 warnings		11	0
+
+
+
+
+
+
+
+
 //+------------------------------------------------------------------+
 //|                                           PatternManager.mqh       |
 //|                                  Copyright 2025, Khajavi         |
