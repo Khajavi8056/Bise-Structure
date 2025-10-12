@@ -27,7 +27,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2025, Khajavi _ HipoAlgoritm"
 #property link      "https://www.HipoAlgoritm.com"
-#property version   "1.63" // نسخه اصلاح‌شده کلاس MinorStructure با رفع خطاهای کامپایل
+#property version   "1.61" // نسخه اصلاح خطاها
 
 //+------------------------------------------------------------------+
 //| ساختارهای داده و شمارنده‌ها (Structs & Enums)                     |
@@ -934,7 +934,8 @@ private:
    //--- متغیرهای حالت
    SwingPoint       m_minorSwingHighs_Array[]; // آرایه سقف‌های مینور (سری، ظرفیت حداکثر ۱۰)
    SwingPoint       m_minorSwingLows_Array[];  // آرایه کف‌های مینور (سری، ظرفیت حداکثر ۱۰)
-   int              m_lastScannedBar;          // اندیس آخرین بار اسکن شده برای بهینه‌سازی
+   datetime         m_lastHighTime;         // زمان آخرین سقف مینور برای اسکن بعدی
+   datetime         m_lastLowTime;          // زمان آخرین کف مینور برای اسکن بعدی
 
 public:
    //+------------------------------------------------------------------+
@@ -963,7 +964,8 @@ public:
       ArrayResize(m_minorSwingHighs_Array, 0);
       ArrayResize(m_minorSwingLows_Array, 0);
       
-      m_lastScannedBar = 0;
+      m_lastHighTime = 0;
+      m_lastLowTime = 0;
 
       // پاکسازی اشیاء قبلی مربوط به این کلاس روی چارت
       if (m_showDrawing)
@@ -1018,52 +1020,44 @@ public:
       int barsCount = iBars(m_symbol, m_timeframe);
       if (barsCount < m_aoFractalLength * 2 + 1) return false;
 
-      //--- ۱. اسکن اولیه (بار اول) از قدیمی به جدید برای یافتن مبنا
-      if (m_lastScannedBar == 0)
+      int start_bar = 1; // کندل بسته شده جدید (اندیس 1 در متاتریدر)
+
+      //--- اسکن برای سقف مینور
+      int end_bar_high = (m_lastHighTime == 0) ? start_bar + 199 : iBarShift(m_symbol, m_timeframe, m_lastHighTime, false);
+      if (end_bar_high > barsCount - 1) end_bar_high = barsCount - 1;
+
+      for(int bar = start_bar; bar <= end_bar_high; bar++) // از جدید به قدیمی (اندیس کوچک به بزرگ)
       {
-         int scanLimit = MathMin(200, barsCount - m_aoFractalLength - 1);
-         int startBar = MathMax(m_aoFractalLength, barsCount - scanLimit);
-         
-         for (int bar = startBar; bar < barsCount - m_aoFractalLength; bar++)
+         if (IsMinorHigh(bar))
          {
-            if (IsMinorHigh(bar))
+            double maxHigh = FindMaxHighInRange(bar - m_aoFractalLength, bar + m_aoFractalLength);
+            datetime time = iTime(m_symbol, m_timeframe, bar);
+            if (AddMinorPoint(maxHigh, time, true))
             {
-               double maxHigh = FindMaxHighInRange(bar - m_aoFractalLength, bar + m_aoFractalLength);
-               datetime time = iTime(m_symbol, m_timeframe, bar);
-               if (AddMinorPoint(maxHigh, time, true)) newMinorFound = true;
-            }
-            
-            if (IsMinorLow(bar))
-            {
-               double minLow = FindMinLowInRange(bar - m_aoFractalLength, bar + m_aoFractalLength);
-               datetime time = iTime(m_symbol, m_timeframe, bar);
-               if (AddMinorPoint(minLow, time, false)) newMinorFound = true;
+               m_lastHighTime = time;
+               newMinorFound = true;
+               break; // فقط جدیدترین را اضافه کن
             }
          }
-         
-         m_lastScannedBar = barsCount - m_aoFractalLength - 1;
       }
-      //--- ۲. اسکن بعدی برای نقاط جدید (از آخرین اسکن به جدید)
-      else
+
+      //--- اسکن برای کف مینور
+      int end_bar_low = (m_lastLowTime == 0) ? start_bar + 199 : iBarShift(m_symbol, m_timeframe, m_lastLowTime, false);
+      if (end_bar_low > barsCount - 1) end_bar_low = barsCount - 1;
+
+      for(int bar = start_bar; bar <= end_bar_low; bar++)
       {
-         for (int bar = m_lastScannedBar + 1; bar < barsCount - m_aoFractalLength; bar++)
+         if (IsMinorLow(bar))
          {
-            if (IsMinorHigh(bar))
+            double minLow = FindMinLowInRange(bar - m_aoFractalLength, bar + m_aoFractalLength);
+            datetime time = iTime(m_symbol, m_timeframe, bar);
+            if (AddMinorPoint(minLow, time, false))
             {
-               double maxHigh = FindMaxHighInRange(bar - m_aoFractalLength, bar + m_aoFractalLength);
-               datetime time = iTime(m_symbol, m_timeframe, bar);
-               if (AddMinorPoint(maxHigh, time, true)) newMinorFound = true;
-            }
-            
-            if (IsMinorLow(bar))
-            {
-               double minLow = FindMinLowInRange(bar - m_aoFractalLength, bar + m_aoFractalLength);
-               datetime time = iTime(m_symbol, m_timeframe, bar);
-               if (AddMinorPoint(minLow, time, false)) newMinorFound = true;
+               m_lastLowTime = time;
+               newMinorFound = true;
+               break; // فقط جدیدترین را اضافه کن
             }
          }
-         
-         m_lastScannedBar = barsCount - m_aoFractalLength - 1;
       }
       
       return newMinorFound;
@@ -1073,43 +1067,31 @@ private:
    //--- تابع کمکی: بررسی فرکتال سقف AO در بار مشخص (میله وسط > اطراف)
    bool IsMinorHigh(const int bar) const
    {
-      double ao[1];
-      if (CopyBuffer(m_ao_handle, 0, bar, 1, ao) != 1) return false;
-      double ao_center = ao[0];
-      
+      double ao_center = iAO(m_symbol, m_timeframe, bar);
       for (int j = 1; j <= m_aoFractalLength; j++)
       {
-         if (CopyBuffer(m_ao_handle, 0, bar - j, 1, ao) != 1) return false;
-         double left = ao[0];
-         
-         if (CopyBuffer(m_ao_handle, 0, bar + j, 1, ao) != 1) return false;
-         double right = ao[0];
-         
-         if (ao_center <= left || ao_center <= right) return false;
+         if (ao_center <= iAO(m_symbol, m_timeframe, bar - j) || ao_center <= iAO(m_symbol, m_timeframe, bar + j))
+         {
+            return false;
+         }
       }
       return true;
    }
-   
+
    //--- تابع کمکی: بررسی فرکتال کف AO در بار مشخص (میله وسط < اطراف)
    bool IsMinorLow(const int bar) const
    {
-      double ao[1];
-      if (CopyBuffer(m_ao_handle, 0, bar, 1, ao) != 1) return false;
-      double ao_center = ao[0];
-      
+      double ao_center = iAO(m_symbol, m_timeframe, bar);
       for (int j = 1; j <= m_aoFractalLength; j++)
       {
-         if (CopyBuffer(m_ao_handle, 0, bar - j, 1, ao) != 1) return false;
-         double left = ao[0];
-         
-         if (CopyBuffer(m_ao_handle, 0, bar + j, 1, ao) != 1) return false;
-         double right = ao[0];
-         
-         if (ao_center >= left || ao_center >= right) return false;
+         if (ao_center >= iAO(m_symbol, m_timeframe, bar - j) || ao_center >= iAO(m_symbol, m_timeframe, bar + j))
+         {
+            return false;
+         }
       }
       return true;
    }
-   
+
    //--- تابع کمکی: یافتن بیشترین قیمت در محدوده بارها
    double FindMaxHighInRange(const int startBar, const int endBar) const
    {
@@ -1121,7 +1103,7 @@ private:
       }
       return maxHigh;
    }
-   
+
    //--- تابع کمکی: یافتن کمترین قیمت در محدوده بارها
    double FindMinLowInRange(const int startBar, const int endBar) const
    {
@@ -1133,14 +1115,14 @@ private:
       }
       return minLow;
    }
-   
-   //--- تابع ترسیمی: رسم نقطه مینور (با فلش کوچک و آفست)
+
+   //--- تابع ترسیمی: رسم نقطه مینور (با فلش کوچک و آفست بزرگتر)
    void drawMinorSwingPoint(const SwingPoint &sp, const bool isHigh)
    {
       string objName = (isHigh ? "Minor_H_" : "Minor_L_") + TimeToString(sp.time) + m_timeframeSuffix;
       ObjectDelete(m_chartId, objName);
 
-      double offset = _Point * 20; // آفست بزرگتر برای جلوگیری از تداخل
+      double offset = _Point * 20; // آفست بزرگتر برای قرارگیری بهتر
       double drawPrice = isHigh ? sp.price + offset : sp.price - offset;
 
       ObjectCreate(m_chartId, objName, OBJ_ARROW, 0, sp.time, drawPrice);
