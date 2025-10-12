@@ -1,3 +1,20 @@
+wrong parameters count	MarketStructureLibrary.mqh	1062	26
+   built-in: int iAO(const string,ENUM_TIMEFRAMES)	MarketStructureLibrary.mqh	1062	26
+wrong parameters count	MarketStructureLibrary.mqh	1065	27
+   built-in: int iAO(const string,ENUM_TIMEFRAMES)	MarketStructureLibrary.mqh	1065	27
+wrong parameters count	MarketStructureLibrary.mqh	1065	79
+   built-in: int iAO(const string,ENUM_TIMEFRAMES)	MarketStructureLibrary.mqh	1065	79
+wrong parameters count	MarketStructureLibrary.mqh	1076	26
+   built-in: int iAO(const string,ENUM_TIMEFRAMES)	MarketStructureLibrary.mqh	1076	26
+wrong parameters count	MarketStructureLibrary.mqh	1079	27
+   built-in: int iAO(const string,ENUM_TIMEFRAMES)	MarketStructureLibrary.mqh	1079	27
+wrong parameters count	MarketStructureLibrary.mqh	1079	79
+   built-in: int iAO(const string,ENUM_TIMEFRAMES)	MarketStructureLibrary.mqh	1079	79
+
+
+
+
+
 //+------------------------------------------------------------------+
 //|                                MarketStructureLibrary.mqh       |
 //|                                  Copyright 2025, Khajavi  |
