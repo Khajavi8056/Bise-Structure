@@ -392,7 +392,7 @@ public:
 };
 
 //==================================================================//
-//               کلاس ۱: مدیریت ساختار بازار (MarketStructure)       //
+//               کلاس ۱: مدیریت ساختار بازار (MarketStructure)       |
 //==================================================================//
 class MarketStructure
 {
@@ -934,8 +934,7 @@ private:
    //--- متغیرهای حالت
    SwingPoint       m_minorSwingHighs_Array[]; // آرایه سقف‌های مینور (سری، ظرفیت حداکثر ۱۰)
    SwingPoint       m_minorSwingLows_Array[];  // آرایه کف‌های مینور (سری، ظرفیت حداکثر ۱۰)
-   datetime         m_lastHighTime;         // زمان آخرین سقف مینور برای اسکن بعدی
-   datetime         m_lastLowTime;          // زمان آخرین کف مینور برای اسکن بعدی
+   datetime         m_lastScanTime;            // زمان آخرین اسکن برای بهینه‌سازی و جلوگیری از تکرار
 
 public:
    //+------------------------------------------------------------------+
@@ -954,18 +953,13 @@ public:
       m_timeframeSuffix = " (" + TimeFrameToStringShort(timeframe) + ")";
 
       m_ao_handle = iAO(m_symbol, m_timeframe);
-      if (m_ao_handle == INVALID_HANDLE)
-      {
-         Print("خطا در ایجاد هندل AO برای کلاس MinorStructure.");
-      }
 
       ArraySetAsSeries(m_minorSwingHighs_Array, true);
       ArraySetAsSeries(m_minorSwingLows_Array, true);
       ArrayResize(m_minorSwingHighs_Array, 0);
       ArrayResize(m_minorSwingLows_Array, 0);
       
-      m_lastHighTime = 0;
-      m_lastLowTime = 0;
+      m_lastScanTime = 0;
 
       // پاکسازی اشیاء قبلی مربوط به این کلاس روی چارت
       if (m_showDrawing)
@@ -989,11 +983,6 @@ public:
    //+------------------------------------------------------------------+
    ~MinorStructure()
    {
-      if (m_ao_handle != INVALID_HANDLE)
-      {
-         IndicatorRelease(m_ao_handle);
-      }
-      
       // پاک کردن اشیاء هنگام از بین رفتن آبجکت
       if (m_showDrawing)
       {
@@ -1017,112 +1006,126 @@ public:
    {
       bool newMinorFound = false;
       
+      //--- ۱. تعیین بازه اسکن
       int barsCount = iBars(m_symbol, m_timeframe);
       if (barsCount < m_aoFractalLength * 2 + 1) return false;
 
-      int start_bar = 1; // کندل بسته شده جدید (اندیس 1 در متاتریدر)
+      // <<< اصلاح شد: منطق تعیین بازه اسکن کمی خواناتر و امن‌تر شد
+      int endBarIndex = (m_lastScanTime == 0) ? barsCount - 1 : iBarShift(m_symbol, m_timeframe, m_lastScanTime, false);
+      if(endBarIndex < 0) endBarIndex = barsCount - 1; // اگر شیفت ناموفق بود، از کل تاریخچه استفاده کن
 
-      //--- اسکن برای سقف مینور
-      int end_bar_high = (m_lastHighTime == 0) ? start_bar + 199 : iBarShift(m_symbol, m_timeframe, m_lastHighTime, false);
-      if (end_bar_high > barsCount - 1) end_bar_high = barsCount - 1;
-
-      for(int bar = start_bar; bar <= end_bar_high; bar++) // از جدید به قدیمی (اندیس کوچک به بزرگ)
+      int barsToCopy = (m_lastScanTime == 0) ? MathMin(200, barsCount - 1) : endBarIndex;
+      if(barsToCopy <= 0) return false;
+      
+      //--- ۲. کپی بافرها
+      double ao_buffer[];
+      ArraySetAsSeries(ao_buffer, true);
+      // <<< اصلاح شد: اندیس‌دهی CopyBuffer تصحیح شد تا دقیقاً از کندل ۱ شروع شود
+      if (CopyBuffer(m_ao_handle, 0, 1, barsToCopy, ao_buffer) <= 0) 
       {
-         if (IsMinorHigh(bar))
+          LogEvent("خطا در کپی کردن بافر AO.", m_enableLogging, "[MINOR]");
+          return false;
+      }
+      
+      double high_buffer[];
+      ArraySetAsSeries(high_buffer, true);
+      if (CopyHigh(m_symbol, m_timeframe, 1, barsToCopy, high_buffer) <= 0) return false;
+      
+      double low_buffer[];
+      ArraySetAsSeries(low_buffer, true);
+      if (CopyLow(m_symbol, m_timeframe, 1, barsToCopy, low_buffer) <= 0) return false;
+      
+      datetime time_buffer[];
+      ArraySetAsSeries(time_buffer, true);
+      if (CopyTime(m_symbol, m_timeframe, 1, barsToCopy, time_buffer) <= 0) return false;
+      
+      //--- ۳. حلقه اسکن از جدید به قدیمی
+      // <<< اصلاح شد: حلقه از ۰ شروع می‌شود چون بافرها سری هستند و اندیس ۰ جدیدترین داده است
+      for (int i = 0; i < ArraySize(ao_buffer) - (m_aoFractalLength * 2); i++)
+      {
+         int centerIndex = i + m_aoFractalLength;
+
+         //--- شناسایی فرکتال AO برای سقف مینور
+         bool isMinorHigh = true;
+         for (int j = 1; j <= m_aoFractalLength; j++)
          {
-            double maxHigh = FindMaxHighInRange(bar - m_aoFractalLength, bar + m_aoFractalLength);
-            datetime time = iTime(m_symbol, m_timeframe, bar);
-            if (AddMinorPoint(maxHigh, time, true))
+            if (ao_buffer[centerIndex] <= ao_buffer[centerIndex - j] || ao_buffer[centerIndex] <= ao_buffer[centerIndex + j])
             {
-               m_lastHighTime = time;
+               isMinorHigh = false;
+               break;
+            }
+         }
+         if (isMinorHigh)
+         {
+            // کالیبراسیون با قیمت: یافتن max High در بازه
+            double maxHigh = 0;
+            datetime maxTime = 0;
+            for (int k = i; k < i + (m_aoFractalLength * 2) + 1; k++)
+            {
+               if (high_buffer[k] > maxHigh)
+               {
+                  maxHigh = high_buffer[k];
+                  maxTime = time_buffer[k];
+               }
+            }
+            
+            if(AddMinorPoint(maxHigh, maxTime, true))
+            {
                newMinorFound = true;
-               break; // فقط جدیدترین را اضافه کن
+               m_lastScanTime = time_buffer[0]; // <<< اصلاح شد: زمان اسکن به جدیدترین کندلِ اسکن شده آپدیت می‌شود
+               return newMinorFound; // <<< اصلاح شد: خروج فوری از تابع بعد از یافتن اولین نقطه
+            }
+         }
+         
+         //--- شناسایی فرکتال AO برای کف مینور
+         bool isMinorLow = true;
+         for (int j = 1; j <= m_aoFractalLength; j++)
+         {
+            if (ao_buffer[centerIndex] >= ao_buffer[centerIndex - j] || ao_buffer[centerIndex] >= ao_buffer[centerIndex + j])
+            {
+               isMinorLow = false;
+               break;
+            }
+         }
+         if (isMinorLow)
+         {
+            // کالیبراسیون با قیمت: یافتن min Low در بازه
+            double minLow = DBL_MAX;
+            datetime minTime = 0;
+            for (int k = i; k < i + (m_aoFractalLength * 2) + 1; k++)
+            {
+               if (low_buffer[k] < minLow)
+               {
+                  minLow = low_buffer[k];
+                  minTime = time_buffer[k];
+               }
+            }
+            
+            if(AddMinorPoint(minLow, minTime, false))
+            {
+               newMinorFound = true;
+               m_lastScanTime = time_buffer[0]; // <<< اصلاح شد: زمان اسکن به جدیدترین کندلِ اسکن شده آپدیت می‌شود
+               return newMinorFound; // <<< اصلاح شد: خروج فوری از تابع بعد از یافتن اولین نقطه
             }
          }
       }
-
-      //--- اسکن برای کف مینور
-      int end_bar_low = (m_lastLowTime == 0) ? start_bar + 199 : iBarShift(m_symbol, m_timeframe, m_lastLowTime, false);
-      if (end_bar_low > barsCount - 1) end_bar_low = barsCount - 1;
-
-      for(int bar = start_bar; bar <= end_bar_low; bar++)
+      
+      if(!newMinorFound && ArraySize(time_buffer) > 0)
       {
-         if (IsMinorLow(bar))
-         {
-            double minLow = FindMinLowInRange(bar - m_aoFractalLength, bar + m_aoFractalLength);
-            datetime time = iTime(m_symbol, m_timeframe, bar);
-            if (AddMinorPoint(minLow, time, false))
-            {
-               m_lastLowTime = time;
-               newMinorFound = true;
-               break; // فقط جدیدترین را اضافه کن
-            }
-         }
+         m_lastScanTime = time_buffer[0]; // اگر چیزی پیدا نشد، باز هم زمان زمان اسکن را آپدیت کن
       }
       
       return newMinorFound;
    }
 
 private:
-   //--- تابع کمکی: بررسی فرکتال سقف AO در بار مشخص (میله وسط > اطراف)
-   bool IsMinorHigh(const int bar) const
-   {
-      double ao_center = iAO(m_symbol, m_timeframe, bar);
-      for (int j = 1; j <= m_aoFractalLength; j++)
-      {
-         if (ao_center <= iAO(m_symbol, m_timeframe, bar - j) || ao_center <= iAO(m_symbol, m_timeframe, bar + j))
-         {
-            return false;
-         }
-      }
-      return true;
-   }
-
-   //--- تابع کمکی: بررسی فرکتال کف AO در بار مشخص (میله وسط < اطراف)
-   bool IsMinorLow(const int bar) const
-   {
-      double ao_center = iAO(m_symbol, m_timeframe, bar);
-      for (int j = 1; j <= m_aoFractalLength; j++)
-      {
-         if (ao_center >= iAO(m_symbol, m_timeframe, bar - j) || ao_center >= iAO(m_symbol, m_timeframe, bar + j))
-         {
-            return false;
-         }
-      }
-      return true;
-   }
-
-   //--- تابع کمکی: یافتن بیشترین قیمت در محدوده بارها
-   double FindMaxHighInRange(const int startBar, const int endBar) const
-   {
-      double maxHigh = 0;
-      for (int b = MathMax(0, startBar); b <= endBar; b++)
-      {
-         double h = iHigh(m_symbol, m_timeframe, b);
-         if (h > maxHigh) maxHigh = h;
-      }
-      return maxHigh;
-   }
-
-   //--- تابع کمکی: یافتن کمترین قیمت در محدوده بارها
-   double FindMinLowInRange(const int startBar, const int endBar) const
-   {
-      double minLow = DBL_MAX;
-      for (int b = MathMax(0, startBar); b <= endBar; b++)
-      {
-         double l = iLow(m_symbol, m_timeframe, b);
-         if (l < minLow) minLow = l;
-      }
-      return minLow;
-   }
-
-   //--- تابع ترسیمی: رسم نقطه مینور (با فلش کوچک و آفست بزرگتر)
+   //--- تابع ترسیمی: رسم نقطه مینور (با فلش کوچک و آفست)
    void drawMinorSwingPoint(const SwingPoint &sp, const bool isHigh)
    {
       string objName = (isHigh ? "Minor_H_" : "Minor_L_") + TimeToString(sp.time) + m_timeframeSuffix;
       ObjectDelete(m_chartId, objName);
 
-      double offset = _Point * 20; // آفست بزرگتر برای قرارگیری بهتر
+      double offset = _Point * 10; // آفست کوچک برای قرارگیری بهتر
       double drawPrice = isHigh ? sp.price + offset : sp.price - offset;
 
       ObjectCreate(m_chartId, objName, OBJ_ARROW, 0, sp.time, drawPrice);
@@ -1132,77 +1135,80 @@ private:
       ObjectSetInteger(m_chartId, objName, OBJPROP_ANCHOR, isHigh ? ANCHOR_TOP : ANCHOR_BOTTOM);
    }
    
-   //--- تابع کمکی: اضافه کردن نقطه مینور (با مدیریت تکرار و ظرفیت)
-   bool AddMinorPoint(const double price, const datetime time, const bool isHigh)
-   {
-      // انتخاب آرایه مناسب بر اساس isHigh
-      SwingPoint arr[];
-      if (isHigh)
-         ArrayCopy(arr, m_minorSwingHighs_Array);
-      else
-         ArrayCopy(arr, m_minorSwingLows_Array);
+   // <<< جدید: یک تابع کمکی برای جلوگیری از تکرار کد اضافه شد
+//+------------------------------------------------------------------+
+//| تابع کمکی: اضافه کردن نقطه مینور (با مدیریت تکرار و ظرفیت)       |
+//+------------------------------------------------------------------+
+bool AddMinorPoint(const double price, const datetime time, const bool isHigh)
+{
+   // انتخاب آرایه مناسب بر اساس isHigh
+   SwingPoint arr[];
+   if (isHigh)
+      ArrayCopy(arr, m_minorSwingHighs_Array);
+   else
+      ArrayCopy(arr, m_minorSwingLows_Array);
       
-      // چک تکرار
-      for (int j = 0; j < ArraySize(arr); j++)
-      {
-         if (arr[j].time == time)
-            return false; // نقطه تکراری است
-      }
-
-      SwingPoint newPoint;
-      newPoint.price = price;
-      newPoint.time = time;
-      newPoint.bar_index = iBarShift(m_symbol, m_timeframe, time, false);
-
-      SwingPoint temp[1]; 
-      temp[0] = newPoint;
-   
-      // افزودن به آرایه مناسب
-      if (isHigh)
-      {
-         if (ArrayInsert(m_minorSwingHighs_Array, temp, 0))
-         {
-            // مدیریت ظرفیت
-            if (ArraySize(m_minorSwingHighs_Array) > 10)
-            {
-               int lastIndex = ArraySize(m_minorSwingHighs_Array) - 1;
-               if (m_showDrawing)
-               {
-                  string objNameOld = "Minor_H_" + TimeToString(m_minorSwingHighs_Array[lastIndex].time) + m_timeframeSuffix;
-                  ObjectDelete(m_chartId, objNameOld);
-               }
-               ArrayRemove(m_minorSwingHighs_Array, lastIndex, 1);
-            }
-         
-            if (m_showDrawing) drawMinorSwingPoint(newPoint, true);
-            LogEvent("سقف مینور جدید در قیمت " + DoubleToString(price, _Digits) + " شناسایی شد.", m_enableLogging, "[MINOR]");
-            return true;
-         }
-      }
-      else
-      {
-         if (ArrayInsert(m_minorSwingLows_Array, temp, 0))
-         {
-            // مدیریت ظرفیت
-            if (ArraySize(m_minorSwingLows_Array) > 10)
-            {
-               int lastIndex = ArraySize(m_minorSwingLows_Array) - 1;
-               if (m_showDrawing)
-               {
-                  string objNameOld = "Minor_L_" + TimeToString(m_minorSwingLows_Array[lastIndex].time) + m_timeframeSuffix;
-                  ObjectDelete(m_chartId, objNameOld);
-               }
-               ArrayRemove(m_minorSwingLows_Array, lastIndex, 1);
-            }
-         
-            if (m_showDrawing) drawMinorSwingPoint(newPoint, false);
-            LogEvent("کف مینور جدید در قیمت " + DoubleToString(price, _Digits) + " شناسایی شد.", m_enableLogging, "[MINOR]");
-            return true;
-         }
-      }
-   
-      return false;
+   // چک تکرار
+   for (int j = 0; j < ArraySize(arr); j++)
+   {
+      if (arr[j].time == time)
+         return false; // نقطه تکراری است
    }
+
+   SwingPoint newPoint;
+   newPoint.price = price;
+   newPoint.time = time;
+   newPoint.bar_index = iBarShift(m_symbol, m_timeframe, time, false);
+
+   SwingPoint temp[1]; 
+   temp[0] = newPoint;
+   
+   // افزودن به آرایه مناسب
+   if (isHigh)
+   {
+      if (ArrayInsert(m_minorSwingHighs_Array, temp, 0))
+      {
+         // مدیریت ظرفیت
+         if (ArraySize(m_minorSwingHighs_Array) > 10)
+         {
+            int lastIndex = ArraySize(m_minorSwingHighs_Array) - 1;
+            if (m_showDrawing)
+            {
+               string objNameOld = "Minor_H_" + TimeToString(m_minorSwingHighs_Array[lastIndex].time) + m_timeframeSuffix;
+               ObjectDelete(m_chartId, objNameOld);
+            }
+            ArrayRemove(m_minorSwingHighs_Array, lastIndex, 1);
+         }
+         
+         if (m_showDrawing) drawMinorSwingPoint(newPoint, true);
+         LogEvent("سقف مینور جدید در قیمت " + DoubleToString(price, _Digits) + " شناسایی شد.", m_enableLogging, "[MINOR]");
+         return true;
+      }
+   }
+   else
+   {
+      if (ArrayInsert(m_minorSwingLows_Array, temp, 0))
+      {
+         // مدیریت ظرفیت
+         if (ArraySize(m_minorSwingLows_Array) > 10)
+         {
+            int lastIndex = ArraySize(m_minorSwingLows_Array) - 1;
+            if (m_showDrawing)
+            {
+               string objNameOld = "Minor_L_" + TimeToString(m_minorSwingLows_Array[lastIndex].time) + m_timeframeSuffix;
+               ObjectDelete(m_chartId, objNameOld);
+            }
+            ArrayRemove(m_minorSwingLows_Array, lastIndex, 1);
+         }
+         
+         if (m_showDrawing) drawMinorSwingPoint(newPoint, false);
+         LogEvent("کف مینور جدید در قیمت " + DoubleToString(price, _Digits) + " شناسایی شد.", m_enableLogging, "[MINOR]");
+         return true;
+      }
+   }
+   
+   return false;
+}
 
 public:
    //+------------------------------------------------------------------+
