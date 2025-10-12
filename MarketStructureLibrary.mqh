@@ -1,20 +1,3 @@
-wrong parameters count	MarketStructureLibrary.mqh	1062	26
-   built-in: int iAO(const string,ENUM_TIMEFRAMES)	MarketStructureLibrary.mqh	1062	26
-wrong parameters count	MarketStructureLibrary.mqh	1065	27
-   built-in: int iAO(const string,ENUM_TIMEFRAMES)	MarketStructureLibrary.mqh	1065	27
-wrong parameters count	MarketStructureLibrary.mqh	1065	79
-   built-in: int iAO(const string,ENUM_TIMEFRAMES)	MarketStructureLibrary.mqh	1065	79
-wrong parameters count	MarketStructureLibrary.mqh	1076	26
-   built-in: int iAO(const string,ENUM_TIMEFRAMES)	MarketStructureLibrary.mqh	1076	26
-wrong parameters count	MarketStructureLibrary.mqh	1079	27
-   built-in: int iAO(const string,ENUM_TIMEFRAMES)	MarketStructureLibrary.mqh	1079	27
-wrong parameters count	MarketStructureLibrary.mqh	1079	79
-   built-in: int iAO(const string,ENUM_TIMEFRAMES)	MarketStructureLibrary.mqh	1079	79
-
-
-
-
-
 //+------------------------------------------------------------------+
 //|                                MarketStructureLibrary.mqh       |
 //|                                  Copyright 2025, Khajavi  |
@@ -44,7 +27,7 @@ wrong parameters count	MarketStructureLibrary.mqh	1079	79
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2025, Khajavi _ HipoAlgoritm"
 #property link      "https://www.HipoAlgoritm.com"
-#property version   "1.62" // نسخه اصلاح‌شده کلاس MinorStructure
+#property version   "1.63" // نسخه اصلاح‌شده کلاس MinorStructure با رفع خطاهای کامپایل
 
 //+------------------------------------------------------------------+
 //| ساختارهای داده و شمارنده‌ها (Structs & Enums)                     |
@@ -945,6 +928,9 @@ private:
    bool             m_showDrawing;          // کنترل نمایش ترسیمات مینور روی چارت
    int              m_aoFractalLength;      // طول فرکتال AO (تعداد میله‌های اطراف)
 
+   //--- هندل اندیکاتور
+   int              m_ao_handle;            // هندل اندیکاتور Awesome Oscillator
+
    //--- متغیرهای حالت
    SwingPoint       m_minorSwingHighs_Array[]; // آرایه سقف‌های مینور (سری، ظرفیت حداکثر ۱۰)
    SwingPoint       m_minorSwingLows_Array[];  // آرایه کف‌های مینور (سری، ظرفیت حداکثر ۱۰)
@@ -966,6 +952,12 @@ public:
       // تنظیم پسوند تایم فریم برای نمایش MTF (کوتاه شده)
       m_timeframeSuffix = " (" + TimeFrameToStringShort(timeframe) + ")";
 
+      m_ao_handle = iAO(m_symbol, m_timeframe);
+      if (m_ao_handle == INVALID_HANDLE)
+      {
+         Print("خطا در ایجاد هندل AO برای کلاس MinorStructure.");
+      }
+
       ArraySetAsSeries(m_minorSwingHighs_Array, true);
       ArraySetAsSeries(m_minorSwingLows_Array, true);
       ArrayResize(m_minorSwingHighs_Array, 0);
@@ -973,7 +965,7 @@ public:
       
       m_lastScannedBar = 0;
 
-      // پاکسازی اشیاء قبلی مربوط به این کلاس روی چارت (اصلاح نام برای تطبیق دقیق‌تر)
+      // پاکسازی اشیاء قبلی مربوط به این کلاس روی چارت
       if (m_showDrawing)
       {
          int total = ObjectsTotal(m_chartId, 0, -1);
@@ -995,7 +987,12 @@ public:
    //+------------------------------------------------------------------+
    ~MinorStructure()
    {
-      // پاک کردن اشیاء هنگام از بین رفتن آبجکت (اصلاح نام برای تطبیق دقیق‌تر)
+      if (m_ao_handle != INVALID_HANDLE)
+      {
+         IndicatorRelease(m_ao_handle);
+      }
+      
+      // پاک کردن اشیاء هنگام از بین رفتن آبجکت
       if (m_showDrawing)
       {
          int total = ObjectsTotal(m_chartId, 0, -1);
@@ -1076,13 +1073,19 @@ private:
    //--- تابع کمکی: بررسی فرکتال سقف AO در بار مشخص (میله وسط > اطراف)
    bool IsMinorHigh(const int bar) const
    {
-      double ao_center = iAO(m_symbol, m_timeframe, bar);
+      double ao[1];
+      if (CopyBuffer(m_ao_handle, 0, bar, 1, ao) != 1) return false;
+      double ao_center = ao[0];
+      
       for (int j = 1; j <= m_aoFractalLength; j++)
       {
-         if (ao_center <= iAO(m_symbol, m_timeframe, bar - j) || ao_center <= iAO(m_symbol, m_timeframe, bar + j))
-         {
-            return false;
-         }
+         if (CopyBuffer(m_ao_handle, 0, bar - j, 1, ao) != 1) return false;
+         double left = ao[0];
+         
+         if (CopyBuffer(m_ao_handle, 0, bar + j, 1, ao) != 1) return false;
+         double right = ao[0];
+         
+         if (ao_center <= left || ao_center <= right) return false;
       }
       return true;
    }
@@ -1090,13 +1093,19 @@ private:
    //--- تابع کمکی: بررسی فرکتال کف AO در بار مشخص (میله وسط < اطراف)
    bool IsMinorLow(const int bar) const
    {
-      double ao_center = iAO(m_symbol, m_timeframe, bar);
+      double ao[1];
+      if (CopyBuffer(m_ao_handle, 0, bar, 1, ao) != 1) return false;
+      double ao_center = ao[0];
+      
       for (int j = 1; j <= m_aoFractalLength; j++)
       {
-         if (ao_center >= iAO(m_symbol, m_timeframe, bar - j) || ao_center >= iAO(m_symbol, m_timeframe, bar + j))
-         {
-            return false;
-         }
+         if (CopyBuffer(m_ao_handle, 0, bar - j, 1, ao) != 1) return false;
+         double left = ao[0];
+         
+         if (CopyBuffer(m_ao_handle, 0, bar + j, 1, ao) != 1) return false;
+         double right = ao[0];
+         
+         if (ao_center >= left || ao_center >= right) return false;
       }
       return true;
    }
@@ -1105,7 +1114,7 @@ private:
    double FindMaxHighInRange(const int startBar, const int endBar) const
    {
       double maxHigh = 0;
-      for (int b = startBar; b <= endBar; b++)
+      for (int b = MathMax(0, startBar); b <= endBar; b++)
       {
          double h = iHigh(m_symbol, m_timeframe, b);
          if (h > maxHigh) maxHigh = h;
@@ -1117,7 +1126,7 @@ private:
    double FindMinLowInRange(const int startBar, const int endBar) const
    {
       double minLow = DBL_MAX;
-      for (int b = startBar; b <= endBar; b++)
+      for (int b = MathMax(0, startBar); b <= endBar; b++)
       {
          double l = iLow(m_symbol, m_timeframe, b);
          if (l < minLow) minLow = l;
@@ -1125,13 +1134,13 @@ private:
       return minLow;
    }
    
-   //--- تابع ترسیمی: رسم نقطه مینور (با فلش کوچک و آفست بزرگتر برای جلوگیری از تداخل با کندل)
+   //--- تابع ترسیمی: رسم نقطه مینور (با فلش کوچک و آفست)
    void drawMinorSwingPoint(const SwingPoint &sp, const bool isHigh)
    {
       string objName = (isHigh ? "Minor_H_" : "Minor_L_") + TimeToString(sp.time) + m_timeframeSuffix;
       ObjectDelete(m_chartId, objName);
 
-      double offset = _Point * 20; // آفست بزرگتر برای قرارگیری خارج از کندل
+      double offset = _Point * 20; // آفست بزرگتر برای جلوگیری از تداخل
       double drawPrice = isHigh ? sp.price + offset : sp.price - offset;
 
       ObjectCreate(m_chartId, objName, OBJ_ARROW, 0, sp.time, drawPrice);
@@ -1151,7 +1160,7 @@ private:
       else
          ArrayCopy(arr, m_minorSwingLows_Array);
       
-      // چک تکرار (بر اساس زمان)
+      // چک تکرار
       for (int j = 0; j < ArraySize(arr); j++)
       {
          if (arr[j].time == time)
