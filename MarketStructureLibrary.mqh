@@ -1,3 +1,15 @@
+الته چند خطای موقع کامپایل داشتم که اشاره ای نکردید
+MarketStructureLibrary.mqh			
+'&' - reference cannot used	MarketStructureLibrary.mqh	1274	18
+'m_minorSwingHighs_Array' - invalid array access	MarketStructureLibrary.mqh	1274	36
+'m_minorSwingLows_Array' - invalid array access	MarketStructureLibrary.mqh	1274	62
+initialization sequence expected, '{' needed	MarketStructureLibrary.mqh	1274	34
+4 errors, 0 warnings		4	0
+
+
+و من سعی کردم اصلاحج کنم . کد پس اصلاح میشه این  لطفا چک و ببین مشکل منطقی که ایجاد نشده ناخاسته
+
+```mqh
 //+------------------------------------------------------------------+
 //|                                MarketStructureLibrary.mqh       |
 //|                                  Copyright 2025, Khajavi  |
@@ -1271,7 +1283,15 @@ private:
    {
       if (time == 0 || price == 0) return false;
       
-      SwingPoint &arr[] = isHigh ? m_minorSwingHighs_Array : m_minorSwingLows_Array;
+      SwingPoint arr[];
+      if (isHigh)
+      {
+         ArrayCopy(arr, m_minorSwingHighs_Array, 0, 0, WHOLE_ARRAY);
+      }
+      else
+      {
+         ArrayCopy(arr, m_minorSwingLows_Array, 0, 0, WHOLE_ARRAY);
+      }
       
       // چک تکرار بر اساس زمان
       for (int j = 0; j < ArraySize(arr); j++)
@@ -1286,23 +1306,47 @@ private:
 
       SwingPoint temp[1]; temp[0] = newPoint;
       
-      if (ArrayInsert(arr, temp, 0))
+      if (isHigh)
       {
-         // مدیریت ظرفیت (حداکثر 10)
-         if (ArraySize(arr) > 10)
+         if (ArrayInsert(m_minorSwingHighs_Array, temp, 0))
          {
-            int lastIndex = ArraySize(arr) - 1;
-            if (m_showDrawing)
+            // مدیریت ظرفیت (حداکثر 10)
+            if (ArraySize(m_minorSwingHighs_Array) > 10)
             {
-               string objNameOld = (isHigh ? "Minor_H_" : "Minor_L_") + TimeToString(arr[lastIndex].time) + m_timeframeSuffix;
-               ObjectDelete(m_chartId, objNameOld);
+               int lastIndex = ArraySize(m_minorSwingHighs_Array) - 1;
+               if (m_showDrawing)
+               {
+                  string objNameOld = "Minor_H_" + TimeToString(m_minorSwingHighs_Array[lastIndex].time) + m_timeframeSuffix;
+                  ObjectDelete(m_chartId, objNameOld);
+               }
+               ArrayRemove(m_minorSwingHighs_Array, lastIndex, 1);
             }
-            ArrayRemove(arr, lastIndex, 1);
+            
+            if (m_showDrawing) drawMinorSwingPoint(newPoint, true);
+            if (m_enableLogging) LogEvent("سقف مینور جدید در قیمت " + DoubleToString(price, _Digits) + " شناسایی شد.", m_enableLogging, "[MINOR]");
+            return true;
          }
-         
-         if (m_showDrawing) drawMinorSwingPoint(newPoint, isHigh);
-         if (m_enableLogging) LogEvent((isHigh ? "سقف" : "کف") + " مینور جدید در قیمت " + DoubleToString(price, _Digits) + " شناسایی شد.", m_enableLogging, "[MINOR]");
-         return true;
+      }
+      else
+      {
+         if (ArrayInsert(m_minorSwingLows_Array, temp, 0))
+         {
+            // مدیریت ظرفیت (حداکثر 10)
+            if (ArraySize(m_minorSwingLows_Array) > 10)
+            {
+               int lastIndex = ArraySize(m_minorSwingLows_Array) - 1;
+               if (m_showDrawing)
+               {
+                  string objNameOld = "Minor_L_" + TimeToString(m_minorSwingLows_Array[lastIndex].time) + m_timeframeSuffix;
+                  ObjectDelete(m_chartId, objNameOld);
+               }
+               ArrayRemove(m_minorSwingLows_Array, lastIndex, 1);
+            }
+            
+            if (m_showDrawing) drawMinorSwingPoint(newPoint, false);
+            if (m_enableLogging) LogEvent("کف مینور جدید در قیمت " + DoubleToString(price, _Digits) + " شناسایی شد.", m_enableLogging, "[MINOR]");
+            return true;
+         }
       }
       
       return false;
@@ -1330,3 +1374,4 @@ public:
    int GetMinorLowsCount() const { return ArraySize(m_minorSwingLows_Array); }
 };
 //+------------------------------------------------------------------+
+```
