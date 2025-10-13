@@ -1,20 +1,20 @@
 //+------------------------------------------------------------------+
 //| MementoTestEA.mq5 |
 //| Copyright 2025, Khajavi & Gemini|
-//| Test Memento Structure |
+//| Test  Structure |
 //+------------------------------------------------------------------+
-#property copyright "Copyright 2025, Khajavi & Gemini"
+#property copyright "Copyright 2025, Khajavi "
 #property link "https://www.google.com"
-#property version "1.02"
+#property version "1.04"
 #property description "تست کتابخانه MarketStructureLibrary با قابلیت MTF و کلاس MinorStructure"
 #include <MarketStructureLibrary.mqh> // ایمپورت کتابخانه کلاس‌بندی شده
 //+------------------------------------------------------------------+
 //| ورودی‌های اکسپرت (Inputs) - نامگذاری جدید برای جلوگیری از تداخل |
 //+------------------------------------------------------------------+
 input bool Input_EnableLogging = true; // [فعال/غیرفعال کردن] سیستم لاگ
-input int Input_FibUpdateLevel = 35; // سطح اصلاح فیبو برای تایید
-input int Input_FractalLength = 10; // طول فرکتال
-input int Input_AOFractalLength = 3; // طول فرکتال AO برای MinorStructure
+input int Input_FibUpdateLevel = 21; // سطح اصلاح فیبو برای تایید
+input int Input_FractalLength = 5; // طول فرکتال
+input int Input_AOFractalLength = 7; //  برای MinorStructu5re
 input ENUM_TIMEFRAMES MTF_Timeframe = PERIOD_H4; // تایم فریم دوم برای تحلیل MTF
 input bool ShowMTFDrawing = true; // نمایش ترسیمات تایم فریم دوم (MTF) روی چارت فعلی
 //+------------------------------------------------------------------+
@@ -66,13 +66,22 @@ int OnInit()
    Chart_Structure = new MarketStructure(_Symbol, _Period, ChartID(), Input_EnableLogging, true, Input_FibUpdateLevel, Input_FractalLength);
    Chart_FVG = new FVGManager(_Symbol, _Period, ChartID(), Input_EnableLogging, true);
    Chart_Minor = new MinorStructure(_Symbol, _Period, ChartID(), Input_EnableLogging, true, Input_AOFractalLength);
-  
+    // غیرفعال کردن گرید چارت
+   ChartSetInteger(0, CHART_SHOW_GRID, false);
+   
+   // تنظیم رنگ کندل‌ها
+   ChartSetInteger(0, CHART_COLOR_CANDLE_BULL, clrGreen);
+   ChartSetInteger(0, CHART_COLOR_CANDLE_BEAR, clrRed);
+   ChartSetInteger(0, CHART_COLOR_CHART_UP, clrGreen);
+   ChartSetInteger(0, CHART_COLOR_CHART_DOWN, clrRed);
+   
    // ۲. ساخت آبجکت‌های مربوط به تایم فریم MTF
    // (تنظیم نمایش MTF بر اساس ورودی ShowMTFDrawing)
    MTF_Structure = new MarketStructure(_Symbol, MTF_Timeframe, ChartID(), Input_EnableLogging, ShowMTFDrawing, Input_FibUpdateLevel, Input_FractalLength);
    MTF_FVG = new FVGManager(_Symbol, MTF_Timeframe, ChartID(), Input_EnableLogging, ShowMTFDrawing);
    MTF_Minor = new MinorStructure(_Symbol, MTF_Timeframe, ChartID(), Input_EnableLogging, ShowMTFDrawing, Input_AOFractalLength);
   
+   ChartRedraw(ChartID());
    return(INIT_SUCCEEDED);
 }
 //+------------------------------------------------------------------+
@@ -104,7 +113,7 @@ void OnTick()
    if (IsNewBar())
    {
       // پردازش برای تایم فریم چارت فعلی (PERIOD_CURRENT)
-      if (Chart_Structure != NULL && Chart_Structure.ProcessNewBar()) chartRedrawNeeded = true;
+    //  if (Chart_Structure != NULL && Chart_Structure.ProcessNewBar()) chartRedrawNeeded = true;
       if (Chart_FVG != NULL && Chart_FVG.ProcessNewBar()) chartRedrawNeeded = true;
       if (Chart_Minor != NULL && Chart_Minor.ProcessNewBar()) chartRedrawNeeded = true;
    }
@@ -113,9 +122,9 @@ void OnTick()
    {
       // پردازش برای تایم فریم MTF (مثلاً H4)
       if (MTF_Structure != NULL && MTF_Structure.ProcessNewBar()) chartRedrawNeeded = true;
-      if (MTF_FVG != NULL && MTF_FVG.ProcessNewBar()) chartRedrawNeeded = true;
-      if (MTF_Minor != NULL && MTF_Minor.ProcessNewBar()) chartRedrawNeeded = true;
-   }
+     // if (MTF_FVG != NULL && MTF_FVG.ProcessNewBar()) chartRedrawNeeded = true;
+     // if (MTF_Minor != NULL && MTF_Minor.ProcessNewBar()) chartRedrawNeeded = true;
+   }///
   
    //--- مثال دسترسی به داده‌های کلاس جدید MinorStructure (برای لاگ یا منطق معاملاتی)
    if (MTF_Minor != NULL && MTF_Minor.GetMinorHighsCount() > 0)
