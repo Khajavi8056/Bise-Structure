@@ -1,4 +1,3 @@
-```mqh
 //+------------------------------------------------------------------+
 //|                                MarketStructureLibrary.mqh       |
 //|                                  Copyright 2025, Khajavi  |
@@ -28,7 +27,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2025, Khajavi _ HipoAlgoritm"
 #property link      "https://www.HipoAlgoritm.com"
-#property version   "1.75" // نسخه با آپدیت کلاس MinorStructure
+#property version   "1.74" // نسخه با بهینه‌سازی کلاس MinorStructure برای MT5
 
 //+------------------------------------------------------------------+
 //| ساختارهای داده و شمارنده‌ها (Structs & Enums)                     |
@@ -793,8 +792,8 @@ private:
       {
          if (m_showDrawing)
          {
-             ObjectDelete(m_chartId, "H_" + TimeToString(m_swingHighs_Array[1].time) + m_timeframeSuffix);
-             ObjectDelete(m_chartId, "H_" + TimeToString(m_swingHighs_Array[1].time) + m_timeframeSuffix + "_Text");
+             ObjectDelete(m_chartId, "  H_" + TimeToString(m_swingHighs_Array[1].time) + m_timeframeSuffix);
+             ObjectDelete(m_chartId, "  H_" + TimeToString(m_swingHighs_Array[1].time) + m_timeframeSuffix + "_Text");
          }
          ArrayRemove(m_swingHighs_Array, ArraySize(m_swingHighs_Array) - 1, 1);
       }
@@ -816,8 +815,8 @@ private:
       {
          if (m_showDrawing)
          {
-             ObjectDelete(m_chartId, "L_" + TimeToString(m_swingLows_Array[1].time) + m_timeframeSuffix);
-             ObjectDelete(m_chartId, "L_" + TimeToString(m_swingLows_Array[1].time) + m_timeframeSuffix + "_Text");
+             ObjectDelete(m_chartId, "  L_" + TimeToString(m_swingLows_Array[1].time) + m_timeframeSuffix);
+             ObjectDelete(m_chartId, "  L_" + TimeToString(m_swingLows_Array[1].time) + m_timeframeSuffix + "_Text");
          }
          ArrayRemove(m_swingLows_Array, ArraySize(m_swingLows_Array) - 1, 1);
       }
@@ -1111,10 +1110,7 @@ private:
       {
          if (!foundHigh && IsAOFractalHigh(shift, aoBuffer))
          {
-            datetime lastOppositeTime = (ArraySize(m_minorSwingLows_Array) > 0) ? m_minorSwingLows_Array[0].time : 0;
-            int leftSpan = CalculateLeftSpan(shift, aoBuffer, true, lastOppositeTime);
-            int rightSpan = CalculateRightSpan(shift, aoBuffer, true);
-            SwingPoint adjusted = AdjustMinorPoint(shift, true, leftSpan, rightSpan);
+            SwingPoint adjusted = AdjustMinorPoint(shift, true);
             if (AddMinorPoint(adjusted.price, adjusted.time, adjusted.bar_index, true))
             {
                foundHigh = true;
@@ -1125,10 +1121,7 @@ private:
          
          if (!foundLow && IsAOFractalLow(shift, aoBuffer))
          {
-            datetime lastOppositeTime = (ArraySize(m_minorSwingHighs_Array) > 0) ? m_minorSwingHighs_Array[0].time : 0;
-            int leftSpan = CalculateLeftSpan(shift, aoBuffer, false, lastOppositeTime);
-            int rightSpan = CalculateRightSpan(shift, aoBuffer, false);
-            SwingPoint adjusted = AdjustMinorPoint(shift, false, leftSpan, rightSpan);
+            SwingPoint adjusted = AdjustMinorPoint(shift, false);
             if (AddMinorPoint(adjusted.price, adjusted.time, adjusted.bar_index, false))
             {
                foundLow = true;
@@ -1163,12 +1156,7 @@ private:
          bool isFractal = isHigh ? IsAOFractalHigh(shift, aoBuffer) : IsAOFractalLow(shift, aoBuffer);
          if (isFractal)
          {
-            datetime lastOppositeTime = isHigh ? 
-               (ArraySize(m_minorSwingLows_Array) > 0 ? m_minorSwingLows_Array[0].time : 0) :
-               (ArraySize(m_minorSwingHighs_Array) > 0 ? m_minorSwingHighs_Array[0].time : 0);
-            int leftSpan = CalculateLeftSpan(shift, aoBuffer, isHigh, lastOppositeTime);
-            int rightSpan = CalculateRightSpan(shift, aoBuffer, isHigh);
-            SwingPoint adjusted = AdjustMinorPoint(shift, isHigh, leftSpan, rightSpan);
+            SwingPoint adjusted = AdjustMinorPoint(shift, isHigh);
             if (AddMinorPoint(adjusted.price, adjusted.time, adjusted.bar_index, isHigh))
             {
                if (isHigh) m_lastHighTime = adjusted.time;
@@ -1179,54 +1167,6 @@ private:
       }
       
       return newFound;
-   }
-   
-   //--- تابع جدید: محاسبه بازه چپ (گذشته) با ترمز هوشمند
-   int CalculateLeftSpan(const int centerShift, const double &aoBuffer[], const bool isHigh, const datetime lastOppositeTime) const
-   {
-      double aoCenter = aoBuffer[centerShift];
-      int leftSpan = 0;
-      int shift = centerShift + 1; // سمت چپ (قدیمی‌تر، shift بزرگ‌تر)
-      int maxShift = ArraySize(aoBuffer) - 1;
-      
-      while (shift <= maxShift)
-      {
-         datetime currentTime = iTime(m_symbol, m_timeframe, shift);
-         if (lastOppositeTime > 0 && currentTime < lastOppositeTime) break; // ترمز ساختاری
-         
-         double aoValue = aoBuffer[shift];
-         if (aoValue == 0.0) break;
-         
-         bool condition = isHigh ? (aoValue >= aoCenter) : (aoValue <= aoCenter);
-         if (condition) break; // شرط مومنتوم
-         
-         leftSpan++;
-         shift++;
-      }
-      
-      return leftSpan;
-   }
-   
-   //--- تابع جدید: محاسبه بازه راست (جدیدتر) بدون ترمز
-   int CalculateRightSpan(const int centerShift, const double &aoBuffer[], const bool isHigh) const
-   {
-      double aoCenter = aoBuffer[centerShift];
-      int rightSpan = 0;
-      int shift = centerShift - 1; // سمت راست (جدیدتر، shift کوچک‌تر)
-      
-      while (shift >= 0)
-      {
-         double aoValue = aoBuffer[shift];
-         if (aoValue == 0.0) break;
-         
-         bool condition = isHigh ? (aoValue >= aoCenter) : (aoValue <= aoCenter);
-         if (condition) break; // شرط مومنتوم
-         
-         rightSpan++;
-         shift--;
-      }
-      
-      return rightSpan;
    }
    
    //--- تابع: بررسی شرط فرکتال برای سقف AO (بالاتر از اطراف، با کش بافر)
@@ -1275,13 +1215,13 @@ private:
       return isLow;
    }
    
-   //--- تابع آپدیت شده: ریگلاژ قیمت در بازه نامتقارن (leftSpan و rightSpan)
-   SwingPoint AdjustMinorPoint(const int centerShift, const bool isHigh, const int leftSpan, const int rightSpan) const
+   //--- تابع: ریگلاژ قیمت در بازه اطراف (برای سقف max High، برای کف min Low)
+   SwingPoint AdjustMinorPoint(const int centerShift, const bool isHigh) const
    {
       SwingPoint result; result.price = isHigh ? 0 : DBL_MAX; result.time = 0; result.bar_index = -1;
       
-      int start = centerShift - rightSpan; // سمت راست (جدیدتر)
-      int end = centerShift + leftSpan;    // سمت چپ (قدیمی‌تر)
+      int start = centerShift - m_aoFractalLength;
+      int end = centerShift + m_aoFractalLength;
       
       if (start < 0 || end >= iBars(m_symbol, m_timeframe)) return result; // جلوگیری از دسترسی خارج از محدوده
       
@@ -1312,7 +1252,7 @@ private:
       string objName = (isHigh ? "Minor_H_" : "Minor_L_") + TimeToString(sp.time) + m_timeframeSuffix;
       ObjectDelete(m_chartId, objName);
 
-      double offset = _Point * 10; // آفست کوچک برای قرارگیری بهتر
+      double offset = _Point * 50; // آفست کوچک برای قرارگیری بهتر
       double drawPrice = isHigh ? sp.price + offset : sp.price - offset;
 
       if (!ObjectCreate(m_chartId, objName, OBJ_ARROW, 0, sp.time, drawPrice))
@@ -1321,7 +1261,7 @@ private:
          return;
       }
       ObjectSetInteger(m_chartId, objName, OBJPROP_ARROWCODE, isHigh ? 217 : 218); // 217: فلش رو به پایین (سقف)، 218: فلش رو به بالا (کف)
-      ObjectSetInteger(m_chartId, objName, OBJPROP_COLOR, clrBlue);
+      ObjectSetInteger(m_chartId, objName, OBJPROP_COLOR, clrYellow);
       ObjectSetInteger(m_chartId, objName, OBJPROP_WIDTH, 1);
       ObjectSetInteger(m_chartId, objName, OBJPROP_ANCHOR, isHigh ? ANCHOR_TOP : ANCHOR_BOTTOM);
    }
@@ -1422,5 +1362,3 @@ public:
    int GetMinorLowsCount() const { return ArraySize(m_minorSwingLows_Array); }
 };
 //+------------------------------------------------------------------+
-
-```
