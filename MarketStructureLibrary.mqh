@@ -27,7 +27,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2025, Khajavi _ HipoAlgoritm"
 #property link      "https://www.HipoAlgoritm.com"
-#property version   "2.00" // نسخه با ارتقاء کلاس MinorStructure برای شناسایی Order Block و EQ Pattern
+#property version   "2.10" // نسخه با ارتقاء منطق EQ در کلاس MinorStructure
 
 //+------------------------------------------------------------------+
 //| ساختارهای داده و شمارنده‌ها (Structs & Enums)                     |
@@ -987,6 +987,8 @@ private:
    SwingPoint       m_minorSwingHighs_Array[]; // آرایه سقف‌های مینور (سری، ظرفیت حداکثر ۱۰)
    SwingPoint       m_minorSwingLows_Array[];  // آرایه کف‌های مینور (سری، ظرفیت حداکثر ۱۰)
    EQPattern        m_eqPatterns_Array[];      // آرایه الگوهای EQ (سری، ظرفیت حداکثر ۱۰)
+   SwingPoint       m_activeHighCandidate;     // کاندیدای فعال فعلی برای EQ نزولی
+   SwingPoint       m_activeLowCandidate;      // کاندیدای فعال فعلی برای EQ صعودی
    datetime         m_lastHighTime;            // زمان آخرین سقف ذخیره شده (برای اسکن)
    datetime         m_lastLowTime;             // زمان آخرین کف ذخیره شده (برای اسکن)
    datetime         m_lastProcessedBarTime;    // زمان آخرین کندل پردازش شده (برای تشخیص NewBar)
@@ -1021,6 +1023,8 @@ public:
       ArrayResize(m_minorSwingLows_Array, 0, 10);  // رزرو اولیه برای بهینه‌سازی
       ArrayResize(m_eqPatterns_Array, 0, 10);      // رزرو اولیه برای بهینه‌سازی
       
+      m_activeHighCandidate.bar_index = -1;
+      m_activeLowCandidate.bar_index = -1;
       m_lastHighTime = 0;
       m_lastLowTime = 0;
       m_lastProcessedBarTime = 0;
@@ -1032,7 +1036,7 @@ public:
          for(int i = total - 1; i >= 0; i--)
          {
             string name = ObjectName(m_chartId, i);
-            if(StringFind(name, "Minor_" + m_timeframeSuffix) != -1)
+            if(StringFind(name, m_timeframeSuffix) != -1 && (StringFind(name, "Minor_") != -1 || StringFind(name, "Confirmed_") != -1 || StringFind(name, "EQ_") != -1))
             {
                ObjectDelete(m_chartId, name);
             }
@@ -1057,7 +1061,7 @@ public:
          for(int i = total - 1; i >= 0; i--)
          {
             string name = ObjectName(m_chartId, i);
-            if(StringFind(name, "Minor_" + m_timeframeSuffix) != -1)
+            if(StringFind(name, m_timeframeSuffix) != -1 && (StringFind(name, "Minor_") != -1 || StringFind(name, "Confirmed_") != -1 || StringFind(name, "EQ_") != -1))
             {
                ObjectDelete(m_chartId, name);
             }
@@ -1338,159 +1342,137 @@ private:
       return (body > 0.5 * range);
    }
    
-   //--- تابع اصلی: شناسایی الگوی EQ
+   //--- تابع اصلی: شناسایی الگوی EQ (بازنویسی شده با منطق کاندیدای فعال)
    void ProcessEQDetection()
    {
-      int highsCount = GetMinorHighsCount();
-      int lowsCount = GetMinorLowsCount();
-      if (highsCount < 1 || lowsCount < 1) return; // حداقل یک مینور لازم
-      
-      // بررسی برای حالت نزولی (تست سقف - Double Top)
-      for (int idx = 0; idx < MathMin(2, highsCount); idx++)
+      // --- بخش ۱: ارزیابی کاندیدای سقف فعال (برای EQ نزولی) ---
+      if (m_activeHighCandidate.bar_index != -1) // آیا اصلاً کاندیدای فعالی داریم؟
       {
-         SwingPoint swing = GetMinorSwingHigh(idx);
-         if (swing.bar_index == -1) continue;
-         
-         double zoneHigh = swing.price;
-         double zoneLow = swing.body_price;
-         if (zoneHigh <= zoneLow) continue; // زون نامعتبر
-         
-         int startShift = iBarShift(m_symbol, m_timeframe, swing.time, false) - 1; // از کندل بعد از swing شروع
-         bool enteredZone = false;
-         datetime entryTime = 0;
-         double entryPrice = 0;
-         
-         for (int shift = 1; shift <= startShift; shift++) // از جدید به قدیم
+         // شرط ابطال ۱: آیا سقف جدیدتری از کاندیدای ما تشکیل شده؟
+         if (GetMinorHighsCount() > 0 && GetMinorSwingHigh(0).time > m_activeHighCandidate.time)
          {
-            double close_shift = iClose(m_symbol, m_timeframe, shift);
-            if (close_shift > zoneHigh) // شرط ابطال ۱: بسته شدن بالای زون
+            LogEvent("کاندیدای سقف " + TimeToString(m_activeHighCandidate.time) + " توسط سقف جدیدتر باطل شد.", m_enableLogging, "[MINOR]");
+            m_activeHighCandidate = GetMinorSwingHigh(0); // کاندیدا به سقف جدید آپدیت می‌شود
+            return; // در این تیک کاری با این کاندیدا نداریم
+         }
+
+         // تعریف زون فرضی
+         double zoneHigh = m_activeHighCandidate.price;
+         double zoneLow = m_activeHighCandidate.body_price;
+
+         // شرط ابطال ۲: آیا کندل بسته شده فعلی بالای زون بسته شده؟
+         if (iClose(m_symbol, m_timeframe, 1) > zoneHigh)
+         {
+            LogEvent("کاندیدای سقف " + TimeToString(m_activeHighCandidate.time) + " با بسته شدن قیمت بالای زون باطل شد.", m_enableLogging, "[MINOR]");
+            m_activeHighCandidate.bar_index = -1; // کاندیدا غیرفعال می‌شود
+            return;
+         }
+
+         // شرط ورود و تایید الگو
+         if (iHigh(m_symbol, m_timeframe, 1) >= zoneLow) // آیا کندل فعلی وارد زون شده؟
+         {
+            // آیا کندل فعلی یک کندل تایید نزولی و قوی است؟
+            if (iClose(m_symbol, m_timeframe, 1) < iOpen(m_symbol, m_timeframe, 1) && IsStrongCandle(1))
             {
-               break; // باطل، سراغ swing بعدی
-            }
-            
-            if (GetMinorHighsCount() > 0 && GetMinorSwingHigh(0).time > swing.time) // شرط ابطال ۲: سقف جدیدتر
-            {
-               break; // باطل
-            }
-            
-            double high_shift = iHigh(m_symbol, m_timeframe, shift);
-            if (high_shift >= zoneLow && !enteredZone) // ورود به زون
-            {
-               enteredZone = true;
-               entryTime = iTime(m_symbol, m_timeframe, shift);
-               entryPrice = high_shift; // قیمت ورود (High کندل ورود)
-            }
-            
-            if (enteredZone && shift == 1) // بررسی کندل تایید (کندل بسته شده اخیر)
-            {
-               double close_1 = iClose(m_symbol, m_timeframe, 1);
-               double open_1 = iOpen(m_symbol, m_timeframe, 1);
-               if (close_1 < open_1 && IsStrongCandle(1)) // کندل نزولی قوی
+               // الگو تایید شد!
+               EQPattern newEQ;
+               newEQ.isBullish = false;
+               newEQ.time_formation = iTime(m_symbol, m_timeframe, 1); // زمان تایید
+               newEQ.price_entry = iHigh(m_symbol, m_timeframe, 1); // High کندل تایید
+               newEQ.source_swing = m_activeHighCandidate;
+
+               EQPattern temp[1]; temp[0] = newEQ;
+               if (ArrayInsert(m_eqPatterns_Array, temp, 0))
                {
-                  EQPattern newEQ;
-                  newEQ.isBullish = false; // نزولی (Double Top)
-                  newEQ.time_formation = iTime(m_symbol, m_timeframe, 1);
-                  newEQ.price_entry = entryPrice;
-                  newEQ.source_swing = swing;
-                  
-                  EQPattern temp[1]; temp[0] = newEQ;
-                  if (ArrayInsert(m_eqPatterns_Array, temp, 0))
+                  // مدیریت ظرفیت (حداکثر 10)
+                  if (ArraySize(m_eqPatterns_Array) > 10)
                   {
-                     if (ArraySize(m_eqPatterns_Array) > 10)
-                     {
-                        int lastIndex = ArraySize(m_eqPatterns_Array) - 1;
-                        string objNameOld = "EQ_" + TimeToString(m_eqPatterns_Array[lastIndex].time_formation) + m_timeframeSuffix;
-                        ObjectDelete(m_chartId, objNameOld);
-                        ObjectDelete(m_chartId, objNameOld + "_Text");
-                        ArrayRemove(m_eqPatterns_Array, lastIndex, 1);
-                     }
-                     
-                     if (m_showDrawing) drawEQPattern(newEQ);
-                     LogEvent("الگوی EQ نزولی (Double Top) شناسایی شد در زمان " + TimeToString(newEQ.time_formation), m_enableLogging, "[MINOR]");
+                     int lastIndex = ArraySize(m_eqPatterns_Array) - 1;
+                     string objNameOld = "EQ_Line_" + TimeToString(m_eqPatterns_Array[lastIndex].time_formation) + m_timeframeSuffix;
+                     string textNameOld = "EQ_Text_" + TimeToString(m_eqPatterns_Array[lastIndex].time_formation) + m_timeframeSuffix;
+                     string obNameOld = "Confirmed_OB_" + TimeToString(m_eqPatterns_Array[lastIndex].source_swing.time) + m_timeframeSuffix;
+                     ObjectDelete(m_chartId, objNameOld);
+                     ObjectDelete(m_chartId, textNameOld);
+                     ObjectDelete(m_chartId, obNameOld);
+                     ArrayRemove(m_eqPatterns_Array, lastIndex, 1);
                   }
-                  break; // الگو پیدا شد، حلقه را متوقف کن
+                  
+                  if (m_showDrawing) drawConfirmedEQ(newEQ);
+                  LogEvent("الگوی EQ نزولی تایید و رسم شد.", m_enableLogging, "[MINOR]");
+
+                  m_activeHighCandidate.bar_index = -1; // کاندیدا پس از موفقیت، غیرفعال می‌شود
                }
             }
          }
       }
-      
-      // بررسی برای حالت صعودی (تست کف - Double Bottom)
-      for (int idx = 0; idx < MathMin(2, lowsCount); idx++)
+
+      // --- بخش ۲: ارزیابی کاندیدای کف فعال (برای EQ صعودی) ---
+      if (m_activeLowCandidate.bar_index != -1)
       {
-         SwingPoint swing = GetMinorSwingLow(idx);
-         if (swing.bar_index == -1) continue;
-         
-         double zoneLow = swing.price;
-         double zoneHigh = swing.body_price;
-         if (zoneHigh <= zoneLow) continue; // زون نامعتبر
-         
-         int startShift = iBarShift(m_symbol, m_timeframe, swing.time, false) - 1;
-         bool enteredZone = false;
-         datetime entryTime = 0;
-         double entryPrice = 0;
-         
-         for (int shift = 1; shift <= startShift; shift++)
+         // شرط ابطال ۱: آیا کف جدیدتری از کاندیدای ما تشکیل شده؟
+         if (GetMinorLowsCount() > 0 && GetMinorSwingLow(0).time > m_activeLowCandidate.time)
          {
-            double close_shift = iClose(m_symbol, m_timeframe, shift);
-            if (close_shift < zoneLow) // شرط ابطال ۱: بسته شدن پایین زون
+            LogEvent("کاندیدای کف " + TimeToString(m_activeLowCandidate.time) + " توسط کف جدیدتر باطل شد.", m_enableLogging, "[MINOR]");
+            m_activeLowCandidate = GetMinorSwingLow(0); // کاندیدا به کف جدید آپدیت می‌شود
+            return; // در این تیک کاری با این کاندیدا نداریم
+         }
+
+         // تعریف زون فرضی
+         double zoneLow = m_activeLowCandidate.price;
+         double zoneHigh = m_activeLowCandidate.body_price;
+
+         // شرط ابطال ۲: آیا کندل بسته شده فعلی پایین زون بسته شده؟
+         if (iClose(m_symbol, m_timeframe, 1) < zoneLow)
+         {
+            LogEvent("کاندیدای کف " + TimeToString(m_activeLowCandidate.time) + " با بسته شدن قیمت پایین زون باطل شد.", m_enableLogging, "[MINOR]");
+            m_activeLowCandidate.bar_index = -1; // کاندیدا غیرفعال می‌شود
+            return;
+         }
+
+         // شرط ورود و تایید الگو
+         if (iLow(m_symbol, m_timeframe, 1) <= zoneHigh) // آیا کندل فعلی وارد زون شده؟
+         {
+            // آیا کندل فعلی یک کندل تایید صعودی و قوی است؟
+            if (iClose(m_symbol, m_timeframe, 1) > iOpen(m_symbol, m_timeframe, 1) && IsStrongCandle(1))
             {
-               break;
-            }
-            
-            if (GetMinorLowsCount() > 0 && GetMinorSwingLow(0).time > swing.time) // شرط ابطال ۲: کف جدیدتر
-            {
-               break;
-            }
-            
-            double low_shift = iLow(m_symbol, m_timeframe, shift);
-            if (low_shift <= zoneHigh && !enteredZone) // ورود به زون از پایین
-            {
-               enteredZone = true;
-               entryTime = iTime(m_symbol, m_timeframe, shift);
-               entryPrice = low_shift; // قیمت ورود (Low کندل ورود)
-            }
-            
-            if (enteredZone && shift == 1)
-            {
-               double close_1 = iClose(m_symbol, m_timeframe, 1);
-               double open_1 = iOpen(m_symbol, m_timeframe, 1);
-               if (close_1 > open_1 && IsStrongCandle(1)) // کندل صعودی قوی
+               // الگو تایید شد!
+               EQPattern newEQ;
+               newEQ.isBullish = true;
+               newEQ.time_formation = iTime(m_symbol, m_timeframe, 1); // زمان تایید
+               newEQ.price_entry = iLow(m_symbol, m_timeframe, 1); // Low کندل تایید
+               newEQ.source_swing = m_activeLowCandidate;
+
+               EQPattern temp[1]; temp[0] = newEQ;
+               if (ArrayInsert(m_eqPatterns_Array, temp, 0))
                {
-                  EQPattern newEQ;
-                  newEQ.isBullish = true; // صعودی (Double Bottom)
-                  newEQ.time_formation = iTime(m_symbol, m_timeframe, 1);
-                  newEQ.price_entry = entryPrice;
-                  newEQ.source_swing = swing;
-                  
-                  EQPattern temp[1]; temp[0] = newEQ;
-                  if (ArrayInsert(m_eqPatterns_Array, temp, 0))
+                  // مدیریت ظرفیت (حداکثر 10)
+                  if (ArraySize(m_eqPatterns_Array) > 10)
                   {
-                     if (ArraySize(m_eqPatterns_Array) > 10)
-                     {
-                        int lastIndex = ArraySize(m_eqPatterns_Array) - 1;
-                        string objNameOld = "EQ_" + TimeToString(m_eqPatterns_Array[lastIndex].time_formation) + m_timeframeSuffix;
-                        ObjectDelete(m_chartId, objNameOld);
-                        ObjectDelete(m_chartId, objNameOld + "_Text");
-                        ArrayRemove(m_eqPatterns_Array, lastIndex, 1);
-                     }
-                     
-                     if (m_showDrawing) drawEQPattern(newEQ);
-                     LogEvent("الگوی EQ صعودی (Double Bottom) شناسایی شد در زمان " + TimeToString(newEQ.time_formation), m_enableLogging, "[MINOR]");
+                     int lastIndex = ArraySize(m_eqPatterns_Array) - 1;
+                     string objNameOld = "EQ_Line_" + TimeToString(m_eqPatterns_Array[lastIndex].time_formation) + m_timeframeSuffix;
+                     string textNameOld = "EQ_Text_" + TimeToString(m_eqPatterns_Array[lastIndex].time_formation) + m_timeframeSuffix;
+                     string obNameOld = "Confirmed_OB_" + TimeToString(m_eqPatterns_Array[lastIndex].source_swing.time) + m_timeframeSuffix;
+                     ObjectDelete(m_chartId, objNameOld);
+                     ObjectDelete(m_chartId, textNameOld);
+                     ObjectDelete(m_chartId, obNameOld);
+                     ArrayRemove(m_eqPatterns_Array, lastIndex, 1);
                   }
-                  break;
+                  
+                  if (m_showDrawing) drawConfirmedEQ(newEQ);
+                  LogEvent("الگوی EQ صعودی تایید و رسم شد.", m_enableLogging, "[MINOR]");
+
+                  m_activeLowCandidate.bar_index = -1; // کاندیدا پس از موفقیت، غیرفعال می‌شود
                }
             }
          }
       }
    }
    
-   //--- تابع ترسیمی: رسم نقطه مینور (با فلش کوچک، آفست و زون واکنش)
+   //--- تابع ترسیمی: رسم نقطه مینور (فقط فلش کوچک و آفست، بدون زون)
    void drawMinorSwingPoint(const SwingPoint &sp, const bool isHigh)
    {
       string objName = (isHigh ? "Minor_H_" : "Minor_L_") + TimeToString(sp.time) + m_timeframeSuffix;
-      string obName = "Minor_OB_" + (isHigh ? "H_" : "L_") + TimeToString(sp.time) + m_timeframeSuffix;
       ObjectDelete(m_chartId, objName);
-      ObjectDelete(m_chartId, obName);
 
       double offset = _Point * 50; // آفست کوچک برای قرارگیری بهتر
       double drawPrice = isHigh ? sp.price + offset : sp.price - offset;
@@ -1504,39 +1486,41 @@ private:
       ObjectSetInteger(m_chartId, objName, OBJPROP_COLOR, clrYellow);
       ObjectSetInteger(m_chartId, objName, OBJPROP_WIDTH, 1);
       ObjectSetInteger(m_chartId, objName, OBJPROP_ANCHOR, isHigh ? ANCHOR_TOP : ANCHOR_BOTTOM);
-      
-      // رسم زون واکنش (Order Block) به عنوان مستطیل نیمه‌شفاف
-      datetime endTime = D'2030.01.01 00:00'; // امتداد تا آینده
-      color obColor = isHigh ? clrLightSteelBlue : clrLightPink;
-      double highZone = isHigh ? sp.price : sp.body_price;
-      double lowZone = isHigh ? sp.body_price : sp.price;
-      
-      ObjectCreate(m_chartId, obName, OBJ_RECTANGLE, 0, sp.time, highZone, endTime, lowZone);
+   }
+   
+   //--- تابع جدید: رسم الگوی EQ تایید شده (زون خاکستری + خط چین + لیبل EQ)
+   void drawConfirmedEQ(const EQPattern &eq)
+   {
+      // --- بخش اول: رسم زون خاکستری که حالا تایید شده ---
+      string obName = "Confirmed_OB_" + TimeToString(eq.source_swing.time) + m_timeframeSuffix;
+      datetime endTime = D'2030.01.01 00:00';
+      color obColor = clrLightGray; // رنگ خاکستری روشن برای هر دو حالت
+      double highZone = eq.isBullish ? eq.source_swing.body_price : eq.source_swing.price;
+      double lowZone = eq.isBullish ? eq.source_swing.price : eq.source_swing.body_price;
+
+      ObjectCreate(m_chartId, obName, OBJ_RECTANGLE, 0, eq.source_swing.time, highZone, endTime, lowZone);
       ObjectSetInteger(m_chartId, obName, OBJPROP_COLOR, obColor);
       ObjectSetInteger(m_chartId, obName, OBJPROP_FILL, true);
       ObjectSetInteger(m_chartId, obName, OBJPROP_BACK, true);
-   }
-   
-   //--- تابع جدید: رسم الگوی EQ
-   void drawEQPattern(const EQPattern &eq)
-   {
-      string typeStr = eq.isBullish ? "Double Bottom" : "Double Top";
-      string objName = "EQ_" + TimeToString(eq.time_formation) + "_" + typeStr + m_timeframeSuffix;
-      string textName = objName + "_Text";
-      
-      // خط نقطه‌چین از source_swing.price به price_entry
-      ObjectCreate(m_chartId, objName, OBJ_TREND, 0, eq.source_swing.time, eq.source_swing.price, eq.time_formation, eq.price_entry);
-      ObjectSetInteger(m_chartId, objName, OBJPROP_STYLE, STYLE_DOT);
-      ObjectSetInteger(m_chartId, objName, OBJPROP_COLOR, eq.isBullish ? clrLime : clrRed);
-      ObjectSetInteger(m_chartId, objName, OBJPROP_WIDTH, 1);
-      
-      // لیبل متن
+
+      // --- بخش دوم: رسم خط چین و لیبل EQ ---
+      string eqLineName = "EQ_Line_" + TimeToString(eq.time_formation) + m_timeframeSuffix;
+      string eqTextName = "EQ_Text_" + TimeToString(eq.time_formation) + m_timeframeSuffix;
+      color eqColor = eq.isBullish ? clrLime : clrRed; // سبز برای کف، قرمز برای سقف
+
+      // نقطه چین از سقف اصلی تا High/Low کندل تایید
+      ObjectCreate(m_chartId, eqLineName, OBJ_TREND, 0, eq.source_swing.time, eq.source_swing.price, eq.time_formation, eq.price_entry);
+      ObjectSetInteger(m_chartId, eqLineName, OBJPROP_STYLE, STYLE_DOT);
+      ObjectSetInteger(m_chartId, eqLineName, OBJPROP_COLOR, eqColor);
+      ObjectSetInteger(m_chartId, eqLineName, OBJPROP_WIDTH, 1);
+
+      // لیبل متن "EQ"
       double midPrice = (eq.source_swing.price + eq.price_entry) / 2;
       datetime midTime = eq.source_swing.time + (eq.time_formation - eq.source_swing.time) / 2;
-      ObjectCreate(m_chartId, textName, OBJ_TEXT, 0, midTime, midPrice);
-      ObjectSetString(m_chartId, textName, OBJPROP_TEXT, "EQ " + typeStr + m_timeframeSuffix);
-      ObjectSetInteger(m_chartId, textName, OBJPROP_COLOR, eq.isBullish ? clrLime : clrRed);
-      ObjectSetInteger(m_chartId, textName, OBJPROP_ANCHOR, ANCHOR_CENTER);
+      ObjectCreate(m_chartId, eqTextName, OBJ_TEXT, 0, midTime, midPrice);
+      ObjectSetString(m_chartId, eqTextName, OBJPROP_TEXT, "EQ" + m_timeframeSuffix);
+      ObjectSetInteger(m_chartId, eqTextName, OBJPROP_COLOR, eqColor);
+      ObjectSetInteger(m_chartId, eqTextName, OBJPROP_ANCHOR, ANCHOR_CENTER);
    }
    
    //--- تابع اصلاح شده: اضافه کردن نقطه مینور (با ورودی SwingPoint کامل و مدیریت تکرار و ظرفیت)
@@ -1573,15 +1557,18 @@ private:
                if (m_showDrawing)
                {
                   string objNameOld = "Minor_H_" + TimeToString(m_minorSwingHighs_Array[lastIndex].time) + m_timeframeSuffix;
-                  string obNameOld = "Minor_OB_H_" + TimeToString(m_minorSwingHighs_Array[lastIndex].time) + m_timeframeSuffix;
                   ObjectDelete(m_chartId, objNameOld);
-                  ObjectDelete(m_chartId, obNameOld);
                }
                ArrayRemove(m_minorSwingHighs_Array, lastIndex, 1);
             }
             
             if (m_showDrawing) drawMinorSwingPoint(newPoint, true);
             if (m_enableLogging) LogEvent("سقف مینور جدید در قیمت " + DoubleToString(newPoint.price, _Digits) + " شناسایی شد.", m_enableLogging, "[MINOR]");
+            
+            // آپدیت کاندیدای فعال
+            m_activeHighCandidate = newPoint;
+            LogEvent("سقف مینور " + TimeToString(newPoint.time) + " به عنوان کاندیدای فعال جدید برای EQ تنظیم شد.", m_enableLogging, "[MINOR]");
+            
             return true;
          }
       }
@@ -1596,15 +1583,18 @@ private:
                if (m_showDrawing)
                {
                   string objNameOld = "Minor_L_" + TimeToString(m_minorSwingLows_Array[lastIndex].time) + m_timeframeSuffix;
-                  string obNameOld = "Minor_OB_L_" + TimeToString(m_minorSwingLows_Array[lastIndex].time) + m_timeframeSuffix;
                   ObjectDelete(m_chartId, objNameOld);
-                  ObjectDelete(m_chartId, obNameOld);
                }
                ArrayRemove(m_minorSwingLows_Array, lastIndex, 1);
             }
             
             if (m_showDrawing) drawMinorSwingPoint(newPoint, false);
             if (m_enableLogging) LogEvent("کف مینور جدید در قیمت " + DoubleToString(newPoint.price, _Digits) + " شناسایی شد.", m_enableLogging, "[MINOR]");
+            
+            // آپدیت کاندیدای فعال
+            m_activeLowCandidate = newPoint;
+            LogEvent("کف مینور " + TimeToString(newPoint.time) + " به عنوان کاندیدای فعال جدید برای EQ تنظیم شد.", m_enableLogging, "[MINOR]");
+            
             return true;
          }
       }
