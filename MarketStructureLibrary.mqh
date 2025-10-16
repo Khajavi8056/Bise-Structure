@@ -1,8 +1,7 @@
 //+------------------------------------------------------------------+
-//|                                MarketStructureLibrary.mqh       |
-//|                                  Copyright 2025, Khajavi  |
-//|                                             Powerd by HIPOALGORITM |
-//|------------------------------------------------------------------|
+//|                                MarketStructureLibrary.mqh         |
+//|                              Copyright 2025, Khajavi - HipoAlgoritm|
+//|                                                                  |
 //| راهنمای اجرا و استفاده (Blueprint for Memento Project):          |
 //| این کتابخانه شامل سه کلاس مستقل 'MarketStructure'، 'FVGManager' |
 //| و 'MinorStructure' است که قابلیت اجرای چندگانه (Multi-Timeframe/Multi-Symbol) را   |
@@ -25,9 +24,9 @@
 //| ۴. مدیریت نمایش: با پارامتر 'showDrawing' در سازنده، می توانید   |
 //|    نمایش ترسیمات کلاس را روی چارت خاموش یا روشن کنید.             |
 //+------------------------------------------------------------------+
-#property copyright "Copyright 2025, Khajavi _ HipoAlgoritm"
-#property link      "https://www.HipoAlgoritm.com"
-#property version   "2.10" // نسخه با ارتقاء منطق EQ در کلاس MinorStructure
+#property copyright "Copyright 2025, Khajavi - HipoAlgoritm"
+#property link      "https://github.com/Khajavi8056/"
+#property version   "2.11" // نسخه با ارتقاء منطق ابطال EQ و ظرفیت ۴ تایی
 
 //+------------------------------------------------------------------+
 //| ساختارهای داده و شمارنده‌ها (Structs & Enums)                     |
@@ -76,19 +75,19 @@ struct EQPattern
 //--- تابع تبدیل تایم فریم Enum به رشته کوتاه (مثلاً PERIOD_H4 به "4H")
 string TimeFrameToStringShort(ENUM_TIMEFRAMES tf)
 {
-    switch(tf)
-    {
-        case PERIOD_M1:  return "1M";
-        case PERIOD_M5:  return "5M";
-        case PERIOD_M15: return "15M";
-        case PERIOD_M30: return "30M";
-        case PERIOD_H1:  return "1H";
-        case PERIOD_H4:  return "4H";
-        case PERIOD_D1:  return "1D";
-        case PERIOD_W1:  return "1W";
-        case PERIOD_MN1: return "1M";
-        default: return EnumToString(tf);
-    }
+   switch(tf)
+   {
+      case PERIOD_M1:  return "1M";
+      case PERIOD_M5:  return "5M";
+      case PERIOD_M15: return "15M";
+      case PERIOD_M30: return "30M";
+      case PERIOD_H1:  return "1H";
+      case PERIOD_H4:  return "4H";
+      case PERIOD_D1:  return "1D";
+      case PERIOD_W1:  return "1W";
+      case PERIOD_MN1: return "1M";
+      default: return EnumToString(tf);
+   }
 }
 
 //--- تابع کمکی برای لاگ‌گیری (با رفع خطای تبدیل نوع)
@@ -99,7 +98,6 @@ void LogEvent(const string message, const bool enabled, const string prefix = ""
       Print(prefix, message);
    }
 }
-
 
 //==================================================================//
 //                   کلاس ۲: مدیریت FVG (FVGManager)                  //
@@ -448,8 +446,9 @@ private:
    bool             m_enableLogging;        // فعال/غیرفعال بودن لاگ
    string           m_timeframeSuffix;      // پسوند تایم‌فریم کوتاه شده
    bool             m_showDrawing;          // کنترل نمایش ترسیمات ساختار روی چارت
+   bool             m_showFibonacci;        // کنترل نمایش فیبوناچی (جدید، پیش‌فرض false)
    int              m_fibUpdateLevel;       // سطح اصلاح فیبو (مثلاً 35)
-   int              m_fractalLength;        // طول فرکتال (مثلاً 10)
+   int              m_fractalLength;        // طول فرکتال (طول برای اولیه، اما حالا از Minor استفاده می‌شود)
    
    //--- متغیرهای حالت
    SwingPoint       m_swingHighs_Array[];   // آرایه سقف‌ها (سری)
@@ -467,7 +466,7 @@ public:
    //+------------------------------------------------------------------+
    //| سازنده کلاس (Constructor)                                       |
    //+------------------------------------------------------------------+
-   MarketStructure(const string symbol, const ENUM_TIMEFRAMES timeframe, const long chartId, const bool enableLogging_in, const bool showDrawing, const int fibUpdateLevel_in, const int fractalLength_in)
+   MarketStructure(const string symbol, const ENUM_TIMEFRAMES timeframe, const long chartId, const bool enableLogging_in, const bool showDrawing, const int fibUpdateLevel_in, const int fractalLength_in, const bool showFibonacci = false)
    {
       m_symbol = symbol;
       m_timeframe = timeframe;
@@ -475,6 +474,7 @@ public:
       // اصلاح هشدار 'hiding global variable'
       m_enableLogging = enableLogging_in;
       m_showDrawing = showDrawing;
+      m_showFibonacci = showFibonacci; // گزینه جدید برای نمایش فیبوناچی
       m_fibUpdateLevel = fibUpdateLevel_in;
       m_fractalLength = fractalLength_in;
       
@@ -511,7 +511,7 @@ public:
          }
       }
       
-      // شناسایی ساختار اولیه
+      // شناسایی ساختار اولیه با استفاده از MinorStructure
       IdentifyInitialStructure();
       UpdateTrendLabel();
       
@@ -536,6 +536,10 @@ public:
             }
          }
       }
+      if (m_showFibonacci)
+      {
+         ObjectDelete(m_chartId, "Tracking_Fib" + m_timeframeSuffix);
+      }
       LogEvent("کلاس MarketStructure متوقف شد.", m_enableLogging, "[SMC]");
    }
    
@@ -558,12 +562,12 @@ public:
          if(CheckForNewSwingPoint())
          {
             structureChanged = true;
-            if (m_showDrawing) ObjectDelete(m_chartId, "Tracking_Fib" + m_timeframeSuffix);
+            if (m_showFibonacci) ObjectDelete(m_chartId, "Tracking_Fib" + m_timeframeSuffix);
          }
          else
          {
             // به‌روزرسانی فیبوناچی ردیاب فقط در صورت نیاز
-            if (m_showDrawing) DrawTrackingFibonacci(); 
+            if (m_showFibonacci) DrawTrackingFibonacci(); 
          }
       }
       
@@ -574,29 +578,31 @@ public:
    }
 
 private:
-   //--- شناسایی ساختار اولیه بازار (بر مبنای فرکتال)
+   //--- شناسایی ساختار اولیه بازار (بر مبنای MinorStructure به جای فرکتال ساده)
    void IdentifyInitialStructure()
    {
-      int barsCount = iBars(m_symbol, m_timeframe);
-      if(barsCount < m_fractalLength * 2 + 1) return;
-      
-      // جستجو برای اولین سقف و کف معتبر
-      for(int i = m_fractalLength; i < barsCount - m_fractalLength; i++)
+      // ایجاد یک نمونه موقت از MinorStructure برای تایم فریم جاری
+      MinorStructure *minorTemp = new MinorStructure(m_symbol, m_timeframe, m_chartId, m_enableLogging, false, m_fractalLength); // showDrawing = false برای موقت
+      minorTemp.ProcessNewBar(); // پردازش برای پیدا کردن مینورها
+
+      // جستجو برای اولین سقف و کف از آرایه مینور
+      int highCount = minorTemp.GetMinorHighsCount();
+      int lowCount = minorTemp.GetMinorLowsCount();
+
+      if (highCount > 0 && ArraySize(m_swingHighs_Array) == 0)
       {
-         bool isSwingHigh = true;
-         bool isSwingLow = true;
-
-         for(int j = 1; j <= m_fractalLength; j++)
-         {
-             if(iHigh(m_symbol, m_timeframe, i) < iHigh(m_symbol, m_timeframe, i - j) || iHigh(m_symbol, m_timeframe, i) < iHigh(m_symbol, m_timeframe, i + j)) isSwingHigh = false;
-             if(iLow(m_symbol, m_timeframe, i) > iLow(m_symbol, m_timeframe, i - j) || iLow(m_symbol, m_timeframe, i) > iLow(m_symbol, m_timeframe, i + j)) isSwingLow = false;
-         }
-
-         if(isSwingHigh && ArraySize(m_swingHighs_Array) == 0) AddSwingHigh(iHigh(m_symbol, m_timeframe, i), iTime(m_symbol, m_timeframe, i), i);
-         if(isSwingLow && ArraySize(m_swingLows_Array) == 0) AddSwingLow(iLow(m_symbol, m_timeframe, i), iTime(m_symbol, m_timeframe, i), i);
-
-         if(ArraySize(m_swingHighs_Array) > 0 && ArraySize(m_swingLows_Array) > 0) break;
+         SwingPoint highPoint = minorTemp.GetMinorSwingHigh(highCount - 1); // قدیمی‌ترین سقف
+         AddSwingHigh(highPoint.price, highPoint.time, highPoint.bar_index);
       }
+
+      if (lowCount > 0 && ArraySize(m_swingLows_Array) == 0)
+      {
+         SwingPoint lowPoint = minorTemp.GetMinorSwingLow(lowCount - 1); // قدیمی‌ترین کف
+         AddSwingLow(lowPoint.price, lowPoint.time, lowPoint.bar_index);
+      }
+
+      // حذف نمونه موقت
+      delete minorTemp;
    }
    
    //--- بررسی شکست سقف یا کف (BoS/CHoCH)
@@ -1098,7 +1104,10 @@ public:
       // اسکن برای کف‌های مینور
       newMinorFound |= ScanForMinors(aoBuffer, false);
       
-      // شناسایی الگوی EQ بعد از مینورهای جدید
+      // ابطال الگوهای EQ تایید شده (مرگ بعد از زندگی)
+      ProcessEQInvalidation();
+      
+      // شناسایی الگوی EQ جدید
       ProcessEQDetection();
       
       if (newMinorFound && m_enableLogging) LogEvent("مینور جدید شناسایی شد.", m_enableLogging, "[MINOR]");
@@ -1310,7 +1319,6 @@ private:
          double close_i = iClose(m_symbol, m_timeframe, i);
          double bodyExt = isHigh ? MathMax(open_i, close_i) : MathMin(open_i, close_i);
          if ((isHigh && bodyExt > bestBodyPrice) || (!isHigh && bodyExt < bestBodyPrice))
-         {
             bestBodyPrice = bodyExt;
          }
       }
@@ -1340,6 +1348,43 @@ private:
       
       // شرط قوی: بدنه بیش از 50% رنج کندل
       return (body > 0.5 * range);
+   }
+   
+   //--- تابع جدید: پردازش ابطال الگوهای EQ تایید شده (مرگ بعد از زندگی)
+   void ProcessEQInvalidation()
+   {
+      // حلقه را از آخر به اول می‌زنیم تا حذف کردن یک عنصر، باعث بهم ریختن اندیس‌ها نشود
+      for (int i = ArraySize(m_eqPatterns_Array) - 1; i >= 0; i--)
+      {
+         EQPattern eq = m_eqPatterns_Array[i];
+
+         // بازسازی زون واکنش الگو
+         double zoneHigh = eq.isBullish ? eq.source_swing.body_price : eq.source_swing.price;
+         double zoneLow = eq.isBullish ? eq.source_swing.price : eq.source_swing.body_price;
+
+         bool isInvalidated = false;
+         // شرط ابطال برای EQ نزولی (Double Top)
+         if (!eq.isBullish && iClose(m_symbol, m_timeframe, 1) > zoneHigh)
+         {
+            isInvalidated = true;
+         }
+         // شرط ابطال برای EQ صعودی (Double Bottom)
+         if (eq.isBullish && iClose(m_symbol, m_timeframe, 1) < zoneLow)
+         {
+            isInvalidated = true;
+         }
+
+         if (isInvalidated)
+         {
+            LogEvent("الگوی EQ در زمان " + TimeToString(eq.time_formation) + " با بسته شدن قیمت خارج از زون باطل شد.", m_enableLogging, "[MINOR]");
+
+            // پاک کردن تمام اشیاء گرافیکی مربوط به این EQ
+            deleteEQObjects(eq); 
+
+            // حذف الگو از آرایه حافظه
+            ArrayRemove(m_eqPatterns_Array, i, 1);
+         }
+      }
    }
    
    //--- تابع اصلی: شناسایی الگوی EQ (بازنویسی شده با منطق کاندیدای فعال)
@@ -1384,16 +1429,19 @@ private:
                EQPattern temp[1]; temp[0] = newEQ;
                if (ArrayInsert(m_eqPatterns_Array, temp, 0))
                {
-                  // مدیریت ظرفیت (حداکثر 10)
-                  if (ArraySize(m_eqPatterns_Array) > 10)
+                  // مدیریت ظرفیت (حداکثر 4)
+                  // اگر تعداد از 4 بیشتر شد، قدیمی‌ترین (که در انتهای آرایه سری قرار دارد) حذف می‌شود
+                  if (ArraySize(m_eqPatterns_Array) > 4)
                   {
                      int lastIndex = ArraySize(m_eqPatterns_Array) - 1;
-                     string objNameOld = "EQ_Line_" + TimeToString(m_eqPatterns_Array[lastIndex].time_formation) + m_timeframeSuffix;
-                     string textNameOld = "EQ_Text_" + TimeToString(m_eqPatterns_Array[lastIndex].time_formation) + m_timeframeSuffix;
-                     string obNameOld = "Confirmed_OB_" + TimeToString(m_eqPatterns_Array[lastIndex].source_swing.time) + m_timeframeSuffix;
-                     ObjectDelete(m_chartId, objNameOld);
-                     ObjectDelete(m_chartId, textNameOld);
-                     ObjectDelete(m_chartId, obNameOld);
+                     EQPattern oldestEQ = m_eqPatterns_Array[lastIndex];
+
+                     LogEvent("ظرفیت EQ تکمیل. قدیمی‌ترین الگو در زمان " + TimeToString(oldestEQ.time_formation) + " حذف می‌شود.", m_enableLogging, "[MINOR]");
+
+                     // پاک کردن اشیاء گرافیکی الگوی قدیمی با تابع کمکی
+                     deleteEQObjects(oldestEQ);
+
+                     // حذف از آرایه حافظه
                      ArrayRemove(m_eqPatterns_Array, lastIndex, 1);
                   }
                   
@@ -1445,16 +1493,19 @@ private:
                EQPattern temp[1]; temp[0] = newEQ;
                if (ArrayInsert(m_eqPatterns_Array, temp, 0))
                {
-                  // مدیریت ظرفیت (حداکثر 10)
-                  if (ArraySize(m_eqPatterns_Array) > 10)
+                  // مدیریت ظرفیت (حداکثر 4)
+                  // اگر تعداد از 4 بیشتر شد، قدیمی‌ترین (که در انتهای آرایه سری قرار دارد) حذف می‌شود
+                  if (ArraySize(m_eqPatterns_Array) > 4)
                   {
                      int lastIndex = ArraySize(m_eqPatterns_Array) - 1;
-                     string objNameOld = "EQ_Line_" + TimeToString(m_eqPatterns_Array[lastIndex].time_formation) + m_timeframeSuffix;
-                     string textNameOld = "EQ_Text_" + TimeToString(m_eqPatterns_Array[lastIndex].time_formation) + m_timeframeSuffix;
-                     string obNameOld = "Confirmed_OB_" + TimeToString(m_eqPatterns_Array[lastIndex].source_swing.time) + m_timeframeSuffix;
-                     ObjectDelete(m_chartId, objNameOld);
-                     ObjectDelete(m_chartId, textNameOld);
-                     ObjectDelete(m_chartId, obNameOld);
+                     EQPattern oldestEQ = m_eqPatterns_Array[lastIndex];
+
+                     LogEvent("ظرفیت EQ تکمیل. قدیمی‌ترین الگو در زمان " + TimeToString(oldestEQ.time_formation) + " حذف می‌شود.", m_enableLogging, "[MINOR]");
+
+                     // پاک کردن اشیاء گرافیکی الگوی قدیمی با تابع کمکی
+                     deleteEQObjects(oldestEQ);
+
+                     // حذف از آرایه حافظه
                      ArrayRemove(m_eqPatterns_Array, lastIndex, 1);
                   }
                   
@@ -1521,6 +1572,20 @@ private:
       ObjectSetString(m_chartId, eqTextName, OBJPROP_TEXT, "EQ" + m_timeframeSuffix);
       ObjectSetInteger(m_chartId, eqTextName, OBJPROP_COLOR, eqColor);
       ObjectSetInteger(m_chartId, eqTextName, OBJPROP_ANCHOR, ANCHOR_CENTER);
+   }
+   
+   //--- تابع کمکی جدید: پاک کردن تمام اشیاء گرافیکی مربوط به یک الگوی EQ
+   void deleteEQObjects(const EQPattern &eq)
+   {
+      // ساختن نام دقیق آبجکت‌ها بر اساس اطلاعات الگو
+      string obName = "Confirmed_OB_" + TimeToString(eq.source_swing.time) + m_timeframeSuffix;
+      string eqLineName = "EQ_Line_" + TimeToString(eq.time_formation) + m_timeframeSuffix;
+      string eqTextName = "EQ_Text_" + TimeToString(eq.time_formation) + m_timeframeSuffix;
+
+      // حذف هر سه آبجکت از چارت
+      ObjectDelete(m_chartId, obName);
+      ObjectDelete(m_chartId, eqLineName);
+      ObjectDelete(m_chartId, eqTextName);
    }
    
    //--- تابع اصلاح شده: اضافه کردن نقطه مینور (با ورودی SwingPoint کامل و مدیریت تکرار و ظرفیت)
