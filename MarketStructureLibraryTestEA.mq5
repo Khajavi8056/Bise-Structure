@@ -1,9 +1,9 @@
 //+------------------------------------------------------------------+
 //| MementoTestEA.mq5 |
 //| Copyright 2025, Khajavi & Gemini|
-//| Test  Structure |
+//| Test  Structure lib |
 //+------------------------------------------------------------------+
-#property copyright "Copyright 2025, Khajavi "
+#property copyright "Copyright 2025, Khajavi & Gemini"
 #property link "https://www.google.com"
 #property version "1.04"
 #property description "تست کتابخانه MarketStructureLibrary با قابلیت MTF و کلاس MinorStructure"
@@ -80,7 +80,10 @@ int OnInit()
    MTF_Structure = new MarketStructure(_Symbol, MTF_Timeframe, ChartID(), Input_EnableLogging, ShowMTFDrawing, Input_FibUpdateLevel, Input_FractalLength);
    MTF_FVG = new FVGManager(_Symbol, MTF_Timeframe, ChartID(), Input_EnableLogging, ShowMTFDrawing);
    MTF_Minor = new MinorStructure(_Symbol, MTF_Timeframe, ChartID(), Input_EnableLogging, ShowMTFDrawing, Input_AOFractalLength);
-  
+  iMA(Symbol(),PERIOD_CURRENT,50,0,MODE_EMA,0);
+    iMA(Symbol(),PERIOD_CURRENT,100,0,MODE_SMMA,0);
+    iMA(Symbol(),PERIOD_CURRENT,200,0,MODE_SMMA,0);
+
    ChartRedraw(ChartID());
    return(INIT_SUCCEEDED);
 }
