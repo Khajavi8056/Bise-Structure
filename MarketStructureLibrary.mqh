@@ -1542,19 +1542,19 @@ private:
       double highZone = eq.isBullish ? eq.source_swing.body_price : eq.source_swing.price;
       double lowZone = eq.isBullish ? eq.source_swing.price : eq.source_swing.body_price;
 
-      ObjectCreate(m_chartId, obName, OBJ_RECTANGLE, 0, eq.source_swing.time, highZone, endTime, lowZone);
+    /*  ObjectCreate(m_chartId, obName, OBJ_RECTANGLE, 0, eq.source_swing.time, highZone, endTime, lowZone);
       ObjectSetInteger(m_chartId, obName, OBJPROP_COLOR, obColor);
       ObjectSetInteger(m_chartId, obName, OBJPROP_FILL, true);
       ObjectSetInteger(m_chartId, obName, OBJPROP_BACK, true);
-
+*///کامنت شده تا فعلان زون رسم نشود 
       // --- بخش دوم: رسم خط چین و لیبل EQ ---
       string eqLineName = "EQ_Line_" + TimeToString(eq.time_formation) + m_timeframeSuffix;
       string eqTextName = "EQ_Text_" + TimeToString(eq.time_formation) + m_timeframeSuffix;
-      color eqColor = eq.isBullish ? clrLime : clrRed; // سبز برای کف، قرمز برای سقف
+      color eqColor = eq.isBullish ? clrBlue : clrPink; // سبز برای کف، قرمز برای سقف
 
       // نقطه چین از سقف اصلی تا High/Low کندل تایید
       ObjectCreate(m_chartId, eqLineName, OBJ_TREND, 0, eq.source_swing.time, eq.source_swing.price, eq.time_formation, eq.price_entry);
-      ObjectSetInteger(m_chartId, eqLineName, OBJPROP_STYLE, STYLE_DOT);
+      ObjectSetInteger(m_chartId, eqLineName, OBJPROP_STYLE, STYLE_DASHDOTDOT);
       ObjectSetInteger(m_chartId, eqLineName, OBJPROP_COLOR, eqColor);
       ObjectSetInteger(m_chartId, eqLineName, OBJPROP_WIDTH, 1);
 
