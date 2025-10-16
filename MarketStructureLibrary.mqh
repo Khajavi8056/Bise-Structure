@@ -447,11 +447,11 @@ private:
    string           m_timeframeSuffix;      // پسوند تایم‌فریم کوتاه شده
    bool             m_showDrawing;          // کنترل نمایش ترسیمات ساختار روی چارت
    int              m_fibUpdateLevel;       // سطح اصلاح فیبو (مثلاً 35)
-   int              m_fractalLength;        // طول فرکتال (طول ساده برای فراکتال اولیه)
-
+   int              m_fractalLength;        // طول فرکتال (مثلاً 10)
+   
    //--- متغیرهای حالت
-   SwingPoint       m_swingHighs_Array[];   // آرایه سقف‌های ماژور (سری)
-   SwingPoint       m_swingLows_Array[];    // آرایه کف‌های ماژور (سری)
+   SwingPoint       m_swingHighs_Array[];   // آرایه سقف‌ها (سری)
+   SwingPoint       m_swingLows_Array[];    // آرایه کف‌ها (سری)
    TREND_TYPE       m_currentTrend;         // وضعیت فعلی روند
    SwingPoint       m_pivotHighForTracking; // نقطه 100% فیبو (ثابت) در فاز نزولی
    SwingPoint       m_pivotLowForTracking;  // نقطه 100% فیبو (ثابت) در فاز صعودی
@@ -572,32 +572,29 @@ public:
    }
 
 private:
-   //--- شناسایی ساختار اولیه بازار (بر مبنای کلاس MinorStructure برای فراکتال حرفه‌ای‌تر)
+   //--- شناسایی ساختار اولیه بازار (بر مبنای فرکتال)
    void IdentifyInitialStructure()
    {
       int barsCount = iBars(m_symbol, m_timeframe);
       if(barsCount < m_fractalLength * 2 + 1) return;
       
-      // ایجاد یکインスタンス موقت از MinorStructure برای اسکن اولیه
-      MinorStructure *minor = new MinorStructure(m_symbol, m_timeframe, m_chartId, false, false, m_fractalLength); // لاگ و نمایش خاموش
-      minor->ProcessNewBar(); // اجرای پردازش برای یافتن مینورها
-      
-      // استفاده از آخرین مینور سقف و کف از MinorStructure
-      SwingPoint initialHigh = minor->GetMinorSwingHigh(0);
-      SwingPoint initialLow = minor->GetMinorSwingLow(0);
-
-      if(initialHigh.bar_index != -1 && ArraySize(m_swingHighs_Array) == 0)
+      // جستجو برای اولین سقف و کف معتبر
+      for(int i = m_fractalLength; i < barsCount - m_fractalLength; i++)
       {
-         AddSwingHigh(initialHigh.price, initialHigh.time, initialHigh.bar_index);
-      }
+         bool isSwingHigh = true;
+         bool isSwingLow = true;
 
-      if(initialLow.bar_index != -1 && ArraySize(m_swingLows_Array) == 0)
-      {
-         AddSwingLow(initialLow.price, initialLow.time, initialLow.bar_index);
-      }
+         for(int j = 1; j <= m_fractalLength; j++)
+         {
+             if(iHigh(m_symbol, m_timeframe, i) < iHigh(m_symbol, m_timeframe, i - j) || iHigh(m_symbol, m_timeframe, i) < iHigh(m_symbol, m_timeframe, i + j)) isSwingHigh = false;
+             if(iLow(m_symbol, m_timeframe, i) > iLow(m_symbol, m_timeframe, i - j) || iLow(m_symbol, m_timeframe, i) > iLow(m_symbol, m_timeframe, i + j)) isSwingLow = false;
+         }
 
-      // حذفインスタンス موقت
-      delete minor;
+         if(isSwingHigh && ArraySize(m_swingHighs_Array) == 0) AddSwingHigh(iHigh(m_symbol, m_timeframe, i), iTime(m_symbol, m_timeframe, i), i);
+         if(isSwingLow && ArraySize(m_swingLows_Array) == 0) AddSwingLow(iLow(m_symbol, m_timeframe, i), iTime(m_symbol, m_timeframe, i), i);
+
+         if(ArraySize(m_swingHighs_Array) > 0 && ArraySize(m_swingLows_Array) > 0) break;
+      }
    }
    
    //--- بررسی شکست سقف یا کف (BoS/CHoCH)
@@ -1314,6 +1311,7 @@ private:
          double close_i = iClose(m_symbol, m_timeframe, i);
          double bodyExt = isHigh ? MathMax(open_i, close_i) : MathMin(open_i, close_i);
          if ((isHigh && bodyExt > bestBodyPrice) || (!isHigh && bodyExt < bestBodyPrice))
+         {
             bestBodyPrice = bodyExt;
          }
       }
