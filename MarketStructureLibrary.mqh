@@ -1008,7 +1008,7 @@ public:
       m_timeframeSuffix = " (" + TimeFrameToStringShort(timeframe) + ")";
 
       // هندل AO بدون نمایش روی چارت
-      m_ao_handle = iAO(m_symbol, m_timeframe);
+      m_ao_handle = IndicatorCreate(m_symbol,m_timeframe,IND_AO,0);
       if (m_ao_handle == INVALID_HANDLE)
       {
          if (m_enableLogging) Print("[MINOR] خطا در ایجاد هندل Awesome Oscillator.");
