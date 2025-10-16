@@ -446,13 +446,12 @@ private:
    bool             m_enableLogging;        // فعال/غیرفعال بودن لاگ
    string           m_timeframeSuffix;      // پسوند تایم‌فریم کوتاه شده
    bool             m_showDrawing;          // کنترل نمایش ترسیمات ساختار روی چارت
-   bool             m_showFibonacci;        // کنترل نمایش فیبوناچی (جدید، پیش‌فرض false)
    int              m_fibUpdateLevel;       // سطح اصلاح فیبو (مثلاً 35)
-   int              m_fractalLength;        // طول فرکتال (طول برای اولیه، اما حالا از Minor استفاده می‌شود)
-   
+   int              m_fractalLength;        // طول فرکتال (طول ساده برای فراکتال اولیه)
+
    //--- متغیرهای حالت
-   SwingPoint       m_swingHighs_Array[];   // آرایه سقف‌ها (سری)
-   SwingPoint       m_swingLows_Array[];    // آرایه کف‌ها (سری)
+   SwingPoint       m_swingHighs_Array[];   // آرایه سقف‌های ماژور (سری)
+   SwingPoint       m_swingLows_Array[];    // آرایه کف‌های ماژور (سری)
    TREND_TYPE       m_currentTrend;         // وضعیت فعلی روند
    SwingPoint       m_pivotHighForTracking; // نقطه 100% فیبو (ثابت) در فاز نزولی
    SwingPoint       m_pivotLowForTracking;  // نقطه 100% فیبو (ثابت) در فاز صعودی
@@ -466,7 +465,7 @@ public:
    //+------------------------------------------------------------------+
    //| سازنده کلاس (Constructor)                                       |
    //+------------------------------------------------------------------+
-   MarketStructure(const string symbol, const ENUM_TIMEFRAMES timeframe, const long chartId, const bool enableLogging_in, const bool showDrawing, const int fibUpdateLevel_in, const int fractalLength_in, const bool showFibonacci = false)
+   MarketStructure(const string symbol, const ENUM_TIMEFRAMES timeframe, const long chartId, const bool enableLogging_in, const bool showDrawing, const int fibUpdateLevel_in, const int fractalLength_in)
    {
       m_symbol = symbol;
       m_timeframe = timeframe;
@@ -474,7 +473,6 @@ public:
       // اصلاح هشدار 'hiding global variable'
       m_enableLogging = enableLogging_in;
       m_showDrawing = showDrawing;
-      m_showFibonacci = showFibonacci; // گزینه جدید برای نمایش فیبوناچی
       m_fibUpdateLevel = fibUpdateLevel_in;
       m_fractalLength = fractalLength_in;
       
@@ -511,7 +509,7 @@ public:
          }
       }
       
-      // شناسایی ساختار اولیه با استفاده از MinorStructure
+      // شناسایی ساختار اولیه
       IdentifyInitialStructure();
       UpdateTrendLabel();
       
@@ -536,10 +534,6 @@ public:
             }
          }
       }
-      if (m_showFibonacci)
-      {
-         ObjectDelete(m_chartId, "Tracking_Fib" + m_timeframeSuffix);
-      }
       LogEvent("کلاس MarketStructure متوقف شد.", m_enableLogging, "[SMC]");
    }
    
@@ -562,12 +556,12 @@ public:
          if(CheckForNewSwingPoint())
          {
             structureChanged = true;
-            if (m_showFibonacci) ObjectDelete(m_chartId, "Tracking_Fib" + m_timeframeSuffix);
+            if (m_showDrawing) ObjectDelete(m_chartId, "Tracking_Fib" + m_timeframeSuffix);
          }
          else
          {
             // به‌روزرسانی فیبوناچی ردیاب فقط در صورت نیاز
-            if (m_showFibonacci) DrawTrackingFibonacci(); 
+            if (m_showDrawing) DrawTrackingFibonacci(); 
          }
       }
       
@@ -578,31 +572,32 @@ public:
    }
 
 private:
-   //--- شناسایی ساختار اولیه بازار (بر مبنای MinorStructure به جای فرکتال ساده)
+   //--- شناسایی ساختار اولیه بازار (بر مبنای کلاس MinorStructure برای فراکتال حرفه‌ای‌تر)
    void IdentifyInitialStructure()
    {
-      // ایجاد یک نمونه موقت از MinorStructure برای تایم فریم جاری
-      MinorStructure *minorTemp = new MinorStructure(m_symbol, m_timeframe, m_chartId, m_enableLogging, false, m_fractalLength); // showDrawing = false برای موقت
-      minorTemp.ProcessNewBar(); // پردازش برای پیدا کردن مینورها
+      int barsCount = iBars(m_symbol, m_timeframe);
+      if(barsCount < m_fractalLength * 2 + 1) return;
+      
+      // ایجاد یکインスタンス موقت از MinorStructure برای اسکن اولیه
+      MinorStructure *minor = new MinorStructure(m_symbol, m_timeframe, m_chartId, false, false, m_fractalLength); // لاگ و نمایش خاموش
+      minor->ProcessNewBar(); // اجرای پردازش برای یافتن مینورها
+      
+      // استفاده از آخرین مینور سقف و کف از MinorStructure
+      SwingPoint initialHigh = minor->GetMinorSwingHigh(0);
+      SwingPoint initialLow = minor->GetMinorSwingLow(0);
 
-      // جستجو برای اولین سقف و کف از آرایه مینور
-      int highCount = minorTemp.GetMinorHighsCount();
-      int lowCount = minorTemp.GetMinorLowsCount();
-
-      if (highCount > 0 && ArraySize(m_swingHighs_Array) == 0)
+      if(initialHigh.bar_index != -1 && ArraySize(m_swingHighs_Array) == 0)
       {
-         SwingPoint highPoint = minorTemp.GetMinorSwingHigh(highCount - 1); // قدیمی‌ترین سقف
-         AddSwingHigh(highPoint.price, highPoint.time, highPoint.bar_index);
+         AddSwingHigh(initialHigh.price, initialHigh.time, initialHigh.bar_index);
       }
 
-      if (lowCount > 0 && ArraySize(m_swingLows_Array) == 0)
+      if(initialLow.bar_index != -1 && ArraySize(m_swingLows_Array) == 0)
       {
-         SwingPoint lowPoint = minorTemp.GetMinorSwingLow(lowCount - 1); // قدیمی‌ترین کف
-         AddSwingLow(lowPoint.price, lowPoint.time, lowPoint.bar_index);
+         AddSwingLow(initialLow.price, initialLow.time, initialLow.bar_index);
       }
 
-      // حذف نمونه موقت
-      delete minorTemp;
+      // حذفインスタンス موقت
+      delete minor;
    }
    
    //--- بررسی شکست سقف یا کف (BoS/CHoCH)
