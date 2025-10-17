@@ -688,7 +688,7 @@ private:
       int endScan = pivotBarIndex;  // پایان اسکن در کندل پیوت (100% فیبو)
 
       // اسکن معکوس از جدیدتر (startScan) به قدیمی‌تر (endScan)
-      for (int i = startScan; i >= endScan; i++)
+      for (int i = startScan; i <= endScan; i++)
       {
          bool candidate = false;
 
