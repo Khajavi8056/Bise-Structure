@@ -26,7 +26,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2025, Khajavi - HipoAlgoritm"
 #property link      "https://github.com/Khajavi8056/"
-#property version   "2.11" // نسخه با ارتقاء منطق ابطال EQ و ظرفیت ۴ تایی
+#property version   "2.13" // نسخه با اصلاح باگ منطقی FVG در شناسایی OB
 
 //+------------------------------------------------------------------+
 //| ساختارهای داده و شمارنده‌ها (Structs & Enums)                     |
@@ -448,6 +448,7 @@ private:
    bool             m_showDrawing;          // کنترل نمایش ترسیمات ساختار روی چارت
    int              m_fibUpdateLevel;       // سطح اصلاح فیبو (مثلاً 35)
    int              m_fractalLength;        // طول فرکتال (مثلاً 10)
+   bool             m_enableOB_FVG_Check;   // فعال/غیرفعال کردن شرط FVG برای شناسایی OB (ورودی جدید سازنده)
    
    //--- متغیرهای حالت
    SwingPoint       m_swingHighs_Array[];   // آرایه سقف‌ها (سری)
@@ -460,12 +461,29 @@ private:
    datetime         m_lastCHoCHTime;        // زمان آخرین CHoCH
    datetime         m_lastBoSTime;          // زمان آخرین BoS
    string           m_trendObjectName;      // نام ثابت لیبل روند با پسوند
+   
+   //--- ساختار داده جدید برای Order Block (OB)
+   struct OrderBlock
+   {
+      bool     isBullish;  // نوع OB: صعودی (تقاضا، true) یا نزولی (عرضه، false)
+      double   highPrice;  // قیمت سقف ناحیه OB (بالاترین قیمت کندل)
+      double   lowPrice;   // قیمت کف ناحیه OB (پایین‌ترین قیمت کندل)
+      datetime time;       // زمان کندل OB
+      int      bar_index;  // اندیس کندل OB
+   };
+   
+   //--- آرایه‌های ذخیره‌سازی برای Order Blocks
+   OrderBlock       m_unmitigatedOBs[];     // آرایه OBهای مصرف نشده (unmitigated، سری)
+   OrderBlock       m_mitigatedOBs[];       // آرایه OBهای مصرف شده (mitigated، سری)
+   
+   //--- متغیرهای کنترلی برای Order Blocks
+   bool             m_isCurrentlyMitigatingOB; // وضعیت لحظه‌ای: آیا قیمت در حال مصرف یک OB است؟ (برای دسترسی عمومی)
 
 public:
    //+------------------------------------------------------------------+
-   //| سازنده کلاس (Constructor)                                       |
+   //| سازنده کلاس (Constructor) - با ورودی جدید برای شرط FVG در OB   |
    //+------------------------------------------------------------------+
-   MarketStructure(const string symbol, const ENUM_TIMEFRAMES timeframe, const long chartId, const bool enableLogging_in, const bool showDrawing, const int fibUpdateLevel_in, const int fractalLength_in)
+   MarketStructure(const string symbol, const ENUM_TIMEFRAMES timeframe, const long chartId, const bool enableLogging_in, const bool showDrawing, const int fibUpdateLevel_in, const int fractalLength_in, const bool enableOB_FVG_Check_in)
    {
       m_symbol = symbol;
       m_timeframe = timeframe;
@@ -475,6 +493,7 @@ public:
       m_showDrawing = showDrawing;
       m_fibUpdateLevel = fibUpdateLevel_in;
       m_fractalLength = fractalLength_in;
+      m_enableOB_FVG_Check = enableOB_FVG_Check_in; // مقداردهی ورودی جدید
       
       // تنظیم پسوند تایم فریم برای نمایش MTF (کوتاه شده)
       m_timeframeSuffix = " (" + TimeFrameToStringShort(timeframe) + ")";
@@ -485,11 +504,18 @@ public:
       ArrayResize(m_swingHighs_Array, 0);
       ArrayResize(m_swingLows_Array, 0);
       
+      // مقداردهی اولیه آرایه‌های OB (سری با ظرفیت رزرو شده)
+      ArraySetAsSeries(m_unmitigatedOBs, true);
+      ArraySetAsSeries(m_mitigatedOBs, true);
+      ArrayResize(m_unmitigatedOBs, 0, 10); // رزرو اولیه برای بهینه‌سازی
+      ArrayResize(m_mitigatedOBs, 0, 10);   // رزرو اولیه برای بهینه‌سازی
+      
       m_currentTrend = TREND_NONE;
       m_isTrackingHigh = false;
       m_isTrackingLow = false;
       m_lastCHoCHTime = 0;
       m_lastBoSTime = 0;
+      m_isCurrentlyMitigatingOB = false; // مقداردهی اولیه وضعیت مصرف OB
 
       // مقداردهی اولیه ساختارهای پیوت ردیابی
       m_pivotHighForTracking.price = 0; m_pivotHighForTracking.time = 0; m_pivotHighForTracking.bar_index = -1; m_pivotHighForTracking.body_price = 0;
@@ -538,11 +564,22 @@ public:
    }
    
    //+------------------------------------------------------------------+
+   //| تابع جدید: پردازش تیک جدید برای مدیریت OB (میتگیشن و ابطال لحظه‌ای) |
+   //+------------------------------------------------------------------+
+   bool ProcessNewTick()
+   {
+      ProcessOrderBlocks(); // فراخوانی مدیریت چرخه حیات OBها
+      return m_isCurrentlyMitigatingOB; // بازگشت وضعیت مصرف لحظه‌ای برای استفاده اکسپرت
+   }
+   
+   //+------------------------------------------------------------------+
    //| تابع اصلی: پردازش کندل بسته شده (در OnTick با شرط NewBar فراخوانی شود) |
    //+------------------------------------------------------------------+
    bool ProcessNewBar()
    {
       bool structureChanged = false;
+      
+      ProcessOrderBlocks(); // مدیریت OBها در ابتدای پردازش کندل جدید (برای ابطال/میتگیشن)
       
       //--- ۱. بررسی شکست ساختار
       if(ArraySize(m_swingHighs_Array) >= 1 && ArraySize(m_swingLows_Array) >= 1)
@@ -597,7 +634,7 @@ private:
       }
    }
    
-   //--- بررسی شکست سقف یا کف (BoS/CHoCH)
+   //--- بررسی شکست سقف یا کف (BoS/CHoCH) و شناسایی OB بلافاصله پس از آن
    void CheckForBreakout()
    {
       if(m_isTrackingHigh || m_isTrackingLow) return;
@@ -606,7 +643,7 @@ private:
       SwingPoint lastHigh = m_swingHighs_Array[0];
       SwingPoint lastLow = m_swingLows_Array[0];
 
-      //--- شکست سقف (BoS/CHoCH صعودی)
+      //--- شکست سقف (BoS/CHoCH صعودی) - شناسایی OB صعودی (تقاضا)
       if(close_1 > lastHigh.price)
       {
          bool isCHoCH = (m_currentTrend == TREND_BEARISH);
@@ -617,10 +654,13 @@ private:
 
          m_pivotLowForTracking = FindOppositeSwing(lastHigh.time, iTime(m_symbol, m_timeframe, 1), false); 
 
+         // شناسایی OB صعودی بلافاصله پس از یافتن پیوت
+         IdentifyOrderBlock(true, iBarShift(m_symbol, m_timeframe, iTime(m_symbol, m_timeframe, 1), false), m_pivotLowForTracking.bar_index);
+
          m_isTrackingHigh = true; m_isTrackingLow = false;
          LogEvent("--> فاز جدید: [شکار سقف] فعال شد. نقطه 100% فیبو (ثابت) در کف " + DoubleToString(m_pivotLowForTracking.price, _Digits) + " ثبت شد.", m_enableLogging, "[SMC]");
       }
-      //--- شکست کف (BoS/CHoCH نزولی)
+      //--- شکست کف (BoS/CHoCH نزولی) - شناسایی OB نزولی (عرضه)
       else if(close_1 < lastLow.price)
       {
          bool isCHoCH = (m_currentTrend == TREND_BULLISH);
@@ -631,9 +671,262 @@ private:
 
          m_pivotHighForTracking = FindOppositeSwing(lastLow.time, iTime(m_symbol, m_timeframe, 1), true); 
 
+         // شناسایی OB نزولی بلافاصله پس از یافتن پیوت
+         IdentifyOrderBlock(false, iBarShift(m_symbol, m_timeframe, iTime(m_symbol, m_timeframe, 1), false), m_pivotHighForTracking.bar_index);
+
          m_isTrackingLow = true; m_isTrackingHigh = false;
          LogEvent("--> فاز جدید: [شکار کف] فعال شد. نقطه 100% فیبو (ثابت) در سقف " + DoubleToString(m_pivotHighForTracking.price, _Digits) + " ثبت شد.", m_enableLogging, "[SMC]");
       }
+   }
+   
+   //--- تابع جدید: شناسایی Order Block بر اساس الگوریتم مشخص شده (با اصلاح منطق FVG)
+   void IdentifyOrderBlock(const bool isBullish, const int breakBar, const int pivotBarIndex)
+   {
+      if (breakBar < 1 || pivotBarIndex < 0 || breakBar >= pivotBarIndex) return; // محدوده نامعتبر
+
+      int startScan = breakBar - 1; // شروع اسکن از کندل قبل از شکست
+      int endScan = pivotBarIndex;  // پایان اسکن در کندل پیوت (100% فیبو)
+
+      // اسکن معکوس از جدیدتر (startScan) به قدیمی‌تر (endScan)
+      for (int i = startScan; i >= endScan; i--)
+      {
+         bool candidate = false;
+
+         if (isBullish) // OB صعودی (تقاضا) - پس از شکست سقف
+         {
+            // شرط ۱: کندل نزولی (رنگ مخالف)
+            if (iClose(m_symbol, m_timeframe, i) < iOpen(m_symbol, m_timeframe, i))
+            {
+               // شرط ۲: جمع‌آوری نقدینگی (Low پایین‌تر از Low کندل قبل) - نکته: i+1 در خط زمان قبل از کندل i قرار دارد
+               if (iLow(m_symbol, m_timeframe, i) < iLow(m_symbol, m_timeframe, i + 1))
+               {
+                  candidate = true;
+
+                  // شرط ۳: ایجاد گپ FVG ساده (اختیاری) - اصلاح شده برای چک گپ واقعی (عدم همپوشانی)
+                  if (m_enableOB_FVG_Check)
+                  {
+                     if (i < 2) candidate = false; // اطمینان از وجود کندل‌های ک
+                  else if (iLow(m_symbol, m_timeframe, i - 2) <= iHigh(m_symbol, m_timeframe, i)) candidate = false; اگر همپوشانی وجود داشته باشد، رد کن (گپ باید کامل باشد: Low(i-2) > High(i))
+                  }
+               }
+            }
+         }
+         else // OB نزولی (عرضه) - پس از شکست کف
+         {
+            // شرط ۱: کندل صعودی (رنگ مخالف)
+            if (iClose(m_symbol, m_timeframe, i) > iOpen(m_symbol, m_timeframe, i))
+            {
+               // شرط ۲: جمع‌آوری نقدینگی (High بالاتر از High کندل قبل) - نکته: i+1 در خط زمان قبل از کندل i قرار دارد
+               if (iHigh(m_symbol, m_timeframe, i) > iHigh(m_symbol, m_timeframe, i + 1))
+               {
+                  candidate = true;
+
+                  // شرط ۳: ایجاد گپ FVG ساده (اختیاری) - اصلاح شده برای چک گپ واقعی (عدم همپوشانی)
+                  if (m_enableOB_FVG_Check)
+                  {
+                     if (i < 2) candidate = false; // اطمینان از وجود کندل‌های کافی
+                     else if (iHigh(m_symbol, m_timeframe, i - 2) >= iLow(m_symbol, m_timeframe, i)) candidate = false; // اگر همپوشانی وجود داشته باشد، رد کن (گپ باید کامل باشد: High(i-2) < Low(i))
+                  }
+               }
+            }
+         }
+
+         if (candidate)
+         {
+            // ایجاد و اضافه کردن OB جدید
+            OrderBlock newOB;
+            newOB.isBullish = isBullish;
+            newOB.highPrice = iHigh(m_symbol, m_timeframe, i);
+            newOB.lowPrice = iLow(m_symbol, m_timeframe, i);
+            newOB.time = iTime(m_symbol, m_timeframe, i);
+            newOB.bar_index = i;
+
+            AddUnmitigatedOB(newOB);
+            LogEvent("OB جدید " + (isBullish ? "صعودی (تقاضا)" : "نزولی (عرضه)") + " در زمان " + TimeToString(newOB.time) + " شناسایی شد.", m_enableLogging, "[SMC-OB]");
+            break; // فقط اولین (جدیدترین) کاندیدا را انتخاب کن و حلقه را متوقف کن
+         }
+      }
+   }
+   
+   //--- تابع جدید: اضافه کردن OB جدید به آرایه unmitigated با مدیریت ظرفیت (حداکثر ۱۰)
+   void AddUnmitigatedOB(const OrderBlock &newOB)
+   {
+      // مدیریت ظرفیت: اگر بیش از ۱۰ شد، قدیمی‌ترین (آخر آرایه) را حذف کن
+      if (ArraySize(m_unmitigatedOBs) >= 10)
+      {
+         int lastIndex = ArraySize(m_unmitigatedOBs) - 1;
+         string typeStrOld = m_unmitigatedOBs[lastIndex].isBullish ? "Bullish" : "Bearish";
+         if (m_showDrawing)
+         {
+            string objNameOld = "OB_" + TimeToString(m_unmitigatedOBs[lastIndex].time) + "_" + typeStrOld + m_timeframeSuffix;
+            ObjectDelete(m_chartId, objNameOld);
+            ObjectDelete(m_chartId, objNameOld + "_Text");
+         }
+         ArrayRemove(m_unmitigatedOBs, lastIndex, 1);
+         LogEvent("ظرفیت unmitigated OB تکمیل. قدیمی‌ترین OB حذف شد.", m_enableLogging, "[SMC-OB]");
+      }
+
+      // درج OB جدید در ابتدای آرایه (سری)
+      OrderBlock temp[1]; temp[0] = newOB;
+      if (ArrayInsert(m_unmitigatedOBs, temp, 0))
+      {
+         if (m_showDrawing) drawOrderBlock(m_unmitigatedOBs[0]);
+      }
+      else
+      {
+         LogEvent("خطا: نتوانست OB جدید را در آرایه unmitigated درج کند.", m_enableLogging, "[SMC-OB]");
+      }
+   }
+   
+   //--- تابع جدید: مدیریت چرخه حیات OBها (میتگیشن و ابطال با قیمت‌های لحظه‌ای)
+   void ProcessOrderBlocks()
+   {
+      double currentAsk = SymbolInfoDouble(m_symbol, SYMBOL_ASK);
+      double currentBid = SymbolInfoDouble(m_symbol, SYMBOL_BID);
+      m_isCurrentlyMitigatingOB = false; // ریست وضعیت لحظه‌ای در ابتدای هر تیک/بار
+
+      // مرحله ۱: چک میتگیشن (مصرف) برای OBهای unmitigated
+      for (int i = 0; i < ArraySize(m_unmitigatedOBs); i++)
+      {
+         OrderBlock ob = m_unmitigatedOBs[i];
+         bool mitigated = false;
+
+         // چک وارد شدن قیمت به OB (میتگیشن)
+         if (ob.isBullish && ob.lowPrice <= currentAsk && currentAsk <= ob.highPrice) mitigated = true;
+         if (!ob.isBullish && ob.lowPrice <= currentBid && currentBid <= ob.highPrice) mitigated = true;
+
+         if (mitigated)
+         {
+            // انتقال به آرایه mitigated
+            AddMitigatedOB(ob);
+            m_isCurrentlyMitigatingOB = true; // تنظیم وضعیت لحظه‌ای مصرف
+
+            // حذف از آرایه unmitigated
+            ArrayRemove(m_unmitigatedOBs, i, 1);
+            i--; // تنظیم اندیس پس از حذف
+            LogEvent("OB " + (ob.isBullish ? "صعودی" : "نزولی") + " در زمان " + TimeToString(ob.time) + " مصرف (mitigated) شد.", m_enableLogging, "[SMC-OB]");
+         }
+      }
+
+      // مرحله ۲: چک ابطال (invalidation) برای هر دو آرایه unmitigated و mitigated
+      // اول unmitigated
+      for (int i = 0; i < ArraySize(m_unmitigatedOBs); i++)
+      {
+         OrderBlock ob = m_unmitigatedOBs[i];
+         bool invalidated = false;
+
+         // چک عبور قیمت از OB (ابطال)
+         if (ob.isBullish && currentBid < ob.lowPrice) invalidated = true;
+         if (!ob.isBullish && currentAsk > ob.highPrice) invalidated = true;
+
+         if (invalidated)
+         {
+            // پاک کردن اشیاء گرافیکی
+            if (m_showDrawing) deleteOBDrawingObjects(ob, false);
+
+            // حذف از آرایه
+            ArrayRemove(m_unmitigatedOBs, i, 1);
+            i--;
+            LogEvent("OB " + (ob.isBullish ? "صعودی" : "نزولی") + " در زمان " + TimeToString(ob.time) + " ابطال (invalidated) شد.", m_enableLogging, "[SMC-OB]");
+         }
+      }
+
+      // سپس mitigated
+      for (int i = 0; i < ArraySize(m_mitigatedOBs); i++)
+      {
+         OrderBlock ob = m_mitigatedOBs[i];
+         bool invalidated = false;
+
+         // چک عبور قیمت از OB (ابطال)
+         if (ob.isBullish && currentBid < ob.lowPrice) invalidated = true;
+         if (!ob.isBullish && currentAsk > ob.highPrice) invalidated = true;
+
+         if (invalidated)
+         {
+            // پاک کردن اشیاء گرافیکی
+            if (m_showDrawing) deleteOBDrawingObjects(ob, true);
+
+            // حذف از آرایه
+            ArrayRemove(m_mitigatedOBs, i, 1);
+            i--;
+            LogEvent("OB مصرف شده " + (ob.isBullish ? "صعودی" : "نزولی") + " در زمان " + TimeToString(ob.time) + " ابطال (invalidated) شد.", m_enableLogging, "[SMC-OB]");
+         }
+      }
+   }
+   
+   //--- تابع جدید: اضافه کردن OB به آرایه mitigated با مدیریت ظرفیت (حداکثر ۱۰) و آپدیت گرافیکی
+   void AddMitigatedOB(const OrderBlock &ob)
+   {
+      // مدیریت ظرفیت: اگر بیش از ۱۰ شد، قدیمی‌ترین را حذف کن
+      if (ArraySize(m_mitigatedOBs) >= 10)
+      {
+         int lastIndex = ArraySize(m_mitigatedOBs) - 1;
+         if (m_showDrawing) deleteOBDrawingObjects(m_mitigatedOBs[lastIndex], true);
+         ArrayRemove(m_mitigatedOBs, lastIndex, 1);
+         LogEvent("ظرفیت mitigated OB تکمیل. قدیمی‌ترین OB مصرف شده حذف شد.", m_enableLogging, "[SMC-OB]");
+      }
+
+      // درج OB در ابتدای آرایه
+      OrderBlock temp[1]; temp[0] = ob;
+      if (ArrayInsert(m_mitigatedOBs, temp, 0))
+      {
+         // آپدیت گرافیکی برای نشان دادن مصرف شده (اضافه کردن $ به متن)
+         if (m_showDrawing) updateOBToMitigated(m_mitigatedOBs[0]);
+      }
+      else
+      {
+         LogEvent("خطا: نتوانست OB را در آرایه mitigated درج کند.", m_enableLogging, "[SMC-OB]");
+      }
+   }
+   
+   //--- تابع جدید: رسم OB (با قابلیت MTF، مستطیل سفید شفاف و متن)
+   void drawOrderBlock(const OrderBlock &ob)
+   {
+      string typeStr = ob.isBullish ? "Bullish" : "Bearish";
+      string objName = "OB_" + TimeToString(ob.time) + "_" + typeStr + m_timeframeSuffix;
+      string textName = objName + "_Text";
+
+      color obColor = C'245,245,245'; // سفید شفاف
+      datetime endTime = D'2030.01.01 00:00'; // امتداد زون
+
+      // ایجاد مستطیل
+      ObjectCreate(m_chartId, objName, OBJ_RECTANGLE, 0, ob.time, ob.highPrice, endTime, ob.lowPrice);
+      ObjectSetInteger(m_chartId, objName, OBJPROP_COLOR, obColor);
+      ObjectSetInteger(m_chartId, objName, OBJPROP_FILL, true);
+      ObjectSetInteger(m_chartId, objName, OBJPROP_BACK, true); // پشت کندل‌ها
+
+      // محاسبه موقعیت اولیه وسط برای متن
+      datetime currentTime = iTime(NULL, PERIOD_CURRENT, 0);
+      datetime midTime = ob.time + (currentTime - ob.time) / 2;
+      double midPrice = (ob.highPrice + ob.lowPrice) / 2;
+
+      // ایجاد متن OB با پسوند تایم فریم
+      ObjectCreate(m_chartId, textName, OBJ_TEXT, 0, midTime, midPrice);
+      ObjectSetString(m_chartId, textName, OBJPROP_TEXT, "OB" + m_timeframeSuffix); 
+      ObjectSetInteger(m_chartId, textName, OBJPROP_COLOR, clrBlack); // رنگ متن برای تمایز
+      ObjectSetInteger(m_chartId, textName, OBJPROP_FONTSIZE, 8);
+      ObjectSetInteger(m_chartId, textName, OBJPROP_ANCHOR, ANCHOR_CENTER);
+   }
+   
+   //--- تابع جدید: آپدیت گرافیکی OB به حالت mitigated (اضافه کردن $ به متن)
+   void updateOBToMitigated(const OrderBlock &ob)
+   {
+      string typeStr = ob.isBullish ? "Bullish" : "Bearish";
+      string textName = "OB_" + TimeToString(ob.time) + "_" + typeStr + m_timeframeSuffix + "_Text";
+
+      // فقط متن را آپدیت کن (اضافه کردن $)
+      ObjectSetString(m_chartId, textName, OBJPROP_TEXT, "OB$" + m_timeframeSuffix);
+   }
+   
+   //--- تابع جدید: پاک کردن اشیاء گرافیکی یک OB خاص (تغییر نام برای وضوح بیشتر)
+   void deleteOBDrawingObjects(const OrderBlock &ob, const bool isMitigated)
+   {
+      string typeStr = ob.isBullish ? "Bullish" : "Bearish";
+      string objName = "OB_" + TimeToString(ob.time) + "_" + typeStr + m_timeframeSuffix;
+      string textName = objName + "_Text";
+
+      ObjectDelete(m_chartId, objName);
+      ObjectDelete(m_chartId, textName);
    }
    
    //--- یافتن نقطه محوری مقابل (پیوت - 100% فیبو)
@@ -961,6 +1254,27 @@ public:
    
    //--- وضعیت روند فعلی
    TREND_TYPE GetCurrentTrend() const { return m_currentTrend; }
+   
+   //--- توابع جدید برای دسترسی به OBهای مصرف نشده (unmitigated)
+   int GetUnmitigatedOBCount() const { return ArraySize(m_unmitigatedOBs); }
+   OrderBlock GetUnmitigatedOB(const int index) const 
+   { 
+      if (index >= 0 && index < ArraySize(m_unmitigatedOBs)) return m_unmitigatedOBs[index]; 
+      OrderBlock empty; empty.isBullish = false; empty.highPrice = 0; empty.lowPrice = 0; empty.time = 0; empty.bar_index = -1; 
+      return empty; 
+   }
+   
+   //--- توابع جدید برای دسترسی به OBهای مصرف شده (mitigated)
+   int GetMitigatedOBCount() const { return ArraySize(m_mitigatedOBs); }
+   OrderBlock GetMitigatedOB(const int index) const 
+   { 
+      if (index >= 0 && index < ArraySize(m_mitigatedOBs)) return m_mitigatedOBs[index]; 
+      OrderBlock empty; empty.isBullish = false; empty.highPrice = 0; empty.lowPrice = 0; empty.time = 0; empty.bar_index = -1; 
+      return empty; 
+   }
+   
+   //--- وضعیت لحظه‌ای مصرف OB
+   bool IsCurrentlyMitigatingOB() const { return m_isCurrentlyMitigatingOB; }
 };
 
 //==================================================================//
