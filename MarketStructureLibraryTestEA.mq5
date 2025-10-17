@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2025, Khajavi & Gemini"
 #property link "https://www.google.com"
-#property version "1.04"
+#property version "1.05"
 #property description "تست کتابخانه MarketStructureLibrary با قابلیت MTF و کلاس MinorStructure"
 #include <MarketStructureLibrary.mqh> // ایمپورت کتابخانه کلاس‌بندی شده
 //+------------------------------------------------------------------+
@@ -14,9 +14,12 @@
 input bool Input_EnableLogging = true; // [فعال/غیرفعال کردن] سیستم لاگ
 input int Input_FibUpdateLevel = 21; // سطح اصلاح فیبو برای تایید
 input int Input_FractalLength = 5; // طول فرکتال
-input int Input_AOFractalLength = 7; //  برای MinorStructu5re
+input int Input_AOFractalLength = 7; // برای MinorStructure
+input bool Input_EnableOB_FVG_Check = true; // [فعال/غیرفعال کردن] شرط FVG در شناسایی OB
 input ENUM_TIMEFRAMES MTF_Timeframe = PERIOD_H4; // تایم فریم دوم برای تحلیل MTF
 input bool ShowMTFDrawing = true; // نمایش ترسیمات تایم فریم دوم (MTF) روی چارت فعلی
+input bool ShowChartFVG = false; // نمایش FVG در تایم فریم چارت فعلی (پیش‌فرض false)
+input bool ShowMTFFVG = false; // نمایش FVG در تایم فریم MTF (پیش‌فرض false)
 //+------------------------------------------------------------------+
 //| آبجکت‌های سراسری (Instances of Classes) |
 //+------------------------------------------------------------------+
@@ -62,11 +65,12 @@ bool IsNewBarMTF(ENUM_TIMEFRAMES tf)
 int OnInit()
 {
    // ۱. ساخت آبجکت‌های مربوط به تایم فریم چارت فعلی
-   // (تنظیم نمایش روی true برای همه کلاس‌ها در تایم فریم فعلی)
-   Chart_Structure = new MarketStructure(_Symbol, _Period, ChartID(), Input_EnableLogging, true, Input_FibUpdateLevel, Input_FractalLength);
-   Chart_FVG = new FVGManager(_Symbol, _Period, ChartID(), Input_EnableLogging, true);
+   // (تنظیم نمایش روی true برای Structure و Minor، و ShowChartFVG برای FVG)
+   Chart_Structure = new MarketStructure(_Symbol, _Period, ChartID(), Input_EnableLogging, true, Input_FibUpdateLevel, Input_FractalLength, Input_EnableOB_FVG_Check);
+   Chart_FVG = new FVGManager(_Symbol, _Period, ChartID(), Input_EnableLogging, ShowChartFVG);
    Chart_Minor = new MinorStructure(_Symbol, _Period, ChartID(), Input_EnableLogging, true, Input_AOFractalLength);
-    // غیرفعال کردن گرید چارت
+   
+   // غیرفعال کردن گرید چارت
    ChartSetInteger(0, CHART_SHOW_GRID, false);
    
    // تنظیم رنگ کندل‌ها
@@ -76,13 +80,14 @@ int OnInit()
    ChartSetInteger(0, CHART_COLOR_CHART_DOWN, clrRed);
    
    // ۲. ساخت آبجکت‌های مربوط به تایم فریم MTF
-   // (تنظیم نمایش MTF بر اساس ورودی ShowMTFDrawing)
-   MTF_Structure = new MarketStructure(_Symbol, MTF_Timeframe, ChartID(), Input_EnableLogging, ShowMTFDrawing, Input_FibUpdateLevel, Input_FractalLength);
-   MTF_FVG = new FVGManager(_Symbol, MTF_Timeframe, ChartID(), Input_EnableLogging, ShowMTFDrawing);
+   // (تنظیم نمایش MTF بر اساس ورودی ShowMTFDrawing برای Structure و Minor، و ShowMTFFVG برای FVG)
+   MTF_Structure = new MarketStructure(_Symbol, MTF_Timeframe, ChartID(), Input_EnableLogging, ShowMTFDrawing, Input_FibUpdateLevel, Input_FractalLength, Input_EnableOB_FVG_Check);
+   MTF_FVG = new FVGManager(_Symbol, MTF_Timeframe, ChartID(), Input_EnableLogging, ShowMTFFVG);
    MTF_Minor = new MinorStructure(_Symbol, MTF_Timeframe, ChartID(), Input_EnableLogging, ShowMTFDrawing, Input_AOFractalLength);
-  iMA(Symbol(),PERIOD_CURRENT,50,0,MODE_EMA,0);
-    iMA(Symbol(),PERIOD_CURRENT,100,0,MODE_SMMA,0);
-    iMA(Symbol(),PERIOD_CURRENT,200,0,MODE_SMMA,0);
+   
+   iMA(Symbol(),PERIOD_CURRENT,50,0,MODE_EMA,0);
+   iMA(Symbol(),PERIOD_CURRENT,100,0,MODE_SMMA,0);
+   iMA(Symbol(),PERIOD_CURRENT,200,0,MODE_SMMA,0);
 
    ChartRedraw(ChartID());
    return(INIT_SUCCEEDED);
@@ -107,16 +112,18 @@ void OnTick()
 {
    bool chartRedrawNeeded = false;
   
-   //--- ۱. اجرای منطق FVG در هر تیک (برای ابطال لحظه‌ای)
-   // این پردازش برای هر دو آبجکت FVG اجرا می‌شود
+   //--- ۱. اجرای منطق در هر تیک (برای ابطال لحظه‌ای FVG و مدیریت OB در Structure)
+   // این پردازش برای هر دو آبجکت FVG و Structure اجرا می‌شود
+   if (Chart_Structure != NULL && Chart_Structure.ProcessNewTick()) chartRedrawNeeded = true;
    if (Chart_FVG != NULL && Chart_FVG.ProcessNewTick()) chartRedrawNeeded = true;
+   if (MTF_Structure != NULL && MTF_Structure.ProcessNewTick()) chartRedrawNeeded = true;
    if (MTF_FVG != NULL && MTF_FVG.ProcessNewTick()) chartRedrawNeeded = true;
   
    //--- ۲. اجرای منطق ساختارها فقط در کلوز کندل جدید مربوطه
    if (IsNewBar())
    {
       // پردازش برای تایم فریم چارت فعلی (PERIOD_CURRENT)
-    //  if (Chart_Structure != NULL && Chart_Structure.ProcessNewBar()) chartRedrawNeeded = true;
+      if (Chart_Structure != NULL && Chart_Structure.ProcessNewBar()) chartRedrawNeeded = true;
       if (Chart_FVG != NULL && Chart_FVG.ProcessNewBar()) chartRedrawNeeded = true;
       if (Chart_Minor != NULL && Chart_Minor.ProcessNewBar()) chartRedrawNeeded = true;
    }
@@ -125,9 +132,9 @@ void OnTick()
    {
       // پردازش برای تایم فریم MTF (مثلاً H4)
       if (MTF_Structure != NULL && MTF_Structure.ProcessNewBar()) chartRedrawNeeded = true;
-     // if (MTF_FVG != NULL && MTF_FVG.ProcessNewBar()) chartRedrawNeeded = true;
-     // if (MTF_Minor != NULL && MTF_Minor.ProcessNewBar()) chartRedrawNeeded = true;
-   }///
+      if (MTF_FVG != NULL && MTF_FVG.ProcessNewBar()) chartRedrawNeeded = true;
+      if (MTF_Minor != NULL && MTF_Minor.ProcessNewBar()) chartRedrawNeeded = true;
+   }
   
    //--- مثال دسترسی به داده‌های کلاس جدید MinorStructure (برای لاگ یا منطق معاملاتی)
    if (MTF_Minor != NULL && MTF_Minor.GetMinorHighsCount() > 0)
