@@ -684,11 +684,11 @@ private:
    {
       if (breakBar < 1 || pivotBarIndex < 0 || breakBar >= pivotBarIndex) return; // محدوده نامعتبر
 
-      int startScan = breakBar - 1; // شروع اسکن از کندل قبل از شکست
+      int startScan = breakBar + 1; // شروع اسکن از کندل قبل از شکست
       int endScan = pivotBarIndex;  // پایان اسکن در کندل پیوت (100% فیبو)
 
       // اسکن معکوس از جدیدتر (startScan) به قدیمی‌تر (endScan)
-      for (int i = startScan; i >= endScan; i--)
+      for (int i = startScan; i >= endScan; i++)
       {
          bool candidate = false;
 
@@ -706,7 +706,7 @@ private:
                   if (m_enableOB_FVG_Check)
                   {
                      if (i < 2) candidate = false; // اطمینان از وجود کندل‌های ک
-                  else if (iLow(m_symbol, m_timeframe, i - 2) <= iHigh(m_symbol, m_timeframe, i)) candidate = false; اگر همپوشانی وجود داشته باشد، رد کن (گپ باید کامل باشد: Low(i-2) > High(i))
+                  else if (iLow(m_symbol, m_timeframe, i - 2) <= iHigh(m_symbol, m_timeframe, i)) candidate = false;// اگر همپوشانی وجود داشته باشد، رد کن (گپ باید کامل با=شد: Low(i-2) > High(i))
                   }
                }
             }
