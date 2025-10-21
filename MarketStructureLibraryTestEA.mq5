@@ -1,6 +1,6 @@
 //+------------------------------------------------------------------+
-//| MementoTestEA.mq5 |
-//| Copyright 2025, Khajavi & Gemini|
+//|MarketStructureLibraryTestEA.mq5 |
+//| Copyright 2025, Khajavi |
 //| Test Structure lib |
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2025, Khajavi & Gemini"
@@ -77,7 +77,7 @@ int OnInit()
    // (تنظیم نمایش روی true برای همه کلاس‌ها در تایم فریم فعلی)
    Chart_Structure = new MarketStructure(_Symbol, _Period, ChartID(), Input_EnableLogging, true, Input_FibUpdateLevel, Input_FractalLength, Input_EnableOB_FVG_Check);
    Chart_FVG = new FVGManager(_Symbol, _Period, ChartID(), Input_EnableLogging, false);
-   Chart_Minor = new MinorStructure(_Symbol, _Period, ChartID(), Input_EnableLogging, true, Input_AOFractalLength);
+   Chart_Minor = new MinorStructure(_Symbol, _Period, ChartID(), Input_EnableLogging, true, Input_AOFractalLength,false);
    Chart_Liq = new CLiquidityManager(Chart_Structure, Chart_Minor, _Symbol, _Period, ChartID(), Input_EnableLogging, true, DrawEQ, DrawTraps, DrawPDL, DrawPWL, DrawPML, DrawPYL);
    
    // غیرفعال کردن گرید چارت
@@ -93,7 +93,7 @@ int OnInit()
    // (تنظیم نمایش MTF بر اساس ورودی ShowMTFDrawing)
    MTF_Structure = new MarketStructure(_Symbol, MTF_Timeframe, ChartID(), Input_EnableLogging, ShowMTFDrawing, Input_FibUpdateLevel, Input_FractalLength, Input_EnableOB_FVG_Check);
    MTF_FVG = new FVGManager(_Symbol, MTF_Timeframe, ChartID(), Input_EnableLogging, ShowMTFDrawing);
-   MTF_Minor = new MinorStructure(_Symbol, MTF_Timeframe, ChartID(), Input_EnableLogging, ShowMTFDrawing, Input_AOFractalLength);
+   MTF_Minor = new MinorStructure(_Symbol, MTF_Timeframe, ChartID(), Input_EnableLogging, ShowMTFDrawing, Input_AOFractalLength,false);
    MTF_Liq = new CLiquidityManager(MTF_Structure, MTF_Minor, _Symbol, MTF_Timeframe, ChartID(), Input_EnableLogging, ShowMTFDrawing, DrawEQ, DrawTraps, DrawPDL, DrawPWL, DrawPML, DrawPYL);
    
  //  int ma1 = iMA(Symbol(), PERIOD_CURRENT, 50, 0, MODE_EMA, PRICE_CLOSE);
