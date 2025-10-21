@@ -1,32 +1,44 @@
+سلام خوبی 
+
+می‌خوام کد زیر رو به طور دقیق و موشکافانه‌ای باگی خطایی مشکلی چیزی نداره به نظرتون در مورد هر بخشش بگید تمام بخش‌هاشو می‌خوام تمام کتابخونه‌هایی که تمام کلاس‌هایی که داری رو منطق تمام بخششو بهم بگی 
+منطق بخش‌های زیر را با تمام جزئیات بگو منطق ای کیو برای مینور و میژور 
+منطق بخش کلاس لیکیدیتی 
+منطق کلاس مینور منطقه کلاس ماژور 
+وسایل بخش اردر بلاک‌ها و بخش‌های دیگر منطقشون رو خیلی دقیق می‌خوام توضیح بدیم و با تمام جزئیاتش دقت کنی و نظر دقیقتو بهم بگی 
+
+
+
+در خصوص اون مورد اول که چرا ما از اومدیم از پایه در واقع سقف و کف فراکتالی در تابع فقط برای بار اول است و که در بخش استراکچر برای شروع در واقع منطقه استراکچر و بالاخره یه نقطه وجود داشته باشه که اون رو بشکنه و این چرخش ادامه داشته باشه از اون استفاده کردیم تاثیر زیادی نخواهد داشت در منطق و بلافاصله بعد از اولین شکست ساختاری سیستم به حالتی اتفاق می‌افته که شروع می‌کنه به خود ترمیمی و خود اصلاح کردن بدونم بدونی و به عنوان یک دفاعیه داشته باشیمش که بدونیم چرا از اون استفاده کردن و برداشت اشتباهی نشه اوکی شروع کن ببینم چی میشه 
+
+
+
+```mqh
 //+------------------------------------------------------------------+
 //|                                MarketStructureLibrary.mqh         |
 //|                              Copyright 2025, Khajavi - HipoAlgoritm|
 //|                                                                  |
 //| راهنمای اجرا و استفاده (Blueprint for Memento Project):          |
-//| این کتابخانه شامل سه کلاس مستقل 'MarketStructure'، 'FVGManager' |
-//| و 'MinorStructure' است که قابلیت اجرای چندگانه (Multi-Timeframe/Multi-Symbol) را   |
-//| فراهم می کنند.                                                   |
+//| این کتابخانه شامل چهار کلاس مستقل 'MarketStructure'، 'FVGManager'،|
+//| 'MinorStructure' و 'CLiquidityManager' است که قابلیت اجرای چندگانه (Multi-Timeframe/Multi-Symbol) را فراهم می کنند.|
 //|                                                                  |
-//| ۱. ایجاد آبجکت: در تابع OnInit() اکسپرت، نمونه‌هایی از این کلاس‌ها|
-//|    را ایجاد کنید. برای هر تایم فریم/نماد مورد نیاز، یک آبجکت جدید|
-//|    بسازید.                                                       |
-//|    مثال: MarketStructure *H1_Struct = new MarketStructure(...)   |
+//| ۱. ایجاد آبجکت: در تابع OnInit() اکسپرت، نمونه‌هایی از این کلاس‌ها را ایجاد کنید. برای هر تایم فریم/نماد مورد نیاز، یک آبجکت جدید بسازید.|
+//|    مثال: MarketStructure *H1_Struct = new MarketStructure(...);  |
+//|          MinorStructure *H1_Minor = new MinorStructure(...);     |
+//|          CLiquidityManager *H1_Liq = new CLiquidityManager(H1_Struct, H1_Minor, ...); // تزریق وابستگی به کلاس‌های MarketStructure و MinorStructure الزامی است.|
 //|                                                                  |
 //| ۲. پردازش داده: در OnTick() یا OnTimer() اکسپرت:                  |
-//|    - متد ProcessNewTick() را برای مدیریت FVG (ابطال لحظه‌ای)      |
-//|      فراخوانی کنید.                                              |
-//|    - متد ProcessNewBar() را فقط در هنگام کلوز کندل جدید تایم فریم|
-//|      مربوطه فراخوانی کنید (برای شناسایی ساختار و FVG جدید).      |
+//|    - متد ProcessNewTick() را برای مدیریت FVG (ابطال لحظه‌ای) و OB (میتگیشن لحظه‌ای) و نقدینگی (ProcessNewTick() کلاس CLiquidityManager) فراخوانی کنید.|
+//|    - متد ProcessNewBar() را فقط در هنگام کلوز کندل جدید تایم فریم مربوطه فراخوانی کنید (برای شناسایی ساختار، FVG جدید، مینور، EQ و نقدینگی).|
 //|                                                                  |
-//| ۳. دسترسی به داده: از توابع Get... مانند GetLastSwingHigh() و    |
-//|    GetFVGCount() برای استخراج داده‌های لازم برای ترید استفاده کنید.|
+//| ۳. دسترسی به داده: از توابع Get... مانند GetLastSwingHigh()، GetFVGCount()، GetMajorEQPattern()، GetLiquidityEvent() و ... برای استخراج داده‌های لازم برای ترید استفاده کنید.|
 //|                                                                  |
-//| ۴. مدیریت نمایش: با پارامتر 'showDrawing' در سازنده، می توانید   |
-//|    نمایش ترسیمات کلاس را روی چارت خاموش یا روشن کنید.             |
+//| ۴. مدیریت نمایش: با پارامتر 'showDrawing' در سازنده، می توانید نمایش ترسیمات کلاس را روی چارت خاموش یا روشن کنید. برای CLiquidityManager، ورودی‌های جداگانه برای هر نوع نقدینگی (drawEQ, drawTraps و ...) وجود دارد.|
+//|                                                                  |
+//| نکته: کلاس CLiquidityManager وابسته به MarketStructure و MinorStructure است و باید پس از ایجاد آن‌ها ساخته شود. پوینترها را به سازنده آن پاس دهید.|
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2025, Khajavi - HipoAlgoritm"
 #property link      "https://github.com/Khajavi8056/"
-#property version   "2.13" // نسخه با اصلاح باگ منطقی FVG در شناسایی OB
+#property version   "3.00" // نسخه با اضافه کردن قابلیت نقدینگی یکپارچه و EQ ماژور
 
 //+------------------------------------------------------------------+
 //| ساختارهای داده و شمارنده‌ها (Structs & Enums)                     |
@@ -66,6 +78,43 @@ struct EQPattern
    datetime time_formation; // زمان کندل تایید (کندل قرمز/سبز) که الگو را نهایی کرده است
    double   price_entry;    // قیمت Low/High کندلی که وارد زون شده است (نقطه انتهایی خط چین)
    SwingPoint source_swing; // کپی کامل از SwingPoint اصلی که این الگو بر اساس آن شکل گرفته
+};
+
+//--- ساختار داده برای نگهداری اطلاعات الگوی EQ ماژور
+struct MajorEQPattern
+{
+   bool     isBullish;      // نوع الگو: صعودی (true) یا نزولی (false)
+   datetime time_formation; // زمان کندل تایید
+   double   price_entry;    // قیمت Low/High کندل ورود به زون
+   SwingPoint source_swing; // سوئینگ ماژور مبدا
+};
+
+//--- شمارنده برای انواع رویدادهای نقدینگی
+enum ENUM_LIQUIDITY_TYPE
+{
+   LIQ_EQH,    // Equal High (تست سقف)
+   LIQ_EQL,    // Equal Low (تست کف)
+   LIQ_SMS,    // Swing Market Structure (تله ساختاری)
+   LIQ_CF,     // Confirmation Flip (تله تایید شده)
+   LIQ_PDH,    // Previous Day High
+   LIQ_PDL,    // Previous Day Low
+   LIQ_PWH,    // Previous Week High
+   LIQ_PWL,    // Previous Week Low
+   LIQ_PMH,    // Previous Month High
+   LIQ_PML,    // Previous Month Low
+   LIQ_PYH,    // Previous Year High
+   LIQ_PYL     // Previous Year Low
+};
+
+//--- ساختار داده برای نگهداری تاریخچه رویدادهای نقدینگی
+struct LiquidityEvent
+{
+   ENUM_LIQUIDITY_TYPE type;        // نوع نقدینگی
+   bool                isBullish;   // جهت الگو (صعودی/نزولی)
+   datetime            time;        // زمان رویداد
+   double              price;       // قیمت مرتبط
+   string              description; // توضیح کوتاه
+   SwingPoint          source_swing;// منبع سوئینگ (برای EQ و تله‌ها)
 };
 
 //+------------------------------------------------------------------+
@@ -479,6 +528,13 @@ private:
    //--- متغیرهای کنترلی برای Order Blocks
    bool             m_isCurrentlyMitigatingOB; // وضعیت لحظه‌ای: آیا قیمت در حال مصرف یک OB است؟ (برای دسترسی عمومی)
 
+   //--- متغیرهای حالت برای EQ ماژور
+   MajorEQPattern   m_majorEQPatterns_Array[]; // آرایه EQهای ماژور (سری، ظرفیت ۴)
+   SwingPoint       m_activeMajorHighCandidate;  // کاندیدای فعال برای EQ نزولی ماژور
+   SwingPoint       m_activeMajorLowCandidate;   // کاندیدای فعال برای EQ صعودی ماژور
+   datetime         m_lastMajorEQInvalidationCheck; // برای جلوگیری از تکرار ابطال
+   datetime         m_lastMajorEQDetectionCheck;    // برای جلوگیری از تکرار تشخیص
+
 public:
    //+------------------------------------------------------------------+
    //| سازنده کلاس (Constructor) - با ورودی جدید برای شرط FVG در OB   |
@@ -538,6 +594,14 @@ public:
       // شناسایی ساختار اولیه
       IdentifyInitialStructure();
       UpdateTrendLabel();
+      
+      // مقداردهی اولیه برای EQ ماژور
+      ArraySetAsSeries(m_majorEQPatterns_Array, true);
+      ArrayResize(m_majorEQPatterns_Array, 0, 4); // ظرفیت اولیه ۴
+      m_activeMajorHighCandidate.bar_index = -1;
+      m_activeMajorLowCandidate.bar_index = -1;
+      m_lastMajorEQInvalidationCheck = 0;
+      m_lastMajorEQDetectionCheck = 0;
       
       LogEvent("کلاس MarketStructure برای نماد " + m_symbol + " و تایم فریم " + EnumToString(m_timeframe) + " آغاز به کار کرد.", m_enableLogging, "[SMC]");
    }
@@ -604,6 +668,10 @@ public:
       
       //--- ۳. به‌روزرسانی نمایش روند
       if(UpdateTrendLabel()) structureChanged = true;
+      
+      //--- ۴. پردازش الگوهای EQ ماژور
+      ProcessMajorEQInvalidation();
+      ProcessMajorEQDetection();
       
       return structureChanged;
    }
@@ -1106,6 +1174,10 @@ private:
       m_swingHighs_Array[0].bar_index = bar_index;
       m_swingHighs_Array[0].body_price = MathMax(iOpen(m_symbol, m_timeframe, bar_index), iClose(m_symbol, m_timeframe, bar_index)); // برای سقف
 
+      // آپدیت کاندیدای فعال برای EQ ماژور نزولی
+      m_activeMajorHighCandidate = m_swingHighs_Array[0];
+      LogEvent("سقف ماژور " + TimeToString(m_swingHighs_Array[0].time) + " به عنوان کاندیدای EQ ماژور تنظیم شد.", m_enableLogging, "[SMC-EQ]");
+
       if (m_showDrawing) drawSwingPoint(m_swingHighs_Array[0], true);
       LogEvent("سقف جدید در قیمت " + DoubleToString(price, _Digits) + " ثبت شد.", m_enableLogging, "[SMC]");
    }
@@ -1129,6 +1201,10 @@ private:
       m_swingLows_Array[0].time = time;
       m_swingLows_Array[0].bar_index = bar_index;
       m_swingLows_Array[0].body_price = MathMin(iOpen(m_symbol, m_timeframe, bar_index), iClose(m_symbol, m_timeframe, bar_index)); // برای کف
+
+      // آپدیت کاندیدای فعال برای EQ ماژور صعودی
+      m_activeMajorLowCandidate = m_swingLows_Array[0];
+      LogEvent("کف ماژور " + TimeToString(m_swingLows_Array[0].time) + " به عنوان کاندیدای EQ ماژور تنظیم شد.", m_enableLogging, "[SMC-EQ]");
 
       if (m_showDrawing) drawSwingPoint(m_swingLows_Array[0], false);
       LogEvent("کف جدید در قیمت " + DoubleToString(price, _Digits) + " ثبت شد.", m_enableLogging, "[SMC]");
@@ -1231,7 +1307,209 @@ private:
        ObjectSetInteger(m_chartId, textName, OBJPROP_COLOR, breakColor);
        ObjectSetInteger(m_chartId, textName, OBJPROP_ANCHOR, isHighBreak ? ANCHOR_LEFT_LOWER : ANCHOR_LEFT_UPPER);
    }
-   
+
+   //--- تابع کمکی: بررسی کندل قوی (برای تایید EQ)
+   bool IsStrongCandle(const int shift) const
+   {
+      double open = iOpen(m_symbol, m_timeframe, shift);
+      double close = iClose(m_symbol, m_timeframe, shift);
+      double high = iHigh(m_symbol, m_timeframe, shift);
+      double low = iLow(m_symbol, m_timeframe, shift);
+      
+      double body = MathAbs(open - close);
+      double range = high - low;
+      
+      // شرط قوی: بدنه بیش از 50% رنج کندل
+      return (body > 0.5 * range);
+   }
+
+   //--- تابع: پردازش ابطال الگوهای EQ ماژور تایید شده (مرگ بعد از زندگی)
+   void ProcessMajorEQInvalidation()
+   {
+      // جلوگیری از اجرای تکراری روی یک کندل
+      datetime currentTime = iTime(m_symbol, m_timeframe, 1);
+      if (currentTime == m_lastMajorEQInvalidationCheck) return;
+      m_lastMajorEQInvalidationCheck = currentTime;
+
+      // حلقه را از آخر به اول می‌زنیم تا حذف کردن یک عنصر، باعث بهم ریختن اندیس‌ها نشود
+      for (int i = ArraySize(m_majorEQPatterns_Array) - 1; i >= 0; i--)
+      {
+         MajorEQPattern eq = m_majorEQPatterns_Array[i];
+
+         // بازسازی زون واکنش الگو
+         double zoneHigh = eq.isBullish ? eq.source_swing.body_price : eq.source_swing.price;
+         double zoneLow = eq.isBullish ? eq.source_swing.price : eq.source_swing.body_price;
+
+         bool isInvalidated = false;
+         // شرط ابطال برای EQ نزولی (Double Top)
+         if (!eq.isBullish && iClose(m_symbol, m_timeframe, 1) > zoneHigh)
+         {
+            isInvalidated = true;
+         }
+         // شرط ابطال برای EQ صعودی (Double Bottom)
+         if (eq.isBullish && iClose(m_symbol, m_timeframe, 1) < zoneLow)
+         {
+            isInvalidated = true;
+         }
+
+         if (isInvalidated)
+         {
+            LogEvent("الگوی EQ ماژور در زمان " + TimeToString(eq.time_formation) + " با بسته شدن قیمت خارج از زون باطل شد.", m_enableLogging, "[SMC-EQ]");
+
+            // پاک کردن تمام اشیاء گرافیکی مربوط به این EQ - هماهنگ با CLiquidityManager (نام‌گذاری Liq_EQ_Major_...)
+            string baseName = "Liq_EQ_Major_" + TimeToString(eq.source_swing.time) + m_timeframeSuffix;
+            string lineName = baseName + "_Line";
+            string textName = baseName + "_Text";
+            ObjectDelete(m_chartId, lineName);
+            ObjectDelete(m_chartId, textName);
+
+            // حذف الگو از آرایه حافظه
+            ArrayRemove(m_majorEQPatterns_Array, i, 1);
+         }
+      }
+   }
+
+   //--- تابع: پردازش شناسایی الگوهای EQ ماژور جدید
+   void ProcessMajorEQDetection()
+   {
+      // جلوگیری از اجرای تکراری روی یک کندل
+      datetime currentTime = iTime(m_symbol, m_timeframe, 1);
+      if (currentTime == m_lastMajorEQDetectionCheck) return;
+      m_lastMajorEQDetectionCheck = currentTime;
+
+      // --- بخش ۱: ارزیابی کاندیدای سقف فعال (برای EQ نزولی) ---
+      if (m_activeMajorHighCandidate.bar_index != -1) // آیا اصلاً کاندیدای فعالی داریم؟
+      {
+         // شرط ابطال ۱: آیا سقف جدیدتری از کاندیدای ما تشکیل شده؟
+         if (GetSwingHigh(0).time > m_activeMajorHighCandidate.time)
+         {
+            LogEvent("کاندیدای سقف ماژور " + TimeToString(m_activeMajorHighCandidate.time) + " توسط سقف جدیدتر باطل شد.", m_enableLogging, "[SMC-EQ]");
+            m_activeMajorHighCandidate = GetSwingHigh(0); // کاندیدا به سقف جدید آپدیت می‌شود
+            return; // در این تیک کاری با این کاندیدا نداریم
+         }
+
+         // تعریف زون فرضی
+         double zoneHigh = m_activeMajorHighCandidate.price;
+         double zoneLow = m_activeMajorHighCandidate.body_price;
+
+         // شرط ابطال ۲: آیا کندل بسته شده فعلی بالای زون بسته شده؟
+         if (iClose(m_symbol, m_timeframe, 1) > zoneHigh)
+         {
+            LogEvent("کاندیدای سقف ماژور " + TimeToString(m_activeMajorHighCandidate.time) + " با بسته شدن قیمت بالای زون باطل شد.", m_enableLogging, "[SMC-EQ]");
+            m_activeMajorHighCandidate.bar_index = -1; // کاندیدا غیرفعال می‌شود
+            return;
+         }
+
+         // شرط ورود و تایید الگو
+         if (iHigh(m_symbol, m_timeframe, 1) >= zoneLow) // آیا کندل فعلی وارد زون شده؟
+         {
+            // آیا کندل فعلی یک کندل تایید نزولی و قوی است؟
+            if (iClose(m_symbol, m_timeframe, 1) < iOpen(m_symbol, m_timeframe, 1) && IsStrongCandle(1))
+            {
+               // الگو تایید شد!
+               MajorEQPattern newEQ;
+               newEQ.isBullish = false;
+               newEQ.time_formation = iTime(m_symbol, m_timeframe, 1); // زمان تایید
+               newEQ.price_entry = iHigh(m_symbol, m_timeframe, 1); // High کندل تایید
+               newEQ.source_swing = m_activeMajorHighCandidate;
+
+               MajorEQPattern temp[1]; temp[0] = newEQ;
+               if (ArrayInsert(m_majorEQPatterns_Array, temp, 0))
+               {
+                  // مدیریت ظرفیت (حداکثر 4)
+                  if (ArraySize(m_majorEQPatterns_Array) > 4)
+                  {
+                     int lastIndex = ArraySize(m_majorEQPatterns_Array) - 1;
+                     MajorEQPattern oldestEQ = m_majorEQPatterns_Array[lastIndex];
+
+                     LogEvent("ظرفیت EQ ماژور تکمیل. قدیمی‌ترین الگو در زمان " + TimeToString(oldestEQ.time_formation) + " حذف می‌شود.", m_enableLogging, "[SMC-EQ]");
+
+                     // پاک کردن اشیاء گرافیکی الگوی قدیمی
+                     string baseNameOld = "Liq_EQ_Major_" + TimeToString(oldestEQ.source_swing.time) + m_timeframeSuffix;
+                     string lineNameOld = baseNameOld + "_Line";
+                     string textNameOld = baseNameOld + "_Text";
+                     ObjectDelete(m_chartId, lineNameOld);
+                     ObjectDelete(m_chartId, textNameOld);
+
+                     // حذف از آرایه حافظه
+                     ArrayRemove(m_majorEQPatterns_Array, lastIndex, 1);
+                  }
+                  
+                  LogEvent("الگوی EQ ماژور نزولی تایید شد.", m_enableLogging, "[SMC-EQ]");
+
+                  m_activeMajorHighCandidate.bar_index = -1; // کاندیدا پس از موفقیت، غیرفعال می‌شود
+               }
+            }
+         }
+      }
+
+      // --- بخش ۲: ارزیابی کاندیدای کف فعال (برای EQ صعودی) ---
+      if (m_activeMajorLowCandidate.bar_index != -1)
+      {
+         // شرط ابطال ۱: آیا کف جدیدتری از کاندیدای ما تشکیل شده؟
+         if (GetSwingLow(0).time > m_activeMajorLowCandidate.time)
+         {
+            LogEvent("کاندیدای کف ماژور " + TimeToString(m_activeMajorLowCandidate.time) + " توسط کف جدیدتر باطل شد.", m_enableLogging, "[SMC-EQ]");
+            m_activeMajorLowCandidate = GetSwingLow(0); // کاندیدا به کف جدید آپدیت می‌شود
+            return; // در این تیک کاری با این کاندیدا نداریم
+         }
+
+         // تعریف زون فرضی
+         double zoneLow = m_activeMajorLowCandidate.price;
+         double zoneHigh = m_activeMajorLowCandidate.body_price;
+
+         // شرط ابطال ۲: آیا کندل بسته شده فعلی پایین زون بسته شده؟
+         if (iClose(m_symbol, m_timeframe, 1) < zoneLow)
+         {
+            LogEvent("کاندیدای کف ماژور " + TimeToString(m_activeMajorLowCandidate.time) + " با بسته شدن قیمت پایین زون باطل شد.", m_enableLogging, "[SMC-EQ]");
+            m_activeMajorLowCandidate.bar_index = -1; // کاندیدا غیرفعال می‌شود
+            return;
+         }
+
+         // شرط ورود و تایید الگو
+         if (iLow(m_symbol, m_timeframe, 1) <= zoneHigh) // آیا کندل فعلی وارد زون شده؟
+         {
+            // آیا کندل فعلی یک کندل تایید صعودی و قوی است؟
+            if (iClose(m_symbol, m_timeframe, 1) > iOpen(m_symbol, m_timeframe, 1) && IsStrongCandle(1))
+            {
+               // الگو تایید شد!
+               MajorEQPattern newEQ;
+               newEQ.isBullish = true;
+               newEQ.time_formation = iTime(m_symbol, m_timeframe, 1); // زمان تایید
+               newEQ.price_entry = iLow(m_symbol, m_timeframe, 1); // Low کندل تایید
+               newEQ.source_swing = m_activeMajorLowCandidate;
+
+               MajorEQPattern temp[1]; temp[0] = newEQ;
+               if (ArrayInsert(m_majorEQPatterns_Array, temp, 0))
+               {
+                  // مدیریت ظرفیت (حداکثر 4)
+                  if (ArraySize(m_majorEQPatterns_Array) > 4)
+                  {
+                     int lastIndex = ArraySize(m_majorEQPatterns_Array) - 1;
+                     MajorEQPattern oldestEQ = m_majorEQPatterns_Array[lastIndex];
+
+                     LogEvent("ظرفیت EQ ماژور تکمیل. قدیمی‌ترین الگو در زمان " + TimeToString(oldestEQ.time_formation) + " حذف می‌شود.", m_enableLogging, "[SMC-EQ]");
+
+                     // پاک کردن اشیاء گرافیکی الگوی قدیمی
+                     string baseNameOld = "Liq_EQ_Major_" + TimeToString(oldestEQ.source_swing.time) + m_timeframeSuffix;
+                     string lineNameOld = baseNameOld + "_Line";
+                     string textNameOld = baseNameOld + "_Text";
+                     ObjectDelete(m_chartId, lineNameOld);
+                     ObjectDelete(m_chartId, textNameOld);
+
+                     // حذف از آرایه حافظه
+                     ArrayRemove(m_majorEQPatterns_Array, lastIndex, 1);
+                  }
+                  
+                  LogEvent("الگوی EQ ماژور صعودی تایید شد.", m_enableLogging, "[SMC-EQ]");
+
+                  m_activeMajorLowCandidate.bar_index = -1; // کاندیدا پس از موفقیت، غیرفعال می‌شود
+               }
+            }
+         }
+      }
+   }
+
 public:
    //+------------------------------------------------------------------+
    //| توابع دسترسی عمومی (Accessors) - برای استفاده اکسپرت معاملاتی     |
@@ -1275,6 +1553,23 @@ public:
    
    //--- وضعیت لحظه‌ای مصرف OB
    bool IsCurrentlyMitigatingOB() const { return m_isCurrentlyMitigatingOB; }
+   
+   //--- توابع دسترسی به EQ های ماژور تایید شده
+   int GetMajorEQPatternCount() const { return ArraySize(m_majorEQPatterns_Array); }
+   MajorEQPattern GetMajorEQPattern(const int index) const
+   {
+      if (index >= 0 && index < ArraySize(m_majorEQPatterns_Array)) return m_majorEQPatterns_Array[index];
+      MajorEQPattern empty; empty.time_formation = 0; // مقداردهی اولیه برای شناسایی خطا
+      return empty;
+   }
+   
+   //--- تابع جدید برای گرفتن آخرین EQ ماژور تایید شده (برای سادگی کار CLiquidityManager)
+   MajorEQPattern GetLastMajorEQPattern() const
+   {
+      if(ArraySize(m_majorEQPatterns_Array) > 0) return m_majorEQPatterns_Array[0];
+      MajorEQPattern empty; empty.time_formation = 0;
+      return empty;
+   }
 };
 
 //==================================================================//
@@ -2005,5 +2300,530 @@ public:
       EQPattern empty; // برگرداندن یک ساختار خالی در صورت خطا
       return empty; 
    }
+
+   //--- تابع جدید برای گرفتن آخرین EQ مینور تایید شده (برای سادگی کار CLiquidityManager)
+   EQPattern GetLastEQPattern() const
+   {
+      if(ArraySize(m_eqPatterns_Array) > 0) return m_eqPatterns_Array[0];
+      EQPattern empty; empty.time_formation = 0;
+      return empty;
+   }
+};
+
+//==================================================================//
+//             کلاس ۴: مدیریت نقدینگی بازار (CLiquidityManager)     //
+//==================================================================//
+class CLiquidityManager
+{
+private:
+   //--- وابستگی‌ها (تزریق شده از طریق سازنده)
+   MarketStructure *m_major; // پوینتر به آبجکت ساختار ماژور
+   MinorStructure  *m_minor; // پوینتر به آبجکت ساختار مینور
+
+   //--- تنظیمات اصلی
+   string           m_symbol;          // نماد معاملاتی
+   ENUM_TIMEFRAMES  m_timeframe;       // تایم فریم اجرایی این آبجکت
+   long             m_chartId;         // شناسه چارت
+   bool             m_enableLogging;   // فعال/غیرفعال کردن لاگ‌ها
+   string           m_timeframeSuffix; // پسوند تایم فریم برای نامگذاری اشیاء
+   bool             m_showDrawing;     // کنترل کلی نمایش ترسیمات این کلاس
+
+   //--- تنظیمات نمایش انواع نقدینگی (ورودی‌های سازنده)
+   bool             m_drawEQ;          // نمایش EQ های ماژور و مینور
+   bool             m_drawTraps;       // نمایش تله‌های SMS/CF
+   bool             m_drawPDL;         // نمایش سقف/کف روزانه
+   bool             m_drawPWL;         // نمایش سقف/کف هفتگی
+   bool             m_drawPML;         // نمایش سقف/کف ماهانه
+   bool             m_drawPYL;         // نمایش سقف/کف سالانه
+
+   //--- آرایه تاریخچه رویدادهای نقدینگی
+   LiquidityEvent   m_liquidityHistory[]; // آرایه سری، ظرفیت ۵۰
+
+   //--- متغیرهای حالت برای ماشین حالت SMS/CF
+   enum ENUM_SMS_CF_STATE {
+      STATE_IDLE,                     // حالت بیکار، منتظر CHoCH
+      STATE_WAITING_FOR_OPPOSING_BOS, // CHoCH رخ داده، منتظر BoS مخالف
+      STATE_WAITING_FOR_CONFIRMING_BREAK // SMS تایید شده، منتظر شکست تایید کننده CF
+   };
+   ENUM_SMS_CF_STATE m_trapState;        // حالت فعلی ماشین
+   datetime         m_lastKnownCHoCH;   // زمان آخرین CHoCH دیده شده در دنباله
+   datetime         m_lastKnownBoS;     // زمان BoS مخالف (که SMS را تایید کرد)
+   TREND_TYPE       m_preCHoCHTrend;    // روند ماژور *قبل* از CHoCH اولیه
+   SwingPoint       m_sms_source_swing; // سوئینگ پوینت ماژوری که باعث CHoCH اولیه شد
+   SwingPoint       m_cf_source_swing;  // سوئینگ پوینت ماژوری که باعث BoS مخالف شد
+
+   //--- متغیرهای ردیابی برای جلوگیری از ثبت تکراری EQ
+   datetime         m_lastSeenMajorEQTime; // زمان آخرین EQ ماژور ثبت شده
+   datetime         m_lastSeenMinorEQTime; // زمان آخرین EQ مینور ثبت شده
+
+   //--- متغیرهای ردیابی و ذخیره سطوح دوره‌ای
+   datetime         m_lastDailyCheck;   // زمان آخرین به‌روزرسانی روزانه
+   datetime         m_lastWeeklyCheck;  // زمان آخرین به‌روزرسانی هفتگی
+   datetime         m_lastMonthlyCheck; // زمان آخرین به‌روزرسانی ماهانه
+   datetime         m_lastYearlyCheck;  // زمان آخرین به‌روزرسانی سالانه
+   // مقادیر سطوح قبلی
+   double           m_pdl, m_pdh, m_pwl, m_pwh, m_pml, m_pmh, m_pyl, m_pyh;
+   // نام اشیاء گرافیکی سطوح دوره‌ای (برای آپدیت/حذف آسان)
+   string           m_pdhLineName, m_pdlLineName, m_pwhLineName, m_pwlLineName;
+   string           m_pmhLineName, m_pmlLineName, m_pyhLineName, m_pylLineName;
+
+   //--- متغیر کمکی برای اطمینان از اجرای ProcessNewBar
+   datetime         m_lastProcessedBarTime;
+
+   //--- تابع کمکی: ثبت رویداد نقدینگی
+   void RegisterLiquidityEvent(ENUM_LIQUIDITY_TYPE type, bool isBullish, datetime time, double price, string desc, SwingPoint source)
+   {
+      if (ArraySize(m_liquidityHistory) > 0 && m_liquidityHistory[0].type == type && m_liquidityHistory[0].time == time) return; // جلوگیری از تکرار
+      
+      LiquidityEvent newEvent;
+      newEvent.type = type;
+      newEvent.isBullish = isBullish;
+      newEvent.time = time;
+      newEvent.price = price;
+      newEvent.description = desc;
+      newEvent.source_swing = source;
+
+      // مدیریت ظرفیت
+      if (ArraySize(m_liquidityHistory) >= 50) ArrayRemove(m_liquidityHistory, 49, 1);
+
+      LiquidityEvent temp[1]; temp[0] = newEvent;
+      ArrayInsert(m_liquidityHistory, temp, 0);
+
+      LogEvent("رویداد نقدینگی " + EnumToString(type) + " ثبت شد.", m_enableLogging, "[LIQ]");
+   }
+
+   //--- تابع کمکی: رسم سطوح دوره‌ای
+   void DrawPeriodicLevel(double price, const string objName, const string label, color clr, ENUM_LINE_STYLE style, int width = 1)
+   {
+      ObjectDelete(m_chartId, objName);
+      ObjectDelete(m_chartId, objName + "_Text");
+
+      if (!ObjectCreate(m_chartId, objName, OBJ_HLINE, 0, 0, price)) return;
+
+      ObjectSetInteger(m_chartId, objName, OBJPROP_COLOR, clr);
+      ObjectSetInteger(m_chartId, objName, OBJPROP_STYLE, style);
+      ObjectSetInteger(m_chartId, objName, OBJPROP_WIDTH, width);
+      ObjectSetInteger(m_chartId, objName, OBJPROP_BACK, true);
+
+      if (ObjectCreate(m_chartId, objName + "_Text", OBJ_TEXT, 0, TimeCurrent() + PeriodSeconds() * 10, price))
+      {
+         ObjectSetString(m_chartId, objName + "_Text", OBJPROP_TEXT, label + m_timeframeSuffix);
+         ObjectSetInteger(m_chartId, objName + "_Text", OBJPROP_COLOR, clr);
+         ObjectSetInteger(m_chartId, objName + "_Text", OBJPROP_ANCHOR, ANCHOR_RIGHT_LOWER);
+         ObjectSetInteger(m_chartId, objName + "_Text", OBJPROP_FONTSIZE, 8);
+      }
+   }
+
+   //--- تابع کمکی: رسم رویداد EQ
+   void DrawEQEvent(SwingPoint source, datetime time_form, double price_entry, ENUM_LIQUIDITY_TYPE type, bool isMajor)
+   {
+      string baseName = "Liq_EQ_" + (isMajor ? "Major_" : "Minor_") + TimeToString(source.time) + m_timeframeSuffix;
+      string lineName = baseName + "_Line"; string textName = baseName + "_Text";
+      ObjectDelete(m_chartId, lineName); ObjectDelete(m_chartId, textName);
+      color clr = (type == LIQ_EQL) ? clrBlue : clrPink;
+      if (ObjectCreate(m_chartId, lineName, OBJ_TREND, 0, source.time, source.price, time_form, price_entry))
+      {
+         ObjectSetInteger(m_chartId, lineName, OBJPROP_STYLE, STYLE_DASHDOTDOT);
+         ObjectSetInteger(m_chartId, lineName, OBJPROP_COLOR, clr);
+         ObjectSetInteger(m_chartId, lineName, OBJPROP_WIDTH, 1);
+      }
+      double midPrice = (source.price + price_entry) / 2;
+      datetime midTime = source.time + (time_form - source.time) / 2;
+      if (ObjectCreate(m_chartId, textName, OBJ_TEXT, 0, midTime, midPrice))
+      {
+         ObjectSetString(m_chartId, textName, OBJPROP_TEXT, (type == LIQ_EQL ? "EQL$" : "EQH$") + (isMajor ? "(M)" : "(m)") + m_timeframeSuffix);
+         ObjectSetInteger(m_chartId, textName, OBJPROP_COLOR, clr);
+         ObjectSetInteger(m_chartId, textName, OBJPROP_ANCHOR, ANCHOR_CENTER);
+      }
+   }
+
+   //--- تابع کمکی: رسم رویداد تله (SMS/CF)
+   void DrawTrapEvent(SwingPoint source, ENUM_LIQUIDITY_TYPE type)
+   {
+      string objName = "Liq_Trap_" + EnumToString(type) + "_" + TimeToString(source.time) + m_timeframeSuffix;
+      ObjectDelete(m_chartId, objName);
+      color clr = (type == LIQ_SMS) ? C'128,0,128' : C'255,140,0'; // Purple for SMS, Orange for CF
+      double price = source.price + (type == LIQ_SMS ? 1 : -1) * 10 * _Point; // کمی آفست برای دیده شدن
+      if (ObjectCreate(m_chartId, objName, OBJ_TEXT, 0, source.time, price))
+      {
+         ObjectSetString(m_chartId, objName, OBJPROP_TEXT, (type == LIQ_SMS ? "SMS$" : "CF$") + m_timeframeSuffix);
+         ObjectSetInteger(m_chartId, objName, OBJPROP_COLOR, clr);
+         ObjectSetInteger(m_chartId, objName, OBJPROP_ANCHOR, (type == LIQ_SMS ? ANCHOR_BOTTOM : ANCHOR_TOP));
+         ObjectSetInteger(m_chartId, objName, OBJPROP_FONTSIZE, 8);
+      }
+   }
+
+   //--- تابع: به‌روزرسانی سطوح دوره‌ای
+   bool UpdatePeriodicLevels()
+   {
+      bool changed = false;
+
+      // روزانه
+      if (m_drawPDL)
+      {
+         datetime currentDayStart = iTime(m_symbol, PERIOD_D1, 0);
+         if (currentDayStart > m_lastDailyCheck)
+         {
+            m_lastDailyCheck = currentDayStart;
+            double pdh = iHigh(m_symbol, PERIOD_D1, 1);
+            double pdl = iLow(m_symbol, PERIOD_D1, 1);
+            if (pdh != 0 && pdh != m_pdh)
+            {
+               m_pdh = pdh;
+               RegisterLiquidityEvent(LIQ_PDH, false, currentDayStart, m_pdh, "PDH", SwingPoint());
+               DrawPeriodicLevel(m_pdh, m_pdhLineName, "PDH", clrGreen, STYLE_DOT);
+               changed = true;
+            }
+            if (pdl != 0 && pdl != m_pdl)
+            {
+               m_pdl = pdl;
+               RegisterLiquidityEvent(LIQ_PDL, true, currentDayStart, m_pdl, "PDL", SwingPoint());
+               DrawPeriodicLevel(m_pdl, m_pdlLineName, "PDL", clrRed, STYLE_DOT);
+               changed = true;
+            }
+         }
+      }
+
+      // هفتگی
+      if (m_drawPWL)
+      {
+         datetime currentWeekStart = iTime(m_symbol, PERIOD_W1, 0);
+         if (currentWeekStart > m_lastWeeklyCheck)
+         {
+            m_lastWeeklyCheck = currentWeekStart;
+            double pwh = iHigh(m_symbol, PERIOD_W1, 1);
+            double pwl = iLow(m_symbol, PERIOD_W1, 1);
+            if (pwh != 0 && pwh != m_pwh)
+            {
+               m_pwh = pwh;
+               RegisterLiquidityEvent(LIQ_PWH, false, currentWeekStart, m_pwh, "PWH", SwingPoint());
+               DrawPeriodicLevel(m_pwh, m_pwhLineName, "PWH", clrDarkGreen, STYLE_DASHDOT);
+               changed = true;
+            }
+            if (pwl != 0 && pwl != m_pwl)
+            {
+               m_pwl = pwl;
+               RegisterLiquidityEvent(LIQ_PWL, true, currentWeekStart, m_pwl, "PWL", SwingPoint());
+               DrawPeriodicLevel(m_pwl, m_pwlLineName, "PWL", clrDarkRed, STYLE_DASHDOT);
+               changed = true;
+            }
+         }
+      }
+
+      // ماهانه
+      if (m_drawPML)
+      {
+         datetime currentMonthStart = iTime(m_symbol, PERIOD_MN1, 0);
+         if (currentMonthStart > m_lastMonthlyCheck)
+         {
+            m_lastMonthlyCheck = currentMonthStart;
+            double pmh = iHigh(m_symbol, PERIOD_MN1, 1);
+            double pml = iLow(m_symbol, PERIOD_MN1, 1);
+            if (pmh != 0 && pmh != m_pmh)
+            {
+               m_pmh = pmh;
+               RegisterLiquidityEvent(LIQ_PMH, false, currentMonthStart, m_pmh, "PMH", SwingPoint());
+               DrawPeriodicLevel(m_pmh, m_pmhLineName, "PMH", clrForestGreen, STYLE_DASHDOTDOT);
+               changed = true;
+            }
+            if (pml != 0 && pml != m_pml)
+            {
+               m_pml = pml;
+               RegisterLiquidityEvent(LIQ_PML, true, currentMonthStart, m_pml, "PML", SwingPoint());
+               DrawPeriodicLevel(m_pml, m_pmlLineName, "PML", clrFireBrick, STYLE_DASHDOTDOT);
+               changed = true;
+            }
+         }
+      }
+
+      // سالانه
+      if (m_drawPYL)
+      {
+         MqlDateTime dt; TimeToStruct(TimeCurrent(), dt);
+         int current_year_day = dt.day_of_year;
+         datetime currentYearStart = TimeCurrent() - (TimeCurrent() % 31536000); // تقریبی شروع سال
+         if (current_year_day < 5 && currentYearStart > m_lastYearlyCheck)
+         {
+            m_lastYearlyCheck = currentYearStart;
+            MqlRates rates[];
+            int copied = CopyRates(m_symbol, PERIOD_MN1, 1, 12, rates);
+            if (copied == 12)
+            {
+               double yearlyHigh = 0, yearlyLow = DBL_MAX;
+               for (int k = 0; k < 12; k++)
+               {
+                  if (rates[k].high > yearlyHigh) yearlyHigh = rates[k].high;
+                  if (rates[k].low < yearlyLow) yearlyLow = rates[k].low;
+               }
+               if (yearlyHigh != 0 && yearlyHigh != m_pyh)
+               {
+                  m_pyh = yearlyHigh;
+                  RegisterLiquidityEvent(LIQ_PYH, false, currentYearStart, m_pyh, "PYH", SwingPoint());
+                  DrawPeriodicLevel(m_pyh, m_pyhLineName, "PYH", clrLimeGreen, STYLE_SOLID, 2);
+                  changed = true;
+               }
+               if (yearlyLow != 0 && yearlyLow != m_pyl)
+               {
+                  m_pyl = yearlyLow;
+                  RegisterLiquidityEvent(LIQ_PYL, true, currentYearStart, m_pyl, "PYL", SwingPoint());
+                  DrawPeriodicLevel(m_pyl, m_pylLineName, "PYL", clrIndianRed, STYLE_SOLID, 2);
+                  changed = true;
+               }
+            }
+         }
+      }
+      return changed;
+   }
+
+   //--- تابع: اسکن برای EQ
+   bool ScanForEQ()
+   {
+      bool changed = false;
+
+      // چک EQ ماژور
+      MajorEQPattern majorEq = m_major.GetLastMajorEQPattern();
+      if (majorEq.time_formation > m_lastSeenMajorEQTime)
+      {
+         m_lastSeenMajorEQTime = majorEq.time_formation;
+         ENUM_LIQUIDITY_TYPE type = majorEq.isBullish ? LIQ_EQL : LIQ_EQH;
+         RegisterLiquidityEvent(type, majorEq.isBullish, majorEq.time_formation, majorEq.price_entry, "Major " + EnumToString(type), majorEq.source_swing);
+         if (m_drawEQ && m_showDrawing) DrawEQEvent(majorEq.source_swing, majorEq.time_formation, majorEq.price_entry, type, true);
+         changed = true;
+      }
+
+      // چک EQ مینور
+      EQPattern minorEq = GetLastEQPattern();
+      if (minorEq.time_formation > m_lastSeenMinorEQTime)
+      {
+         m_lastSeenMinorEQTime = minorEq.time_formation;
+         ENUM_LIQUIDITY_TYPE type = minorEq.isBullish ? LIQ_EQL : LIQ_EQH;
+         RegisterLiquidityEvent(type, minorEq.isBullish, minorEq.time_formation, minorEq.price_entry, "Minor " + EnumToString(type), minorEq.source_swing);
+         if (m_drawEQ && m_showDrawing) DrawEQEvent(minorEq.source_swing, minorEq.time_formation, minorEq.price_entry, type, false);
+         changed = true;
+      }
+
+      return changed;
+   }
+
+   //--- تابع: اسکن برای تله‌های ساختاری
+   bool ScanForStructuralTraps()
+   {
+      bool changed = false;
+      datetime currentCHoCH = m_major.GetLastChoChTime();
+      datetime currentBoS = m_major.GetLastBoSTime();
+      TREND_TYPE currentTrend = m_major.GetCurrentTrend();
+      SwingPoint lastHigh = m_major.GetLastSwingHigh();
+      SwingPoint lastLow = m_major.GetLastSwingLow();
+
+      switch (m_trapState)
+      {
+         case STATE_IDLE:
+            if (currentCHoCH > m_lastKnownCHoCH && currentCHoCH > m_lastKnownBoS)
+            {
+               m_lastKnownCHoCH = currentCHoCH;
+               m_preCHoCHTrend = (currentTrend == TREND_BULLISH) ? TREND_BEARISH : TREND_BULLISH;
+               m_sms_source_swing = (currentTrend == TREND_BULLISH) ? m_major.GetSwingHigh(1) : m_major.GetSwingLow(1);
+               if (m_sms_source_swing.time == 0) m_sms_source_swing = (currentTrend == TREND_BULLISH) ? lastHigh : lastLow;
+               m_trapState = STATE_WAITING_FOR_OPPOSING_BOS;
+               LogEvent("وضعیت تله به STATE_WAITING_FOR_OPPOSING_BOS تغییر یافت.", m_enableLogging, "[LIQ]");
+            }
+            break;
+         case STATE_WAITING_FOR_OPPOSING_BOS:
+            if (currentBoS > m_lastKnownCHoCH)
+            {
+               m_lastKnownBoS = currentBoS;
+               if (currentTrend == m_preCHoCHTrend)
+               {
+                  RegisterLiquidityEvent(LIQ_SMS, (m_preCHoCHTrend == TREND_BULLISH), m_sms_source_swing.time, m_sms_source_swing.price, "SMS", m_sms_source_swing);
+                  if (m_drawTraps && m_showDrawing) DrawTrapEvent(m_sms_source_swing, LIQ_SMS);
+                  m_cf_source_swing = (currentTrend == TREND_BEARISH) ? m_major.GetSwingLow(1) : m_major.GetSwingHigh(1);
+                  if (m_cf_source_swing.time == 0) m_cf_source_swing = (currentTrend == TREND_BEARISH) ? lastLow : lastHigh;
+                  m_trapState = STATE_WAITING_FOR_CONFIRMING_BREAK;
+                  changed = true;
+                  LogEvent("تله SMS تایید شد.", m_enableLogging, "[LIQ]");
+               }
+               else
+               {
+                  m_trapState = STATE_IDLE;
+                  LogEvent("تله SMS تایید نشد.", m_enableLogging, "[LIQ]");
+               }
+            }
+            else if (currentCHoCH > m_lastKnownCHoCH)
+            {
+               m_lastKnownCHoCH = currentCHoCH;
+               m_preCHoCHTrend = (currentTrend == TREND_BULLISH) ? TREND_BEARISH : TREND_BULLISH;
+               m_sms_source_swing = (currentTrend == TREND_BULLISH) ? m_major.GetSwingHigh(1) : m_major.GetSwingLow(1);
+               if (m_sms_source_swing.time == 0) m_sms_source_swing = (currentTrend == TREND_BULLISH) ? lastHigh : lastLow;
+               m_trapState = STATE_WAITING_FOR_OPPOSING_BOS;
+               LogEvent("تله ریست شد به دلیل CHoCH جدید.", m_enableLogging, "[LIQ]");
+            }
+            break;
+         case STATE_WAITING_FOR_CONFIRMING_BREAK:
+            datetime latestBreak = MathMax(currentCHoCH, currentBoS);
+            if (latestBreak > m_lastKnownBoS)
+            {
+               if (currentTrend != m_preCHoCHTrend)
+               {
+                  RegisterLiquidityEvent(LIQ_CF, (currentTrend == TREND_BULLISH), m_cf_source_swing.time, m_cf_source_swing.price, "CF", m_cf_source_swing);
+                  if (m_drawTraps && m_showDrawing) DrawTrapEvent(m_cf_source_swing, LIQ_CF);
+                  changed = true;
+                  LogEvent("تله CF تایید شد.", m_enableLogging, "[LIQ]");
+               }
+               else
+               {
+                  LogEvent("تله CF تایید نشد.", m_enableLogging, "[LIQ]");
+               }
+               m_trapState = STATE_IDLE;
+               if (currentCHoCH > m_lastKnownCHoCH) m_lastKnownCHoCH = currentCHoCH;
+               if (currentBoS > m_lastKnownBoS) m_lastKnownBoS = currentBoS;
+            }
+            break;
+      }
+      return changed;
+   }
+
+public:
+   //+------------------------------------------------------------------+
+   //| سازنده کلاس (Constructor)                                       |
+   //+------------------------------------------------------------------+
+   CLiquidityManager(MarketStructure *major_ptr, MinorStructure *minor_ptr,
+                     const string symbol, const ENUM_TIMEFRAMES timeframe, const long chartId,
+                     const bool enableLogging_in, const bool showDrawing_in,
+                     const bool drawEQ_in, const bool drawTraps_in,
+                     const bool drawPDL_in, const bool drawPWL_in,
+                     const bool drawPML_in, const bool drawPYL_in)
+   {
+      if (CheckPointer(major_ptr) == POINTER_INVALID || CheckPointer(minor_ptr) == POINTER_INVALID)
+      {
+         LogEvent("خطای حیاتی: پوینترهای Major/Minor نامعتبر هستند!", true, "[LIQ]");
+         return;
+      }
+
+      m_major = major_ptr;
+      m_minor = minor_ptr;
+      m_symbol = symbol;
+      m_timeframe = timeframe;
+      m_chartId = chartId;
+      m_enableLogging = enableLogging_in;
+      m_showDrawing = showDrawing_in;
+      m_drawEQ = drawEQ_in;
+      m_drawTraps = drawTraps_in;
+      m_drawPDL = drawPDL_in;
+      m_drawPWL = drawPWL_in;
+      m_drawPML = drawPML_in;
+      m_drawPYL = drawPYL_in;
+
+      m_timeframeSuffix = " (" + TimeFrameToStringShort(timeframe) + ")";
+
+      ArraySetAsSeries(m_liquidityHistory, true);
+      ArrayResize(m_liquidityHistory, 0, 50);
+
+      m_trapState = STATE_IDLE;
+      m_lastKnownCHoCH = 0;
+      m_lastKnownBoS = 0;
+      m_preCHoCHTrend = TREND_NONE;
+      m_sms_source_swing.time = 0; m_sms_source_swing.bar_index = -1;
+      m_cf_source_swing.time = 0; m_cf_source_swing.bar_index = -1;
+      m_lastSeenMajorEQTime = 0;
+      m_lastSeenMinorEQTime = 0;
+
+      m_lastDailyCheck = 0; m_lastWeeklyCheck = 0; m_lastMonthlyCheck = 0; m_lastYearlyCheck = 0;
+      m_pdl = 0; m_pdh = 0; m_pwl = 0; m_pwh = 0; m_pml = 0; m_pmh = 0; m_pyl = 0; m_pyh = 0;
+
+      m_pdhLineName = "PeriodLevel_PDH" + m_timeframeSuffix;
+      m_pdlLineName = "PeriodLevel_PDL" + m_timeframeSuffix;
+      m_pwhLineName = "PeriodLevel_PWH" + m_timeframeSuffix;
+      m_pwlLineName = "PeriodLevel_PWL" + m_timeframeSuffix;
+      m_pmhLineName = "PeriodLevel_PMH" + m_timeframeSuffix;
+      m_pmlLineName = "PeriodLevel_PML" + m_timeframeSuffix;
+      m_pyhLineName = "PeriodLevel_PYH" + m_timeframeSuffix;
+      m_pylLineName = "PeriodLevel_PYL" + m_timeframeSuffix;
+
+      m_lastProcessedBarTime = 0;
+
+      // پاکسازی اشیاء قبلی
+      if (m_showDrawing)
+      {
+         int total = ObjectsTotal(m_chartId, 0, -1);
+         for (int i = total - 1; i >= 0; i--)
+         {
+            string name = ObjectName(m_chartId, i);
+            if (StringFind(name, m_timeframeSuffix) != -1 && (StringFind(name, "Liq_") != -1 || StringFind(name, "PeriodLevel_") != -1))
+            {
+               ObjectDelete(m_chartId, name);
+            }
+         }
+      }
+
+      LogEvent("کلاس CLiquidityManager برای نماد " + m_symbol + " و تایم فریم " + EnumToString(m_timeframe) + " آغاز به کار کرد.", m_enableLogging, "[LIQ]");
+   }
+
+   //+------------------------------------------------------------------+
+   //| مخرب کلاس (Destructor)                                           |
+   //+------------------------------------------------------------------+
+   ~CLiquidityManager()
+   {
+      if (m_showDrawing)
+      {
+         int total = ObjectsTotal(m_chartId, 0, -1);
+         for (int i = total - 1; i >= 0; i--)
+         {
+            string name = ObjectName(m_chartId, i);
+            if (StringFind(name, m_timeframeSuffix) != -1 && (StringFind(name, "Liq_") != -1 || StringFind(name, "PeriodLevel_") != -1))
+            {
+               ObjectDelete(m_chartId, name);
+            }
+         }
+      }
+      LogEvent("کلاس CLiquidityManager متوقف شد.", m_enableLogging, "[LIQ]");
+   }
+
+   //+------------------------------------------------------------------+
+   //| تابع اصلی: پردازش کندل بسته شده                                |
+   //+------------------------------------------------------------------+
+   bool ProcessNewBar()
+   {
+      datetime currentBarTime = iTime(m_symbol, m_timeframe, 0);
+      if (currentBarTime == m_lastProcessedBarTime) return false;
+      m_lastProcessedBarTime = currentBarTime;
+
+      if (CheckPointer(m_major) == POINTER_INVALID || CheckPointer(m_minor) == POINTER_INVALID) return false;
+
+      bool changed = false;
+      changed |= UpdatePeriodicLevels();
+      changed |= ScanForEQ();
+      changed |= ScanForStructuralTraps();
+      return changed;
+   }
+
+   //+------------------------------------------------------------------+
+   //| توابع دسترسی عمومی (Accessors)                                  |
+   //+------------------------------------------------------------------+
+   int GetHistoryCount() const { return ArraySize(m_liquidityHistory); }
+
+   LiquidityEvent GetEvent(const int index) const
+   {
+      if (index >= 0 && index < ArraySize(m_liquidityHistory)) return m_liquidityHistory[index];
+      LiquidityEvent empty; empty.time = 0;
+      return empty;
+   }
+
+   LiquidityEvent GetLastEvent() const
+   {
+      if (ArraySize(m_liquidityHistory) > 0) return m_liquidityHistory[0];
+      LiquidityEvent empty; empty.time = 0;
+      return empty;
+   }
+
+   LiquidityEvent GetLastEventByType(ENUM_LIQUIDITY_TYPE type) const
+   {
+      for (int i = 0; i < ArraySize(m_liquidityHistory); i++)
+      {
+         if (m_liquidityHistory[i].type == type) return m_liquidityHistory[i];
+      }
+      LiquidityEvent empty; empty.time = 0;
+      return empty;
+   }
 };
 //+------------------------------------------------------------------+
+```
