@@ -1,4 +1,3 @@
-```mqh
 //+------------------------------------------------------------------+
 //|                                MarketStructureLibrary.mqh         |
 //|                              Copyright 2025, Khajavi - HipoAlgoritm|
@@ -682,8 +681,16 @@ private:
              if(iLow(m_symbol, m_timeframe, i) > iLow(m_symbol, m_timeframe, i - j) || iLow(m_symbol, m_timeframe, i) > iLow(m_symbol, m_timeframe, i + j)) isSwingLow = false;
          }
 
-         if(isSwingHigh && ArraySize(m_swingHighs_Array) == 0) AddSwingHigh(iHigh(m_symbol, m_timeframe, i), iTime(m_symbol, m_timeframe, i), i);
-         if(isSwingLow && ArraySize(m_swingLows_Array) == 0) AddSwingLow(iLow(m_symbol, m_timeframe, i), iTime(m_symbol, m_timeframe, i), i);
+         if(isSwingHigh && ArraySize(m_swingHighs_Array) == 0) 
+         {
+            double body_price = MathMax(iOpen(m_symbol, m_timeframe, i), iClose(m_symbol, m_timeframe, i));
+            AddSwingHigh(iHigh(m_symbol, m_timeframe, i), iTime(m_symbol, m_timeframe, i), i, body_price);
+         }
+         if(isSwingLow && ArraySize(m_swingLows_Array) == 0) 
+         {
+            double body_price = MathMin(iOpen(m_symbol, m_timeframe, i), iClose(m_symbol, m_timeframe, i));
+            AddSwingLow(iLow(m_symbol, m_timeframe, i), iTime(m_symbol, m_timeframe, i), i, body_price);
+         }
 
          if(ArraySize(m_swingHighs_Array) > 0 && ArraySize(m_swingLows_Array) > 0) break;
       }
@@ -988,6 +995,7 @@ private:
    SwingPoint FindOppositeSwing(const datetime brokenSwingTime, const datetime breakTime, const bool findHigh)
    {
        double extremePrice = findHigh ? 0 : DBL_MAX;
+       double extremeBodyPrice = findHigh ? 0 : DBL_MAX;
        datetime extremeTime = 0;
        int extremeIndex = -1;
 
@@ -1002,20 +1010,33 @@ private:
        {
            if (findHigh)
            {
-               if (iHigh(m_symbol, m_timeframe, i) > extremePrice) { extremePrice = iHigh(m_symbol, m_timeframe, i); extremeTime = iTime(m_symbol, m_timeframe, i); extremeIndex = i; }
+               if (iHigh(m_symbol, m_timeframe, i) > extremePrice) { 
+                  extremePrice = iHigh(m_symbol, m_timeframe, i); 
+                  extremeTime = iTime(m_symbol, m_timeframe, i); 
+                  extremeIndex = i; 
+               }
+               double bodyHigh = MathMax(iOpen(m_symbol, m_timeframe, i), iClose(m_symbol, m_timeframe, i));
+               if (bodyHigh > extremeBodyPrice) extremeBodyPrice = bodyHigh;
            }
            else
            {
-               if (iLow(m_symbol, m_timeframe, i) < extremePrice) { extremePrice = iLow(m_symbol, m_timeframe, i); extremeTime = iTime(m_symbol, m_timeframe, i); extremeIndex = i; }
+               if (iLow(m_symbol, m_timeframe, i) < extremePrice) { 
+                  extremePrice = iLow(m_symbol, m_timeframe, i); 
+                  extremeTime = iTime(m_symbol, m_timeframe, i); 
+                  extremeIndex = i; 
+               }
+               double bodyLow = MathMin(iOpen(m_symbol, m_timeframe, i), iClose(m_symbol, m_timeframe, i));
+               if (bodyLow < extremeBodyPrice) extremeBodyPrice = bodyLow;
            }
        }
 
-       SwingPoint result; result.price = extremePrice; result.time = extremeTime; result.bar_index = extremeIndex; result.body_price = 0;
+       SwingPoint result; result.price = extremePrice; result.time = extremeTime; result.bar_index = extremeIndex; result.body_price = extremeBodyPrice;
 
        if (extremeIndex != -1)
        {
            // ثبت نقطه 100% فیبو به عنوان Swing Point جدید و رسم آن
-           if (findHigh) AddSwingHigh(extremePrice, extremeTime, extremeIndex); else AddSwingLow(extremePrice, extremeTime, extremeIndex);
+           if (findHigh) AddSwingHigh(extremePrice, extremeTime, extremeIndex, extremeBodyPrice); 
+           else AddSwingLow(extremePrice, extremeTime, extremeIndex, extremeBodyPrice);
            return result;
        }
        return errorResult;
@@ -1025,6 +1046,7 @@ private:
    SwingPoint FindExtremePrice(const int startBar, const int endBar, const bool findHigh) const
    {
        double extremePrice = findHigh ? 0 : DBL_MAX;
+       double extremeBodyPrice = findHigh ? 0 : DBL_MAX;
        datetime extremeTime = 0;
        int extremeIndex = -1;
 
@@ -1032,15 +1054,27 @@ private:
        {
            if (findHigh)
            {
-               if (iHigh(m_symbol, m_timeframe, i) > extremePrice) { extremePrice = iHigh(m_symbol, m_timeframe, i); extremeTime = iTime(m_symbol, m_timeframe, i); extremeIndex = i; }
+               if (iHigh(m_symbol, m_timeframe, i) > extremePrice) { 
+                  extremePrice = iHigh(m_symbol, m_timeframe, i); 
+                  extremeTime = iTime(m_symbol, m_timeframe, i); 
+                  extremeIndex = i; 
+               }
+               double bodyHigh = MathMax(iOpen(m_symbol, m_timeframe, i), iClose(m_symbol, m_timeframe, i));
+               if (bodyHigh > extremeBodyPrice) extremeBodyPrice = bodyHigh;
            }
            else
            {
-               if (iLow(m_symbol, m_timeframe, i) < extremePrice) { extremePrice = iLow(m_symbol, m_timeframe, i); extremeTime = iTime(m_symbol, m_timeframe, i); extremeIndex = i; }
+               if (iLow(m_symbol, m_timeframe, i) < extremePrice) { 
+                  extremePrice = iLow(m_symbol, m_timeframe, i); 
+                  extremeTime = iTime(m_symbol, m_timeframe, i); 
+                  extremeIndex = i; 
+               }
+               double bodyLow = MathMin(iOpen(m_symbol, m_timeframe, i), iClose(m_symbol, m_timeframe, i));
+               if (bodyLow < extremeBodyPrice) extremeBodyPrice = bodyLow;
            }
        }
 
-       SwingPoint result; result.price = extremePrice; result.time = extremeTime; result.bar_index = extremeIndex; result.body_price = 0;
+       SwingPoint result; result.price = extremePrice; result.time = extremeTime; result.bar_index = extremeIndex; result.body_price = extremeBodyPrice;
        return result;
    }
    
@@ -1065,7 +1099,7 @@ private:
            if (close_1 <= fibLevel) // شرط تایید (بسته شدن در 35% یا پایین‌تر)
            {
                LogEvent("<<< تایید شد: شرط اصلاح " + IntegerToString(m_fibUpdateLevel) + "٪ برای سقف جدید برقرار شد.", m_enableLogging, "[SMC]");
-               AddSwingHigh(current0Per.price, current0Per.time, current0Per.bar_index);
+               AddSwingHigh(current0Per.price, current0Per.time, current0Per.bar_index, current0Per.body_price);
                m_isTrackingHigh = false;
                return true;
            }
@@ -1089,7 +1123,7 @@ private:
            if (close_1 >= fibLevel) // شرط تایید (بسته شدن در 35% یا بالاتر)
            {
                LogEvent("<<< تایید شد: شرط اصلاح " + IntegerToString(m_fibUpdateLevel) + "٪ برای کف جدید برقرار شد.", m_enableLogging, "[SMC]");
-               AddSwingLow(current0Per.price, current0Per.time, current0Per.bar_index);
+               AddSwingLow(current0Per.price, current0Per.time, current0Per.bar_index, current0Per.body_price);
                m_isTrackingLow = false;
                return true;
            }
@@ -1142,7 +1176,7 @@ private:
    }
 
    //--- اضافه کردن سقف جدید و ترسیم آن 
-   void AddSwingHigh(const double price, const datetime time, const int bar_index)
+   void AddSwingHigh(const double price, const datetime time, const int bar_index, const double body_price)
    {
       if(ArraySize(m_swingHighs_Array) >= 2)
       {
@@ -1163,7 +1197,7 @@ private:
       m_swingHighs_Array[0].price = price;
       m_swingHighs_Array[0].time = time;
       m_swingHighs_Array[0].bar_index = bar_index;
-      m_swingHighs_Array[0].body_price = MathMax(iOpen(m_symbol, m_timeframe, bar_index), iClose(m_symbol, m_timeframe, bar_index)); // برای سقف
+      m_swingHighs_Array[0].body_price = body_price;
 
       // آپدیت کاندیدای فعال برای EQ ماژور نزولی
       m_activeMajorHighCandidate = m_swingHighs_Array[0];
@@ -1174,7 +1208,7 @@ private:
    }
 
    //--- اضافه کردن کف جدید و ترسیم آن 
-   void AddSwingLow(const double price, const datetime time, const int bar_index)
+   void AddSwingLow(const double price, const datetime time, const int bar_index, const double body_price)
    {
       if(ArraySize(m_swingLows_Array) >= 2)
       {
@@ -1195,7 +1229,7 @@ private:
       m_swingLows_Array[0].price = price;
       m_swingLows_Array[0].time = time;
       m_swingLows_Array[0].bar_index = bar_index;
-      m_swingLows_Array[0].body_price = MathMin(iOpen(m_symbol, m_timeframe, bar_index), iClose(m_symbol, m_timeframe, bar_index)); // برای کف
+      m_swingLows_Array[0].body_price = body_price;
 
       // آپدیت کاندیدای فعال برای EQ ماژور صعودی
       m_activeMajorLowCandidate = m_swingLows_Array[0];
@@ -1996,7 +2030,12 @@ private:
             LogEvent("الگوی EQ در زمان " + TimeToString(eq.time_formation) + " با بسته شدن قیمت خارج از زون باطل شد.", m_enableLogging, "[MINOR]");
 
             // پاک کردن تمام اشیاء گرافیکی مربوط به این EQ
-            deleteEQObjects(eq); 
+            //deleteEQObjects(eq); // کامنت شده برای حذف رسم تکراری
+            string baseName = "Liq_EQ_Minor_" + TimeToString(eq.source_swing.time) + m_timeframeSuffix;
+            string lineName = baseName + "_Line";
+            string textName = baseName + "_Text";
+            ObjectDelete(m_chartId, lineName);
+            ObjectDelete(m_chartId, textName);
 
             // حذف الگو از آرایه حافظه
             ArrayRemove(m_eqPatterns_Array, i, 1);
@@ -2061,13 +2100,18 @@ private:
                   LogEvent("ظرفیت EQ تکمیل. قدیمی‌ترین الگو در زمان " + TimeToString(oldestEQ.time_formation) + " حذف می‌شود.", m_enableLogging, "[MINOR]");
 
                   // پاک کردن اشیاء گرافیکی الگوی قدیمی با تابع کمکی
-                  deleteEQObjects(oldestEQ);
+                  //deleteEQObjects(oldestEQ); // کامنت شده برای حذف رسم تکراری
+                  string baseNameOld = "Liq_EQ_Minor_" + TimeToString(oldestEQ.source_swing.time) + m_timeframeSuffix;
+                  string lineNameOld = baseNameOld + "_Line";
+                  string textNameOld = baseNameOld + "_Text";
+                  ObjectDelete(m_chartId, lineNameOld);
+                  ObjectDelete(m_chartId, textNameOld);
 
                   // حذف از آرایه حافظه
                   ArrayRemove(m_eqPatterns_Array, lastIndex, 1);
                }
                
-               if (m_showDrawing) drawConfirmedEQ(m_eqPatterns_Array[0]);
+               //if (m_showDrawing) drawConfirmedEQ(m_eqPatterns_Array[0]); // کامنت شده برای حذف رسم تکراری
                LogEvent("الگوی EQ نزولی تایید و رسم شد.", m_enableLogging, "[MINOR]");
 
                m_activeHighCandidate.bar_index = -1; // کاندیدا پس از موفقیت، غیرفعال می‌شود
@@ -2129,13 +2173,18 @@ private:
                   LogEvent("ظرفیت EQ تکمیل. قدیمی‌ترین الگو در زمان " + TimeToString(oldestEQ.time_formation) + " حذف می‌شود.", m_enableLogging, "[MINOR]");
 
                   // پاک کردن اشیاء گرافیکی الگوی قدیمی با تابع کمکی
-                  deleteEQObjects(oldestEQ);
+                  //deleteEQObjects(oldestEQ); // کامنت شده برای حذف رسم تکراری
+                  string baseNameOld = "Liq_EQ_Minor_" + TimeToString(oldestEQ.source_swing.time) + m_timeframeSuffix;
+                  string lineNameOld = baseNameOld + "_Line";
+                  string textNameOld = baseNameOld + "_Text";
+                  ObjectDelete(m_chartId, lineNameOld);
+                  ObjectDelete(m_chartId, textNameOld);
 
                   // حذف از آرایه حافظه
                   ArrayRemove(m_eqPatterns_Array, lastIndex, 1);
                }
                
-               if (m_showDrawing) drawConfirmedEQ(m_eqPatterns_Array[0]);
+               //if (m_showDrawing) drawConfirmedEQ(m_eqPatterns_Array[0]); // کامنت شده برای حذف رسم تکراری
                LogEvent("الگوی EQ صعودی تایید و رسم شد.", m_enableLogging, "[MINOR]");
 
                m_activeLowCandidate.bar_index = -1; // کاندیدا پس از موفقیت، غیرفعال می‌شود
@@ -2468,7 +2517,13 @@ private:
       datetime midTime = source.time + (time_form - source.time) / 2;
       if (ObjectCreate(m_chartId, textName, OBJ_TEXT, 0, midTime, midPrice))
       {
-         ObjectSetString(m_chartId, textName, OBJPROP_TEXT, (type == LIQ_EQL ? "EQL$" : "EQH$") + (isMajor ? "(M)" : "(m)") + m_timeframeSuffix);
+         string label = "";
+         if (isMajor) {
+            label = (type == LIQ_EQL) ? "EQLS" : "EQHS";
+         } else {
+            label = (type == LIQ_EQL) ? "EQL" : "EQH";
+         }
+         ObjectSetString(m_chartId, textName, OBJPROP_TEXT, label + m_timeframeSuffix);
          ObjectSetInteger(m_chartId, textName, OBJPROP_COLOR, clr);
          ObjectSetInteger(m_chartId, textName, OBJPROP_ANCHOR, ANCHOR_CENTER);
       }
@@ -2626,6 +2681,8 @@ private:
       bool changed = false;
 
       // چک EQ ماژور
+      datetime processedMajorSourceTimes[];
+      ArrayResize(processedMajorSourceTimes, 0);
       MajorEQPattern majorEq = m_major.GetLastMajorEQPattern();
       if (majorEq.time_formation > m_lastSeenMajorEQTime)
       {
@@ -2633,6 +2690,9 @@ private:
          ENUM_LIQUIDITY_TYPE type = majorEq.isBullish ? LIQ_EQL : LIQ_EQH;
          RegisterLiquidityEvent(type, majorEq.isBullish, majorEq.time_formation, majorEq.price_entry, "Major " + EnumToString(type), majorEq.source_swing);
          if (m_drawEQ && m_showDrawing) DrawEQEvent(majorEq.source_swing, majorEq.time_formation, majorEq.price_entry, type, true);
+         int size = ArraySize(processedMajorSourceTimes);
+         ArrayResize(processedMajorSourceTimes, size + 1);
+         processedMajorSourceTimes[size] = majorEq.source_swing.time;
          changed = true;
       }
 
@@ -2640,11 +2700,25 @@ private:
       EQPattern minorEq = m_minor.GetLastEQPattern();
       if (minorEq.time_formation > m_lastSeenMinorEQTime)
       {
-         m_lastSeenMinorEQTime = minorEq.time_formation;
-         ENUM_LIQUIDITY_TYPE type = minorEq.isBullish ? LIQ_EQL : LIQ_EQH;
-         RegisterLiquidityEvent(type, minorEq.isBullish, minorEq.time_formation, minorEq.price_entry, "Minor " + EnumToString(type), minorEq.source_swing);
-         if (m_drawEQ && m_showDrawing) DrawEQEvent(minorEq.source_swing, minorEq.time_formation, minorEq.price_entry, type, false);
-         changed = true;
+         bool overlap = false;
+         for (int k = 0; k < ArraySize(processedMajorSourceTimes); k++)
+         {
+            if (processedMajorSourceTimes[k] == minorEq.source_swing.time)
+            {
+               overlap = true;
+               break;
+            }
+         }
+         if (!overlap)
+         {
+            ENUM_LIQUIDITY_TYPE type = minorEq.isBullish ? LIQ_EQL : LIQ_EQH;
+            RegisterLiquidityEvent(type, minorEq.isBullish, minorEq.time_formation, minorEq.price_entry, "Minor " + EnumToString(type), minorEq.source_swing);
+            if (m_drawEQ && m_showDrawing) DrawEQEvent(minorEq.source_swing, minorEq.time_formation, minorEq.price_entry, type, false);
+            changed = true;
+         } else {
+            LogEvent("EQ مینور به دلیل همپوشانی با ماژور رسم نشد.", m_enableLogging, "[LIQ]");
+         }
+         m_lastSeenMinorEQTime = minorEq.time_formation; // همیشه آپدیت شود
       }
 
       return changed;
@@ -2874,4 +2948,3 @@ public:
    }
 };
 //+------------------------------------------------------------------+
-```
