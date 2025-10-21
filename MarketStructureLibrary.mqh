@@ -1,4 +1,3 @@
-```mqh
 //+------------------------------------------------------------------+
 //|                                MarketStructureLibrary.mqh         |
 //|                              Copyright 2025, Khajavi - HipoAlgoritm|
@@ -25,6 +24,50 @@
 #property copyright "Copyright 2025, Khajavi - HipoAlgoritm"
 #property link      "https://github.com/Khajavi8056/"
 #property version   "3.00" // نسخه با اضافه کردن قابلیت نقدینگی یکپارچه و EQ ماژور
+
+//+------------------------------------------------------------------+
+//| تعاریف سراسری برای عناصر گرافیکی (برای خوانایی و زیبایی بصری)   |
+//+------------------------------------------------------------------+
+const int BASE_LABEL_FONT_SIZE = 7; // سایز فونت پایه برای اکثر لیبل‌ها
+const int SMALL_LABEL_FONT_SIZE = 6; // سایز فونت کوچکتر برای خطوط کوتاه
+const double VERTICAL_OFFSET_TICKS = 10.0; // ضریب آفست عمودی بر اساس اندازه تیک
+const double OVERLAP_TIME_THRESHOLD_BARS = 1.5; // آستانه زمانی برای تشخیص همپوشانی (به تعداد کندل)
+const double OVERLAP_PRICE_THRESHOLD_TICKS = 15.0; // آستانه قیمتی برای تشخیص همپوشانی (به تعداد تیک)
+const int DYNAMIC_SIZE_CANDLE_THRESHOLD = 3; // تعداد کندل آستانه برای استفاده از فونت کوچکتر
+
+//--- تابع کمکی: گرفتن پسوند نمایش شرطی (فقط اگر تایم‌فریم کتابخانه با چارت متفاوت باشد)
+string GetDisplaySuffix(ENUM_TIMEFRAMES libTF, long chartID)
+{
+   ENUM_TIMEFRAMES chartTF = (ENUM_TIMEFRAMES)ChartPeriod(chartID);
+   if (libTF != chartTF)
+   {
+      return " (" + TimeFrameToStringShort(libTF) + ")";
+   }
+   return "";
+}
+
+//--- تابع کمکی: بررسی همپوشانی موقعیت برای جلوگیری از تداخل لیبل‌ها
+bool IsPositionOccupied(long chartID, datetime time, double price, ENUM_TIMEFRAMES libTF)
+{
+   double timeThresholdSeconds = OVERLAP_TIME_THRESHOLD_BARS * PeriodSeconds(libTF);
+   double priceThreshold = OVERLAP_PRICE_THRESHOLD_TICKS * SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
+
+   int total = ObjectsTotal(chartID, 0, OBJ_TEXT);
+   for (int i = total - 1; i >= 0; i--)
+   {
+      string name = ObjectName(chartID, i);
+      if (StringFind(name, TimeFrameToStringShort(libTF)) == -1) continue; // فقط آبجکت‌های این کتابخانه
+
+      datetime existingTime = (datetime)ObjectGetInteger(chartID, name, OBJPROP_TIME, 0);
+      double existingPrice = ObjectGetDouble(chartID, name, OBJPROP_PRICE, 0);
+
+      bool timeOverlap = (MathAbs((double)(time - existingTime)) <= timeThresholdSeconds);
+      bool priceOverlap = (MathAbs(price - existingPrice) <= priceThreshold);
+
+      if (timeOverlap && priceOverlap) return true;
+   }
+   return false;
+}
 
 //+------------------------------------------------------------------+
 //| ساختارهای داده و شمارنده‌ها (Structs & Enums)                     |
@@ -427,11 +470,12 @@ private:
       datetime midTime = fvg.time + (currentTime - fvg.time) / 2;
       double midPrice = (fvg.highPrice + fvg.lowPrice) / 2;
 
-      // ایجاد متن FVG با پسوند تایم فریم (رفع خطای تبدیل نوع ضمنی)
+      // ایجاد متن FVG با پسوند شرطی
+      string suffix = GetDisplaySuffix(m_timeframe, m_chartId);
       ObjectCreate(m_chartId, textName, OBJ_TEXT, 0, midTime, midPrice);
-      ObjectSetString(m_chartId, textName, OBJPROP_TEXT, "FVG" + m_timeframeSuffix); 
+      ObjectSetString(m_chartId, textName, OBJPROP_TEXT, "FVG" + suffix); 
       ObjectSetInteger(m_chartId, textName, OBJPROP_COLOR, clrAliceBlue);
-      ObjectSetInteger(m_chartId, textName, OBJPROP_FONTSIZE, 8);
+      ObjectSetInteger(m_chartId, textName, OBJPROP_FONTSIZE, BASE_LABEL_FONT_SIZE);
       ObjectSetInteger(m_chartId, textName, OBJPROP_ANCHOR, ANCHOR_CENTER);
    }
 
@@ -963,11 +1007,12 @@ private:
       datetime midTime = ob.time + (currentTime - ob.time) / 2;
       double midPrice = (ob.highPrice + ob.lowPrice) / 2;
 
-      // ایجاد متن OB با پسوند تایم فریم
+      // ایجاد متن OB با پسوند شرطی
+      string suffix = GetDisplaySuffix(m_timeframe, m_chartId);
       ObjectCreate(m_chartId, textName, OBJ_TEXT, 0, midTime, midPrice);
-      ObjectSetString(m_chartId, textName, OBJPROP_TEXT, "OB" + m_timeframeSuffix); 
+      ObjectSetString(m_chartId, textName, OBJPROP_TEXT, "OB" + suffix); 
       ObjectSetInteger(m_chartId, textName, OBJPROP_COLOR, clrBlack); // رنگ متن برای تمایز
-      ObjectSetInteger(m_chartId, textName, OBJPROP_FONTSIZE, 8);
+      ObjectSetInteger(m_chartId, textName, OBJPROP_FONTSIZE, BASE_LABEL_FONT_SIZE);
       ObjectSetInteger(m_chartId, textName, OBJPROP_ANCHOR, ANCHOR_CENTER);
    }
    
@@ -978,7 +1023,8 @@ private:
       string textName = "OB_" + TimeToString(ob.time) + "_" + typeStr + m_timeframeSuffix + "_Text";
 
       // فقط متن را آپدیت کن (اضافه کردن $)
-      ObjectSetString(m_chartId, textName, OBJPROP_TEXT, "OB$" + m_timeframeSuffix);
+      string suffix = GetDisplaySuffix(m_timeframe, m_chartId);
+      ObjectSetString(m_chartId, textName, OBJPROP_TEXT, "OB$" + suffix);
    }
    
    //--- تابع جدید: پاک کردن اشیاء گرافیکی یک OB خاص (تغییر نام برای وضوح بیشتر)
@@ -1308,20 +1354,12 @@ private:
    void drawSwingPoint(const SwingPoint &sp, const bool isHigh)
    {
       string objName = (isHigh ? "H_" : "L_") + TimeToString(sp.time) + m_timeframeSuffix;
-      string textName = objName + "_Text";
       ObjectDelete(m_chartId, objName);
-      ObjectDelete(m_chartId, textName);
 
       ObjectCreate(m_chartId, objName, OBJ_ARROW, 0, sp.time, sp.price);
       ObjectSetInteger(m_chartId, objName, OBJPROP_ARROWCODE, 77);
       ObjectSetInteger(m_chartId, objName, OBJPROP_COLOR, isHigh ? clrDodgerBlue : clrRed);
       ObjectSetInteger(m_chartId, objName, OBJPROP_ANCHOR, isHigh ? ANCHOR_BOTTOM : ANCHOR_TOP);
-
-      // ترسیم متن H/L با پسوند تایم فریم
-      ObjectCreate(m_chartId, textName, OBJ_TEXT, 0, sp.time, sp.price);
-      ObjectSetString(m_chartId, textName, OBJPROP_TEXT, (isHigh ? "H" : "L") + m_timeframeSuffix);
-      ObjectSetInteger(m_chartId, textName, OBJPROP_COLOR, isHigh ? clrDodgerBlue : clrRed);
-      ObjectSetInteger(m_chartId, textName, OBJPROP_ANCHOR, isHigh ? ANCHOR_LEFT_LOWER : ANCHOR_LEFT_UPPER);
    }
 
    //--- ترسیم شکست (BoS/CHoCH) (با پسوند تایم فریم و شیفت زمانی)
@@ -1338,14 +1376,35 @@ private:
        ObjectSetInteger(m_chartId, objName, OBJPROP_COLOR, breakColor);
        ObjectSetInteger(m_chartId, objName, OBJPROP_STYLE, STYLE_DOT);
 
-       // شیفت زمانی برای فاصله بیشتر از کندل (20% عرض کندل) - رفع خطای تبدیل نوع ضمنی
-       datetime textTime = breakTime + (datetime)(PeriodSeconds(m_timeframe) * 0.2);
+       // محتوای متن با پسوند شرطی
+       string suffix = GetDisplaySuffix(m_timeframe, m_chartId);
+       string fullText = breakType + suffix;
 
-       ObjectCreate(m_chartId, textName, OBJ_TEXT, 0, textTime, breakPrice);
-       string fullText = breakType + m_timeframeSuffix;
+       // سایز فونت داینامیک
+       int barStart = iBarShift(m_symbol, m_timeframe, brokenSwing.time, false);
+       int barEnd = iBarShift(m_symbol, m_timeframe, breakTime, false);
+       int candleDistance = MathAbs(barEnd - barStart);
+       int fontSize = (candleDistance < DYNAMIC_SIZE_CANDLE_THRESHOLD) ? SMALL_LABEL_FONT_SIZE : BASE_LABEL_FONT_SIZE;
+
+       // موقعیت متن با آفست
+       datetime midTime = brokenSwing.time + (breakTime - brokenSwing.time) / 2;
+       double midPrice = brokenSwing.price;
+       double tickSize = SymbolInfoDouble(m_symbol, SYMBOL_TRADE_TICK_SIZE);
+       double verticalOffset = tickSize * VERTICAL_OFFSET_TICKS;
+       double textPrice = midPrice + (isHighBreak ? verticalOffset : -verticalOffset);
+
+       // مدیریت همپوشانی
+       while (IsPositionOccupied(m_chartId, midTime, textPrice, m_timeframe))
+       {
+          textPrice += (isHighBreak ? (verticalOffset / 2.0) : (-verticalOffset / 2.0));
+       }
+
+       // ایجاد متن
+       ObjectCreate(m_chartId, textName, OBJ_TEXT, 0, midTime, textPrice);
        ObjectSetString(m_chartId, textName, OBJPROP_TEXT, fullText);
        ObjectSetInteger(m_chartId, textName, OBJPROP_COLOR, breakColor);
-       ObjectSetInteger(m_chartId, textName, OBJPROP_ANCHOR, isHighBreak ? ANCHOR_LEFT_LOWER : ANCHOR_LEFT_UPPER);
+       ObjectSetInteger(m_chartId, textName, OBJPROP_FONTSIZE, fontSize);
+       ObjectSetInteger(m_chartId, textName, OBJPROP_ANCHOR, ANCHOR_CENTER);
    }
 
    //--- تابع کمکی: بررسی کندل قوی (برای تایید EQ)
@@ -1675,7 +1734,7 @@ public:
       // تنظیم پسوند تایم فریم برای نمایش MTF (کوتاه شده)
       m_timeframeSuffix = " (" + TimeFrameToStringShort(timeframe) + ")";
 
-      // هندل AO بدون نمایش روی چارت
+      // هندل AO بدون نمایش
       m_ao_handle = iAO(m_symbol, m_timeframe);
       if (m_ao_handle == INVALID_HANDLE)
       {
@@ -2056,7 +2115,7 @@ private:
             LogEvent("الگوی EQ در زمان " + TimeToString(eq.time_formation) + " با بسته شدن قیمت خارج از زون باطل شد.", m_enableLogging, "[MINOR]");
 
             // پاک کردن تمام اشیاء گرافیکی مربوط به این EQ
-            //deleteEQObjects(eq); // کامنت شده برای حذف رسم تکراری
+            //deleteEQObjects(eq); // کامنت شده برای حذف رسم تکراری برای
             string baseName = "Liq_EQ_Minor_" + TimeToString(eq.source_swing.time) + m_timeframeSuffix;
             string lineName = baseName + "_Line";
             string textName = baseName + "_Text";
@@ -2075,7 +2134,7 @@ private:
       // --- بخش ۱: ارزیابی کاندیدای سقف فعال (برای EQ نزولی) ---
       if (m_activeHighCandidate.bar_index != -1) // آیا اصلاً کاندیدای فعالی داریم؟
       {
-         // شرط ابطال ۱: آیا سقف جدیدتری از کاندیدای ما تشکیل شده؟
+         // شرط ابطال 1: آیا سقف جدیدتری از کاندیدای ما تشکیل شده؟
          if (GetMinorHighsCount() > 0 && GetMinorSwingHigh(0).time > m_activeHighCandidate.time)
          {
             LogEvent("کاندیدای سقف " + TimeToString(m_activeHighCandidate.time) + " توسط سقف جدیدتر باطل شد.", m_enableLogging, "[MINOR]");
@@ -2087,7 +2146,7 @@ private:
          double zoneHigh = m_activeHighCandidate.price;
          double zoneLow = m_activeHighCandidate.body_price;
 
-         // شرط ابطال ۲: آیا کندل بسته شده فعلی بالای زون بسته شده؟
+         // شرط ابطال 2: آیا کندل بسته شده فعلی بالای زون بسته شده؟
          if (iClose(m_symbol, m_timeframe, 1) > zoneHigh)
          {
             LogEvent("کاندیدای سقف " + TimeToString(m_activeHighCandidate.time) + " با بسته شدن قیمت بالای زون باطل شد.", m_enableLogging, "[MINOR]");
@@ -2148,7 +2207,7 @@ private:
       // --- بخش ۲: ارزیابی کاندیدای کف فعال (برای EQ صعودی) ---
       if (m_activeLowCandidate.bar_index != -1)
       {
-         // شرط ابطال ۱: آیا کف جدیدتری از کاندیدای ما تشکیل شده؟
+         // شرط ابطال 1: آیا کف جدیدتری از کاندیدای ما تشکیل شده؟
          if (GetMinorLowsCount() > 0 && GetMinorSwingLow(0).time > m_activeLowCandidate.time)
          {
             LogEvent("کاندیدای کف " + TimeToString(m_activeLowCandidate.time) + " توسط کف جدیدتر باطل شد.", m_enableLogging, "[MINOR]");
@@ -2160,7 +2219,7 @@ private:
          double zoneLow = m_activeLowCandidate.price;
          double zoneHigh = m_activeLowCandidate.body_price;
 
-         // شرط ابطال ۲: آیا کندل بسته شده فعلی پایین زون بسته شده؟
+         // شرط ابطال 2: آیا کندل بسته شده فعلی پایین زون بسته شده؟
          if (iClose(m_symbol, m_timeframe, 1) < zoneLow)
          {
             LogEvent("کاندیدای کف " + TimeToString(m_activeLowCandidate.time) + " با بسته شدن قیمت پایین زون باطل شد.", m_enableLogging, "[MINOR]");
@@ -2607,12 +2666,13 @@ public:
       datetime midTime = ob.time + (currentTime - ob.time) / 2;
       double midPrice = (ob.highPrice + ob.lowPrice) / 2;
 
-      // ایجاد متن OB با پسوند تایم فریم
+      // ایجاد متن OB با پسوند شرطی
+      string suffix = GetDisplaySuffix(m_timeframe, m_chartId);
+      string text = isUnmitigated ? "MinorOB" + suffix : "MinorOB$" + suffix;
       ObjectCreate(m_chartId, textName, OBJ_TEXT, 0, midTime, midPrice);
-      string text = isUnmitigated ? "MinorOB" + m_timeframeSuffix : "MinorOB$" + m_timeframeSuffix;
       ObjectSetString(m_chartId, textName, OBJPROP_TEXT, text); 
       ObjectSetInteger(m_chartId, textName, OBJPROP_COLOR, clrBlack);
-      ObjectSetInteger(m_chartId, textName, OBJPROP_FONTSIZE, 8);
+      ObjectSetInteger(m_chartId, textName, OBJPROP_FONTSIZE, BASE_LABEL_FONT_SIZE);
       ObjectSetInteger(m_chartId, textName, OBJPROP_ANCHOR, ANCHOR_CENTER);
    }
    
@@ -2707,12 +2767,12 @@ private:
    LiquidityEvent   m_liquidityHistory[]; // آرایه سری، ظرفیت ۵۰
 
    //--- متغیرهای حالت برای ماشین حالت SMS/CF
-   enum ENUM_SMS_CF_CF_STATE {
+   enum ENUM_SMS_CF_STATE {
       STATE_IDLE,                     // حالت بیکار، منتظر CHoCH
       STATE_WAITING_FOR_OPPOSING_BOS, // CHoCH رخ داده، منتظر BoS مخالف
       STATE_WAITING_FOR_CONFIRMING_BREAK // SMS تایید شده، منتظر شکست تایید کننده CF
    };
-   ENUM_SMS_CF_CF_STATE m_trapState;     // حالت فعلی ماشین
+   ENUM_SMS_CF_STATE m_trapState;     // حالت فعلی ماشین
    datetime         m_lastKnownCHoCH;   // زمان آخرین CHoCH دیده شده در دنباله
    datetime         m_lastKnownBoS;     // زمان BoS مخالف (که SMS را تایید کرد)
    TREND_TYPE       m_preCHoCHTrend;    // روند ماژور *قبل* از CHoCH اولیه
@@ -2780,10 +2840,11 @@ private:
 
       if (ObjectCreate(m_chartId, objName + "_Text", OBJ_TEXT, 0, TimeCurrent() + PeriodSeconds() * 10, price))
       {
-         ObjectSetString(m_chartId, objName + "_Text", OBJPROP_TEXT, label + m_timeframeSuffix);
+         string suffix = GetDisplaySuffix(m_timeframe, m_chartId);
+         ObjectSetString(m_chartId, objName + "_Text", OBJPROP_TEXT, label + suffix);
          ObjectSetInteger(m_chartId, objName + "_Text", OBJPROP_COLOR, clr);
          ObjectSetInteger(m_chartId, objName + "_Text", OBJPROP_ANCHOR, ANCHOR_RIGHT_LOWER);
-         ObjectSetInteger(m_chartId, objName + "_Text", OBJPROP_FONTSIZE, 8);
+         ObjectSetInteger(m_chartId, objName + "_Text", OBJPROP_FONTSIZE, BASE_LABEL_FONT_SIZE - 1);
       }
    }
 
@@ -2802,7 +2863,24 @@ private:
       }
       double midPrice = (source.price + price_entry) / 2;
       datetime midTime = source.time + (time_form - source.time) / 2;
-      if (ObjectCreate(m_chartId, textName, OBJ_TEXT, 0, midTime, midPrice))
+
+      double tickSize = SymbolInfoDouble(m_symbol, SYMBOL_TRADE_TICK_SIZE);
+      double verticalOffset = tickSize * VERTICAL_OFFSET_TICKS;
+      bool isEQH = (type == LIQ_EQH);
+      double textPrice = midPrice + (isEQH ? verticalOffset : -verticalOffset);
+
+      // مدیریت همپوشانی
+      while (IsPositionOccupied(m_chartId, midTime, textPrice, m_timeframe))
+      {
+         textPrice += (isEQH ? (verticalOffset / 2.0) : (-verticalOffset / 2.0));
+      }
+
+      int barStart = iBarShift(m_symbol, m_timeframe, source.time, false);
+      int barEnd = iBarShift(m_symbol, m_timeframe, time_form, false);
+      int candleDistance = MathAbs(barEnd - barStart);
+      int fontSize = (candleDistance < DYNAMIC_SIZE_CANDLE_THRESHOLD) ? SMALL_LABEL_FONT_SIZE : BASE_LABEL_FONT_SIZE;
+
+      if (ObjectCreate(m_chartId, textName, OBJ_TEXT, 0, midTime, textPrice))
       {
          string label = "";
          if (isMajor) {
@@ -2810,9 +2888,21 @@ private:
          } else {
             label = (type == LIQ_EQL) ? "EQL" : "EQH";
          }
-         ObjectSetString(m_chartId, textName, OBJPROP_TEXT, label + m_timeframeSuffix);
+         string suffix = GetDisplaySuffix(m_timeframe, m_chartId);
+         ObjectSetString(m_chartId, textName, OBJPROP_TEXT, label + suffix);
          ObjectSetInteger(m_chartId, textName, OBJPROP_COLOR, clr);
          ObjectSetInteger(m_chartId, textName, OBJPROP_ANCHOR, ANCHOR_CENTER);
+         ObjectSetInteger(m_chartId, textName, OBJPROP_FONTSIZE, fontSize);
+
+         // چرخش متن بر اساس زاویه خط
+         double deltaPricePoints = (price_entry - source.price) / SymbolInfoDouble(m_symbol, SYMBOL_POINT);
+         double deltaTimeSeconds = (double)(time_form - source.time);
+         if (deltaTimeSeconds != 0)
+         {
+            double angle_rad = atan2(deltaPricePoints * SymbolInfoDouble(m_symbol, SYMBOL_POINT) / tickSize, deltaTimeSeconds);
+            double angle_deg = angle_rad * 180.0 / M_PI;
+            ObjectSetInteger(m_chartId, textName, OBJPROP_ANGLE, -angle_deg);
+         }
       }
    }
 
@@ -2825,10 +2915,11 @@ private:
       double price = source.price + (type == LIQ_SMS ? 1 : -1) * 10 * _Point; // کمی آفست برای دیده شدن
       if (ObjectCreate(m_chartId, objName, OBJ_TEXT, 0, source.time, price))
       {
-         ObjectSetString(m_chartId, objName, OBJPROP_TEXT, (type == LIQ_SMS ? "SMS$" : "CF$") + m_timeframeSuffix);
+         string suffix = GetDisplaySuffix(m_timeframe, m_chartId);
+         ObjectSetString(m_chartId, objName, OBJPROP_TEXT, (type == LIQ_SMS ? "SMS$" : "CF$") + suffix);
          ObjectSetInteger(m_chartId, objName, OBJPROP_COLOR, clr);
          ObjectSetInteger(m_chartId, objName, OBJPROP_ANCHOR, (type == LIQ_SMS ? ANCHOR_BOTTOM : ANCHOR_TOP));
-         ObjectSetInteger(m_chartId, objName, OBJPROP_FONTSIZE, 8);
+         ObjectSetInteger(m_chartId, objName, OBJPROP_FONTSIZE, BASE_LABEL_FONT_SIZE);
       }
    }
 
@@ -3065,8 +3156,6 @@ private:
             }
             break;
          case STATE_WAITING_FOR_CONFIRMING_BREAK:
-        //startcase STATE_WAITING_FOR_CONFIRMING_BREAK:
-         {
             datetime latestBreak = MathMax(currentCHoCH, currentBoS);
             if (latestBreak > m_lastKnownBoS)
             {
@@ -3087,7 +3176,6 @@ private:
             }
             break;
       }
-      }//close case STATE_WAITING_FOR_CONFIRMING_BREAK:
       return changed;
    }
 
@@ -3235,4 +3323,3 @@ public:
    }
 };
 //+------------------------------------------------------------------+
-```
