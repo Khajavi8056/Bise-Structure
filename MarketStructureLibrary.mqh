@@ -1,17 +1,3 @@
-سلام خوبی 
-
-می‌خوام کد زیر رو به طور دقیق و موشکافانه‌ای باگی خطایی مشکلی چیزی نداره به نظرتون در مورد هر بخشش بگید تمام بخش‌هاشو می‌خوام تمام کتابخونه‌هایی که تمام کلاس‌هایی که داری رو منطق تمام بخششو بهم بگی 
-منطق بخش‌های زیر را با تمام جزئیات بگو منطق ای کیو برای مینور و میژور 
-منطق بخش کلاس لیکیدیتی 
-منطق کلاس مینور منطقه کلاس ماژور 
-وسایل بخش اردر بلاک‌ها و بخش‌های دیگر منطقشون رو خیلی دقیق می‌خوام توضیح بدیم و با تمام جزئیاتش دقت کنی و نظر دقیقتو بهم بگی 
-
-
-
-در خصوص اون مورد اول که چرا ما از اومدیم از پایه در واقع سقف و کف فراکتالی در تابع فقط برای بار اول است و که در بخش استراکچر برای شروع در واقع منطقه استراکچر و بالاخره یه نقطه وجود داشته باشه که اون رو بشکنه و این چرخش ادامه داشته باشه از اون استفاده کردیم تاثیر زیادی نخواهد داشت در منطق و بلافاصله بعد از اولین شکست ساختاری سیستم به حالتی اتفاق می‌افته که شروع می‌کنه به خود ترمیمی و خود اصلاح کردن بدونم بدونی و به عنوان یک دفاعیه داشته باشیمش که بدونیم چرا از اون استفاده کردن و برداشت اشتباهی نشه اوکی شروع کن ببینم چی میشه 
-
-
-
 ```mqh
 //+------------------------------------------------------------------+
 //|                                MarketStructureLibrary.mqh         |
@@ -373,17 +359,18 @@ private:
       newFVG.time = time;
       newFVG.consumed = false;
 
-      FVG temp[1]; temp[0] = newFVG;
-      if (ArrayInsert(m_fvgArray, temp, 0))
+      // درج دستی به جای ArrayInsert
+      int oldSize = ArraySize(m_fvgArray);
+      ArrayResize(m_fvgArray, oldSize + 1);
+      for (int j = oldSize; j > 0; j--)
       {
-         if (m_showDrawing) drawFVG(m_fvgArray[0]);
-         string typeStr = isBullish ? "Bullish" : "Bearish";
-         LogEvent("FVG جدید از نوع " + typeStr + " در زمان " + TimeToString(time) + " شناسایی شد.", m_enableLogging, "[FVG]");
+         m_fvgArray[j] = m_fvgArray[j - 1];
       }
-      else
-      {
-          LogEvent("خطا: نتوانست FVG جدید را در آرایه درج کند.", m_enableLogging, "[FVG]");
-      }
+      m_fvgArray[0] = newFVG;
+
+      if (m_showDrawing) drawFVG(m_fvgArray[0]);
+      string typeStr = isBullish ? "Bullish" : "Bearish";
+      LogEvent("FVG جدید از نوع " + typeStr + " در زمان " + TimeToString(time) + " شناسایی شد.", m_enableLogging, "[FVG]");
    }
    
    //--- تابع: به‌روزرسانی موقعیت متن‌های FVG برای ماندن در وسط زون (دقیقاً مطابق نیاز کاربر)
@@ -834,16 +821,16 @@ private:
          LogEvent("ظرفیت unmitigated OB تکمیل. قدیمی‌ترین OB حذف شد.", m_enableLogging, "[SMC-OB]");
       }
 
-      // درج OB جدید در ابتدای آرایه (سری)
-      OrderBlock temp[1]; temp[0] = newOB;
-      if (ArrayInsert(m_unmitigatedOBs, temp, 0))
+      // درج دستی OB جدید در ابتدای آرایه (سری)
+      int oldSize = ArraySize(m_unmitigatedOBs);
+      ArrayResize(m_unmitigatedOBs, oldSize + 1);
+      for (int j = oldSize; j > 0; j--)
       {
-         if (m_showDrawing) drawOrderBlock(m_unmitigatedOBs[0]);
+         m_unmitigatedOBs[j] = m_unmitigatedOBs[j - 1];
       }
-      else
-      {
-         LogEvent("خطا: نتوانست OB جدید را در آرایه unmitigated درج کند.", m_enableLogging, "[SMC-OB]");
-      }
+      m_unmitigatedOBs[0] = newOB;
+
+      if (m_showDrawing) drawOrderBlock(m_unmitigatedOBs[0]);
    }
    
    //--- تابع جدید: مدیریت چرخه حیات OBها (میتگیشن و ابطال با قیمت‌های لحظه‌ای)
@@ -934,17 +921,17 @@ private:
          LogEvent("ظرفیت mitigated OB تکمیل. قدیمی‌ترین OB مصرف شده حذف شد.", m_enableLogging, "[SMC-OB]");
       }
 
-      // درج OB در ابتدای آرایه
-      OrderBlock temp[1]; temp[0] = ob;
-      if (ArrayInsert(m_mitigatedOBs, temp, 0))
+      // درج دستی OB در ابتدای آرایه
+      int oldSize = ArraySize(m_mitigatedOBs);
+      ArrayResize(m_mitigatedOBs, oldSize + 1);
+      for (int j = oldSize; j > 0; j--)
       {
-         // آپدیت گرافیکی برای نشان دادن مصرف شده (اضافه کردن $ به متن)
-         if (m_showDrawing) updateOBToMitigated(m_mitigatedOBs[0]);
+         m_mitigatedOBs[j] = m_mitigatedOBs[j - 1];
       }
-      else
-      {
-         LogEvent("خطا: نتوانست OB را در آرایه mitigated درج کند.", m_enableLogging, "[SMC-OB]");
-      }
+      m_mitigatedOBs[0] = ob;
+
+      // آپدیت گرافیکی برای نشان دادن مصرف شده (اضافه کردن $ به متن)
+      if (m_showDrawing) updateOBToMitigated(m_mitigatedOBs[0]);
    }
    
    //--- تابع جدید: رسم OB (با قابلیت MTF، مستطیل سفید شفاف و متن)
@@ -1167,8 +1154,12 @@ private:
          ArrayRemove(m_swingHighs_Array, ArraySize(m_swingHighs_Array) - 1, 1);
       }
 
-      int newSize = ArraySize(m_swingHighs_Array) + 1;
-      ArrayResize(m_swingHighs_Array, newSize);
+      int oldSize = ArraySize(m_swingHighs_Array);
+      ArrayResize(m_swingHighs_Array, oldSize + 1);
+      for (int j = oldSize; j > 0; j--)
+      {
+         m_swingHighs_Array[j] = m_swingHighs_Array[j - 1];
+      }
       m_swingHighs_Array[0].price = price;
       m_swingHighs_Array[0].time = time;
       m_swingHighs_Array[0].bar_index = bar_index;
@@ -1195,8 +1186,12 @@ private:
          ArrayRemove(m_swingLows_Array, ArraySize(m_swingLows_Array) - 1, 1);
       }
 
-      int newSize = ArraySize(m_swingLows_Array) + 1;
-      ArrayResize(m_swingLows_Array, newSize);
+      int oldSize = ArraySize(m_swingLows_Array);
+      ArrayResize(m_swingLows_Array, oldSize + 1);
+      for (int j = oldSize; j > 0; j--)
+      {
+         m_swingLows_Array[j] = m_swingLows_Array[j - 1];
+      }
       m_swingLows_Array[0].price = price;
       m_swingLows_Array[0].time = time;
       m_swingLows_Array[0].bar_index = bar_index;
@@ -1231,9 +1226,18 @@ private:
          string trendText; color trendColor;
          switch(m_currentTrend)
          {
-            case TREND_BULLISH: trendText = "Bullish Trend (HH/HL)"; trendColor = clrDeepSkyBlue; LogEvent("وضعیت روند به صعودی تغییر یافت.", m_enableLogging, "[SMC]"); break;
-            case TREND_BEARISH: trendText = "Bearish Trend (LL/LH)"; trendColor = clrOrangeRed; LogEvent("وضعیت روند به نزولی تغییر یافت.", m_enableLogging, "[SMC]"); break;
-            default: trendText = "No Trend / Ranging"; trendColor = clrGray; LogEvent("وضعیت روند به بدون روند تغییر یافت.", m_enableLogging, "[SMC]");
+            case TREND_BULLISH: 
+               {
+                  trendText = "Bullish Trend (HH/HL)"; trendColor = clrDeepSkyBlue; LogEvent("وضعیت روند به صعودی تغییر یافت.", m_enableLogging, "[SMC]"); break;
+               }
+            case TREND_BEARISH: 
+               {
+                  trendText = "Bearish Trend (LL/LH)"; trendColor = clrOrangeRed; LogEvent("وضعیت روند به نزولی تغییر یافت.", m_enableLogging, "[SMC]"); break;
+               }
+            default: 
+               {
+                  trendText = "No Trend / Ranging"; trendColor = clrGray; LogEvent("وضعیت روند به بدون روند تغییر یافت.", m_enableLogging, "[SMC]");
+               }
          }
          
          // محاسبه موقعیت نمایش لیبل بر اساس تایم فریم (اصلاح خطای سینتکسی)
@@ -1303,7 +1307,8 @@ private:
        datetime textTime = breakTime + (datetime)(PeriodSeconds(m_timeframe) * 0.2);
 
        ObjectCreate(m_chartId, textName, OBJ_TEXT, 0, textTime, breakPrice);
-       ObjectSetString(m_chartId, textName, OBJPROP_TEXT, breakType + m_timeframeSuffix); // اضافه کردن پسوند
+       string fullText = breakType + m_timeframeSuffix;
+       ObjectSetString(m_chartId, textName, OBJPROP_TEXT, fullText);
        ObjectSetInteger(m_chartId, textName, OBJPROP_COLOR, breakColor);
        ObjectSetInteger(m_chartId, textName, OBJPROP_ANCHOR, isHighBreak ? ANCHOR_LEFT_LOWER : ANCHOR_LEFT_UPPER);
    }
@@ -1413,32 +1418,37 @@ private:
                newEQ.price_entry = iHigh(m_symbol, m_timeframe, 1); // High کندل تایید
                newEQ.source_swing = m_activeMajorHighCandidate;
 
-               MajorEQPattern temp[1]; temp[0] = newEQ;
-               if (ArrayInsert(m_majorEQPatterns_Array, temp, 0))
+               // درج دستی به جای ArrayInsert
+               int oldSize = ArraySize(m_majorEQPatterns_Array);
+               ArrayResize(m_majorEQPatterns_Array, oldSize + 1);
+               for (int j = oldSize; j > 0; j--)
                {
-                  // مدیریت ظرفیت (حداکثر 4)
-                  if (ArraySize(m_majorEQPatterns_Array) > 4)
-                  {
-                     int lastIndex = ArraySize(m_majorEQPatterns_Array) - 1;
-                     MajorEQPattern oldestEQ = m_majorEQPatterns_Array[lastIndex];
-
-                     LogEvent("ظرفیت EQ ماژور تکمیل. قدیمی‌ترین الگو در زمان " + TimeToString(oldestEQ.time_formation) + " حذف می‌شود.", m_enableLogging, "[SMC-EQ]");
-
-                     // پاک کردن اشیاء گرافیکی الگوی قدیمی
-                     string baseNameOld = "Liq_EQ_Major_" + TimeToString(oldestEQ.source_swing.time) + m_timeframeSuffix;
-                     string lineNameOld = baseNameOld + "_Line";
-                     string textNameOld = baseNameOld + "_Text";
-                     ObjectDelete(m_chartId, lineNameOld);
-                     ObjectDelete(m_chartId, textNameOld);
-
-                     // حذف از آرایه حافظه
-                     ArrayRemove(m_majorEQPatterns_Array, lastIndex, 1);
-                  }
-                  
-                  LogEvent("الگوی EQ ماژور نزولی تایید شد.", m_enableLogging, "[SMC-EQ]");
-
-                  m_activeMajorHighCandidate.bar_index = -1; // کاندیدا پس از موفقیت، غیرفعال می‌شود
+                  m_majorEQPatterns_Array[j] = m_majorEQPatterns_Array[j - 1];
                }
+               m_majorEQPatterns_Array[0] = newEQ;
+
+               // مدیریت ظرفیت (حداکثر 4)
+               if (ArraySize(m_majorEQPatterns_Array) > 4)
+               {
+                  int lastIndex = ArraySize(m_majorEQPatterns_Array) - 1;
+                  MajorEQPattern oldestEQ = m_majorEQPatterns_Array[lastIndex];
+
+                  LogEvent("ظرفیت EQ ماژور تکمیل. قدیمی‌ترین الگو در زمان " + TimeToString(oldestEQ.time_formation) + " حذف می‌شود.", m_enableLogging, "[SMC-EQ]");
+
+                  // پاک کردن اشیاء گرافیکی الگوی قدیمی
+                  string baseNameOld = "Liq_EQ_Major_" + TimeToString(oldestEQ.source_swing.time) + m_timeframeSuffix;
+                  string lineNameOld = baseNameOld + "_Line";
+                  string textNameOld = baseNameOld + "_Text";
+                  ObjectDelete(m_chartId, lineNameOld);
+                  ObjectDelete(m_chartId, textNameOld);
+
+                  // حذف از آرایه حافظه
+                  ArrayRemove(m_majorEQPatterns_Array, lastIndex, 1);
+               }
+               
+               LogEvent("الگوی EQ ماژور نزولی تایید شد.", m_enableLogging, "[SMC-EQ]");
+
+               m_activeMajorHighCandidate.bar_index = -1; // کاندیدا پس از موفقیت، غیرفعال می‌شود
             }
          }
       }
@@ -1479,32 +1489,37 @@ private:
                newEQ.price_entry = iLow(m_symbol, m_timeframe, 1); // Low کندل تایید
                newEQ.source_swing = m_activeMajorLowCandidate;
 
-               MajorEQPattern temp[1]; temp[0] = newEQ;
-               if (ArrayInsert(m_majorEQPatterns_Array, temp, 0))
+               // درج دستی به جای ArrayInsert
+               int oldSize = ArraySize(m_majorEQPatterns_Array);
+               ArrayResize(m_majorEQPatterns_Array, oldSize + 1);
+               for (int j = oldSize; j > 0; j--)
                {
-                  // مدیریت ظرفیت (حداکثر 4)
-                  if (ArraySize(m_majorEQPatterns_Array) > 4)
-                  {
-                     int lastIndex = ArraySize(m_majorEQPatterns_Array) - 1;
-                     MajorEQPattern oldestEQ = m_majorEQPatterns_Array[lastIndex];
-
-                     LogEvent("ظرفیت EQ ماژور تکمیل. قدیمی‌ترین الگو در زمان " + TimeToString(oldestEQ.time_formation) + " حذف می‌شود.", m_enableLogging, "[SMC-EQ]");
-
-                     // پاک کردن اشیاء گرافیکی الگوی قدیمی
-                     string baseNameOld = "Liq_EQ_Major_" + TimeToString(oldestEQ.source_swing.time) + m_timeframeSuffix;
-                     string lineNameOld = baseNameOld + "_Line";
-                     string textNameOld = baseNameOld + "_Text";
-                     ObjectDelete(m_chartId, lineNameOld);
-                     ObjectDelete(m_chartId, textNameOld);
-
-                     // حذف از آرایه حافظه
-                     ArrayRemove(m_majorEQPatterns_Array, lastIndex, 1);
-                  }
-                  
-                  LogEvent("الگوی EQ ماژور صعودی تایید شد.", m_enableLogging, "[SMC-EQ]");
-
-                  m_activeMajorLowCandidate.bar_index = -1; // کاندیدا پس از موفقیت، غیرفعال می‌شود
+                  m_majorEQPatterns_Array[j] = m_majorEQPatterns_Array[j - 1];
                }
+               m_majorEQPatterns_Array[0] = newEQ;
+
+               // مدیریت ظرفیت (حداکثر 4)
+               if (ArraySize(m_majorEQPatterns_Array) > 4)
+               {
+                  int lastIndex = ArraySize(m_majorEQPatterns_Array) - 1;
+                  MajorEQPattern oldestEQ = m_majorEQPatterns_Array[lastIndex];
+
+                  LogEvent("ظرفیت EQ ماژور تکمیل. قدیمی‌ترین الگو در زمان " + TimeToString(oldestEQ.time_formation) + " حذف می‌شود.", m_enableLogging, "[SMC-EQ]");
+
+                  // پاک کردن اشیاء گرافیکی الگوی قدیمی
+                  string baseNameOld = "Liq_EQ_Major_" + TimeToString(oldestEQ.source_swing.time) + m_timeframeSuffix;
+                  string lineNameOld = baseNameOld + "_Line";
+                  string textNameOld = baseNameOld + "_Text";
+                  ObjectDelete(m_chartId, lineNameOld);
+                  ObjectDelete(m_chartId, textNameOld);
+
+                  // حذف از آرایه حافظه
+                  ArrayRemove(m_majorEQPatterns_Array, lastIndex, 1);
+               }
+               
+               LogEvent("الگوی EQ ماژور صعودی تایید شد.", m_enableLogging, "[SMC-EQ]");
+
+               m_activeMajorLowCandidate.bar_index = -1; // کاندیدا پس از موفقیت، غیرفعال می‌شود
             }
          }
       }
@@ -1617,7 +1632,7 @@ public:
       m_timeframeSuffix = " (" + TimeFrameToStringShort(timeframe) + ")";
 
       // هندل AO بدون نمایش روی چارت
-      m_ao_handle = IndicatorCreate(m_symbol,m_timeframe,IND_AO,0);
+      m_ao_handle = iAO(m_symbol, m_timeframe);
       if (m_ao_handle == INVALID_HANDLE)
       {
          if (m_enableLogging) Print("[MINOR] خطا در ایجاد هندل Awesome Oscillator.");
@@ -2028,30 +2043,34 @@ private:
                newEQ.price_entry = iHigh(m_symbol, m_timeframe, 1); // High کندل تایید
                newEQ.source_swing = m_activeHighCandidate;
 
-               EQPattern temp[1]; temp[0] = newEQ;
-               if (ArrayInsert(m_eqPatterns_Array, temp, 0))
+               // درج دستی به جای ArrayInsert
+               int oldSize = ArraySize(m_eqPatterns_Array);
+               ArrayResize(m_eqPatterns_Array, oldSize + 1);
+               for (int j = oldSize; j > 0; j--)
                {
-                  // مدیریت ظرفیت (حداکثر 4)
-                  // اگر تعداد از 4 بیشتر شد، قدیمی‌ترین (که در انتهای آرایه سری قرار دارد) حذف می‌شود
-                  if (ArraySize(m_eqPatterns_Array) > 4)
-                  {
-                     int lastIndex = ArraySize(m_eqPatterns_Array) - 1;
-                     EQPattern oldestEQ = m_eqPatterns_Array[lastIndex];
-
-                     LogEvent("ظرفیت EQ تکمیل. قدیمی‌ترین الگو در زمان " + TimeToString(oldestEQ.time_formation) + " حذف می‌شود.", m_enableLogging, "[MINOR]");
-
-                     // پاک کردن اشیاء گرافیکی الگوی قدیمی با تابع کمکی
-                     deleteEQObjects(oldestEQ);
-
-                     // حذف از آرایه حافظه
-                     ArrayRemove(m_eqPatterns_Array, lastIndex, 1);
-                  }
-                  
-                  if (m_showDrawing) drawConfirmedEQ(newEQ);
-                  LogEvent("الگوی EQ نزولی تایید و رسم شد.", m_enableLogging, "[MINOR]");
-
-                  m_activeHighCandidate.bar_index = -1; // کاندیدا پس از موفقیت، غیرفعال می‌شود
+                  m_eqPatterns_Array[j] = m_eqPatterns_Array[j - 1];
                }
+               m_eqPatterns_Array[0] = newEQ;
+
+               // مدیریت ظرفیت (حداکثر 4)
+               if (ArraySize(m_eqPatterns_Array) > 4)
+               {
+                  int lastIndex = ArraySize(m_eqPatterns_Array) - 1;
+                  EQPattern oldestEQ = m_eqPatterns_Array[lastIndex];
+
+                  LogEvent("ظرفیت EQ تکمیل. قدیمی‌ترین الگو در زمان " + TimeToString(oldestEQ.time_formation) + " حذف می‌شود.", m_enableLogging, "[MINOR]");
+
+                  // پاک کردن اشیاء گرافیکی الگوی قدیمی با تابع کمکی
+                  deleteEQObjects(oldestEQ);
+
+                  // حذف از آرایه حافظه
+                  ArrayRemove(m_eqPatterns_Array, lastIndex, 1);
+               }
+               
+               if (m_showDrawing) drawConfirmedEQ(m_eqPatterns_Array[0]);
+               LogEvent("الگوی EQ نزولی تایید و رسم شد.", m_enableLogging, "[MINOR]");
+
+               m_activeHighCandidate.bar_index = -1; // کاندیدا پس از موفقیت، غیرفعال می‌شود
             }
          }
       }
@@ -2092,30 +2111,34 @@ private:
                newEQ.price_entry = iLow(m_symbol, m_timeframe, 1); // Low کندل تایید
                newEQ.source_swing = m_activeLowCandidate;
 
-               EQPattern temp[1]; temp[0] = newEQ;
-               if (ArrayInsert(m_eqPatterns_Array, temp, 0))
+               // درج دستی به جای ArrayInsert
+               int oldSize = ArraySize(m_eqPatterns_Array);
+               ArrayResize(m_eqPatterns_Array, oldSize + 1);
+               for (int j = oldSize; j > 0; j--)
                {
-                  // مدیریت ظرفیت (حداکثر 4)
-                  // اگر تعداد از 4 بیشتر شد، قدیمی‌ترین (که در انتهای آرایه سری قرار دارد) حذف می‌شود
-                  if (ArraySize(m_eqPatterns_Array) > 4)
-                  {
-                     int lastIndex = ArraySize(m_eqPatterns_Array) - 1;
-                     EQPattern oldestEQ = m_eqPatterns_Array[lastIndex];
-
-                     LogEvent("ظرفیت EQ تکمیل. قدیمی‌ترین الگو در زمان " + TimeToString(oldestEQ.time_formation) + " حذف می‌شود.", m_enableLogging, "[MINOR]");
-
-                     // پاک کردن اشیاء گرافیکی الگوی قدیمی با تابع کمکی
-                     deleteEQObjects(oldestEQ);
-
-                     // حذف از آرایه حافظه
-                     ArrayRemove(m_eqPatterns_Array, lastIndex, 1);
-                  }
-                  
-                  if (m_showDrawing) drawConfirmedEQ(newEQ);
-                  LogEvent("الگوی EQ صعودی تایید و رسم شد.", m_enableLogging, "[MINOR]");
-
-                  m_activeLowCandidate.bar_index = -1; // کاندیدا پس از موفقیت، غیرفعال می‌شود
+                  m_eqPatterns_Array[j] = m_eqPatterns_Array[j - 1];
                }
+               m_eqPatterns_Array[0] = newEQ;
+
+               // مدیریت ظرفیت (حداکثر 4)
+               if (ArraySize(m_eqPatterns_Array) > 4)
+               {
+                  int lastIndex = ArraySize(m_eqPatterns_Array) - 1;
+                  EQPattern oldestEQ = m_eqPatterns_Array[lastIndex];
+
+                  LogEvent("ظرفیت EQ تکمیل. قدیمی‌ترین الگو در زمان " + TimeToString(oldestEQ.time_formation) + " حذف می‌شود.", m_enableLogging, "[MINOR]");
+
+                  // پاک کردن اشیاء گرافیکی الگوی قدیمی با تابع کمکی
+                  deleteEQObjects(oldestEQ);
+
+                  // حذف از آرایه حافظه
+                  ArrayRemove(m_eqPatterns_Array, lastIndex, 1);
+               }
+               
+               if (m_showDrawing) drawConfirmedEQ(m_eqPatterns_Array[0]);
+               LogEvent("الگوی EQ صعودی تایید و رسم شد.", m_enableLogging, "[MINOR]");
+
+               m_activeLowCandidate.bar_index = -1; // کاندیدا پس از موفقیت، غیرفعال می‌شود
             }
          }
       }
@@ -2211,59 +2234,67 @@ private:
          if (arr[j].time == newPoint.time) return false;
       }
       
-      SwingPoint temp[1]; temp[0] = newPoint;
-      
       if (isHigh)
       {
-         if (ArrayInsert(m_minorSwingHighs_Array, temp, 0))
+         int oldSize = ArraySize(m_minorSwingHighs_Array);
+         ArrayResize(m_minorSwingHighs_Array, oldSize + 1);
+         for (int j = oldSize; j > 0; j--)
          {
-            // مدیریت ظرفیت (حداکثر 10)
-            if (ArraySize(m_minorSwingHighs_Array) > 10)
-            {
-               int lastIndex = ArraySize(m_minorSwingHighs_Array) - 1;
-               if (m_showDrawing)
-               {
-                  string objNameOld = "Minor_H_" + TimeToString(m_minorSwingHighs_Array[lastIndex].time) + m_timeframeSuffix;
-                  ObjectDelete(m_chartId, objNameOld);
-               }
-               ArrayRemove(m_minorSwingHighs_Array, lastIndex, 1);
-            }
-            
-            if (m_showDrawing) drawMinorSwingPoint(newPoint, true);
-            if (m_enableLogging) LogEvent("سقف مینور جدید در قیمت " + DoubleToString(newPoint.price, _Digits) + " شناسایی شد.", m_enableLogging, "[MINOR]");
-            
-            // آپدیت کاندیدای فعال
-            m_activeHighCandidate = newPoint;
-            LogEvent("سقف مینور " + TimeToString(newPoint.time) + " به عنوان کاندیدای فعال جدید برای EQ تنظیم شد.", m_enableLogging, "[MINOR]");
-            
-            return true;
+            m_minorSwingHighs_Array[j] = m_minorSwingHighs_Array[j - 1];
          }
+         m_minorSwingHighs_Array[0] = newPoint;
+
+         // مدیریت ظرفیت (حداکثر 10)
+         if (ArraySize(m_minorSwingHighs_Array) > 10)
+         {
+            int lastIndex = ArraySize(m_minorSwingHighs_Array) - 1;
+            if (m_showDrawing)
+            {
+               string objNameOld = "Minor_H_" + TimeToString(m_minorSwingHighs_Array[lastIndex].time) + m_timeframeSuffix;
+               ObjectDelete(m_chartId, objNameOld);
+            }
+            ArrayRemove(m_minorSwingHighs_Array, lastIndex, 1);
+         }
+         
+         if (m_showDrawing) drawMinorSwingPoint(newPoint, true);
+         if (m_enableLogging) LogEvent("سقف مینور جدید در قیمت " + DoubleToString(newPoint.price, _Digits) + " شناسایی شد.", m_enableLogging, "[MINOR]");
+         
+         // آپدیت کاندیدای فعال
+         m_activeHighCandidate = newPoint;
+         LogEvent("سقف مینور " + TimeToString(newPoint.time) + " به عنوان کاندیدای فعال جدید برای EQ تنظیم شد.", m_enableLogging, "[MINOR]");
+         
+         return true;
       }
       else
       {
-         if (ArrayInsert(m_minorSwingLows_Array, temp, 0))
+         int oldSize = ArraySize(m_minorSwingLows_Array);
+         ArrayResize(m_minorSwingLows_Array, oldSize + 1);
+         for (int j = oldSize; j > 0; j--)
          {
-            // مدیریت ظرفیت (حداکثر 10)
-            if (ArraySize(m_minorSwingLows_Array) > 10)
-            {
-               int lastIndex = ArraySize(m_minorSwingLows_Array) - 1;
-               if (m_showDrawing)
-               {
-                  string objNameOld = "Minor_L_" + TimeToString(m_minorSwingLows_Array[lastIndex].time) + m_timeframeSuffix;
-                  ObjectDelete(m_chartId, objNameOld);
-               }
-               ArrayRemove(m_minorSwingLows_Array, lastIndex, 1);
-            }
-            
-            if (m_showDrawing) drawMinorSwingPoint(newPoint, false);
-            if (m_enableLogging) LogEvent("کف مینور جدید در قیمت " + DoubleToString(newPoint.price, _Digits) + " شناسایی شد.", m_enableLogging, "[MINOR]");
-            
-            // آپدیت کاندیدای فعال
-            m_activeLowCandidate = newPoint;
-            LogEvent("کف مینور " + TimeToString(newPoint.time) + " به عنوان کاندیدای فعال جدید برای EQ تنظیم شد.", m_enableLogging, "[MINOR]");
-            
-            return true;
+            m_minorSwingLows_Array[j] = m_minorSwingLows_Array[j - 1];
          }
+         m_minorSwingLows_Array[0] = newPoint;
+
+         // مدیریت ظرفیت (حداکثر 10)
+         if (ArraySize(m_minorSwingLows_Array) > 10)
+         {
+            int lastIndex = ArraySize(m_minorSwingLows_Array) - 1;
+            if (m_showDrawing)
+            {
+               string objNameOld = "Minor_L_" + TimeToString(m_minorSwingLows_Array[lastIndex].time) + m_timeframeSuffix;
+               ObjectDelete(m_chartId, objNameOld);
+            }
+            ArrayRemove(m_minorSwingLows_Array, lastIndex, 1);
+         }
+         
+         if (m_showDrawing) drawMinorSwingPoint(newPoint, false);
+         if (m_enableLogging) LogEvent("کف مینور جدید در قیمت " + DoubleToString(newPoint.price, _Digits) + " شناسایی شد.", m_enableLogging, "[MINOR]");
+         
+         // آپدیت کاندیدای فعال
+         m_activeLowCandidate = newPoint;
+         LogEvent("کف مینور " + TimeToString(newPoint.time) + " به عنوان کاندیدای فعال جدید برای EQ تنظیم شد.", m_enableLogging, "[MINOR]");
+         
+         return true;
       }
       
       return false;
@@ -2371,7 +2402,7 @@ private:
    datetime         m_lastProcessedBarTime;
 
    //--- تابع کمکی: ثبت رویداد نقدینگی
-   void RegisterLiquidityEvent(ENUM_LIQUIDITY_TYPE type, bool isBullish, datetime time, double price, string desc, SwingPoint source)
+   void RegisterLiquidityEvent(ENUM_LIQUIDITY_TYPE type, bool isBullish, datetime time, double price, string desc, SwingPoint &source)
    {
       if (ArraySize(m_liquidityHistory) > 0 && m_liquidityHistory[0].type == type && m_liquidityHistory[0].time == time) return; // جلوگیری از تکرار
       
@@ -2386,8 +2417,14 @@ private:
       // مدیریت ظرفیت
       if (ArraySize(m_liquidityHistory) >= 50) ArrayRemove(m_liquidityHistory, 49, 1);
 
-      LiquidityEvent temp[1]; temp[0] = newEvent;
-      ArrayInsert(m_liquidityHistory, temp, 0);
+      // درج دستی
+      int oldSize = ArraySize(m_liquidityHistory);
+      ArrayResize(m_liquidityHistory, oldSize + 1);
+      for (int j = oldSize; j > 0; j--)
+      {
+         m_liquidityHistory[j] = m_liquidityHistory[j - 1];
+      }
+      m_liquidityHistory[0] = newEvent;
 
       LogEvent("رویداد نقدینگی " + EnumToString(type) + " ثبت شد.", m_enableLogging, "[LIQ]");
    }
@@ -2415,7 +2452,7 @@ private:
    }
 
    //--- تابع کمکی: رسم رویداد EQ
-   void DrawEQEvent(SwingPoint source, datetime time_form, double price_entry, ENUM_LIQUIDITY_TYPE type, bool isMajor)
+   void DrawEQEvent(SwingPoint &source, datetime time_form, double price_entry, ENUM_LIQUIDITY_TYPE type, bool isMajor)
    {
       string baseName = "Liq_EQ_" + (isMajor ? "Major_" : "Minor_") + TimeToString(source.time) + m_timeframeSuffix;
       string lineName = baseName + "_Line"; string textName = baseName + "_Text";
@@ -2438,8 +2475,8 @@ private:
    }
 
    //--- تابع کمکی: رسم رویداد تله (SMS/CF)
-   void DrawTrapEvent(SwingPoint source, ENUM_LIQUIDITY_TYPE type)
-   {
+   void DrawTrapEvent(SwingPoint &source, ENUM_LIQUIDITY_TYPE type)
+   { 
       string objName = "Liq_Trap_" + EnumToString(type) + "_" + TimeToString(source.time) + m_timeframeSuffix;
       ObjectDelete(m_chartId, objName);
       color clr = (type == LIQ_SMS) ? C'128,0,128' : C'255,140,0'; // Purple for SMS, Orange for CF
@@ -2470,14 +2507,16 @@ private:
             if (pdh != 0 && pdh != m_pdh)
             {
                m_pdh = pdh;
-               RegisterLiquidityEvent(LIQ_PDH, false, currentDayStart, m_pdh, "PDH", SwingPoint());
+               SwingPoint emptySwing; // ساختار خالی برای فیلد source_swing
+               RegisterLiquidityEvent(LIQ_PDH, false, currentDayStart, m_pdh, "PDH", emptySwing);
                DrawPeriodicLevel(m_pdh, m_pdhLineName, "PDH", clrGreen, STYLE_DOT);
                changed = true;
             }
             if (pdl != 0 && pdl != m_pdl)
             {
                m_pdl = pdl;
-               RegisterLiquidityEvent(LIQ_PDL, true, currentDayStart, m_pdl, "PDL", SwingPoint());
+               SwingPoint emptySwing; // ساختار خالی برای فیلد source_swing
+               RegisterLiquidityEvent(LIQ_PDL, true, currentDayStart, m_pdl, "PDL", emptySwing);
                DrawPeriodicLevel(m_pdl, m_pdlLineName, "PDL", clrRed, STYLE_DOT);
                changed = true;
             }
@@ -2496,14 +2535,16 @@ private:
             if (pwh != 0 && pwh != m_pwh)
             {
                m_pwh = pwh;
-               RegisterLiquidityEvent(LIQ_PWH, false, currentWeekStart, m_pwh, "PWH", SwingPoint());
+               SwingPoint emptySwing;
+               RegisterLiquidityEvent(LIQ_PWH, false, currentWeekStart, m_pwh, "PWH", emptySwing);
                DrawPeriodicLevel(m_pwh, m_pwhLineName, "PWH", clrDarkGreen, STYLE_DASHDOT);
                changed = true;
             }
             if (pwl != 0 && pwl != m_pwl)
             {
                m_pwl = pwl;
-               RegisterLiquidityEvent(LIQ_PWL, true, currentWeekStart, m_pwl, "PWL", SwingPoint());
+               SwingPoint emptySwing;
+               RegisterLiquidityEvent(LIQ_PWL, true, currentWeekStart, m_pwl, "PWL", emptySwing);
                DrawPeriodicLevel(m_pwl, m_pwlLineName, "PWL", clrDarkRed, STYLE_DASHDOT);
                changed = true;
             }
@@ -2522,14 +2563,16 @@ private:
             if (pmh != 0 && pmh != m_pmh)
             {
                m_pmh = pmh;
-               RegisterLiquidityEvent(LIQ_PMH, false, currentMonthStart, m_pmh, "PMH", SwingPoint());
+               SwingPoint emptySwing;
+               RegisterLiquidityEvent(LIQ_PMH, false, currentMonthStart, m_pmh, "PMH", emptySwing);
                DrawPeriodicLevel(m_pmh, m_pmhLineName, "PMH", clrForestGreen, STYLE_DASHDOTDOT);
                changed = true;
             }
             if (pml != 0 && pml != m_pml)
             {
                m_pml = pml;
-               RegisterLiquidityEvent(LIQ_PML, true, currentMonthStart, m_pml, "PML", SwingPoint());
+               SwingPoint emptySwing;
+               RegisterLiquidityEvent(LIQ_PML, true, currentMonthStart, m_pml, "PML", emptySwing);
                DrawPeriodicLevel(m_pml, m_pmlLineName, "PML", clrFireBrick, STYLE_DASHDOTDOT);
                changed = true;
             }
@@ -2558,14 +2601,16 @@ private:
                if (yearlyHigh != 0 && yearlyHigh != m_pyh)
                {
                   m_pyh = yearlyHigh;
-                  RegisterLiquidityEvent(LIQ_PYH, false, currentYearStart, m_pyh, "PYH", SwingPoint());
+                  SwingPoint emptySwing;
+                  RegisterLiquidityEvent(LIQ_PYH, false, currentYearStart, m_pyh, "PYH", emptySwing);
                   DrawPeriodicLevel(m_pyh, m_pyhLineName, "PYH", clrLimeGreen, STYLE_SOLID, 2);
                   changed = true;
                }
                if (yearlyLow != 0 && yearlyLow != m_pyl)
                {
                   m_pyl = yearlyLow;
-                  RegisterLiquidityEvent(LIQ_PYL, true, currentYearStart, m_pyl, "PYL", SwingPoint());
+                  SwingPoint emptySwing;
+                  RegisterLiquidityEvent(LIQ_PYL, true, currentYearStart, m_pyl, "PYL", emptySwing);
                   DrawPeriodicLevel(m_pyl, m_pylLineName, "PYL", clrIndianRed, STYLE_SOLID, 2);
                   changed = true;
                }
@@ -2592,7 +2637,7 @@ private:
       }
 
       // چک EQ مینور
-      EQPattern minorEq = GetLastEQPattern();
+      EQPattern minorEq = m_minor.GetLastEQPattern();
       if (minorEq.time_formation > m_lastSeenMinorEQTime)
       {
          m_lastSeenMinorEQTime = minorEq.time_formation;
@@ -2659,6 +2704,8 @@ private:
             }
             break;
          case STATE_WAITING_FOR_CONFIRMING_BREAK:
+        //startcase STATE_WAITING_FOR_CONFIRMING_BREAK:
+         {
             datetime latestBreak = MathMax(currentCHoCH, currentBoS);
             if (latestBreak > m_lastKnownBoS)
             {
@@ -2679,6 +2726,7 @@ private:
             }
             break;
       }
+      }//close case STATE_WAITING_FOR_CONFIRMING_BREAK:
       return changed;
    }
 
