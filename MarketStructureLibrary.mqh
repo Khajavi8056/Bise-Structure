@@ -1,3 +1,4 @@
+```mqh
 //+------------------------------------------------------------------+
 //|                                MarketStructureLibrary.mqh         |
 //|                              Copyright 2025, Khajavi - HipoAlgoritm|
@@ -100,6 +101,16 @@ struct LiquidityEvent
    double              price;       // قیمت مرتبط
    string              description; // توضیح کوتاه
    SwingPoint          source_swing;// منبع سوئینگ (برای EQ و تله‌ها)
+};
+
+//--- ساختار داده برای Order Block (OB) - استخراج شده به عنوان سراسری برای استفاده مشترک
+struct OrderBlock
+{
+   bool     isBullish;  // نوع OB: صعودی (تقاضا، true) یا نزولی (عرضه، false)
+   double   highPrice;  // قیمت سقف ناحیه OB (بالاترین قیمت کندل)
+   double   lowPrice;   // قیمت کف ناحیه OB (پایین‌ترین قیمت کندل)
+   datetime time;       // زمان کندل OB
+   int      bar_index;  // اندیس کندل OB
 };
 
 //+------------------------------------------------------------------+
@@ -496,16 +507,6 @@ private:
    datetime         m_lastCHoCHTime;        // زمان آخرین CHoCH
    datetime         m_lastBoSTime;          // زمان آخرین BoS
    string           m_trendObjectName;      // نام ثابت لیبل روند با پسوند
-   
-   //--- ساختار داده جدید برای Order Block (OB)
-   struct OrderBlock
-   {
-      bool     isBullish;  // نوع OB: صعودی (تقاضا، true) یا نزولی (عرضه، false)
-      double   highPrice;  // قیمت سقف ناحیه OB (بالاترین قیمت کندل)
-      double   lowPrice;   // قیمت کف ناحیه OB (پایین‌ترین قیمت کندل)
-      datetime time;       // زمان کندل OB
-      int      bar_index;  // اندیس کندل OB
-   };
    
    //--- آرایه‌های ذخیره‌سازی برای Order Blocks
    OrderBlock       m_unmitigatedOBs[];     // آرایه OBهای مصرف نشده (unmitigated، سری)
@@ -1419,7 +1420,7 @@ private:
       // --- بخش ۱: ارزیابی کاندیدای سقف فعال (برای EQ نزولی) ---
       if (m_activeMajorHighCandidate.bar_index != -1) // آیا اصلاً کاندیدای فعالی داریم؟
       {
-         // شرط ابطال ۱: آیا سقف جدیدتری از کاندیدای ما تشکیل شده؟
+         // شرط ابطال 1: آیا سقف جدیدتری از کاندیدای ما تشکیل شده؟
          if (GetSwingHigh(0).time > m_activeMajorHighCandidate.time)
          {
             LogEvent("کاندیدای سقف ماژور " + TimeToString(m_activeMajorHighCandidate.time) + " توسط سقف جدیدتر باطل شد.", m_enableLogging, "[SMC-EQ]");
@@ -1490,7 +1491,7 @@ private:
       // --- بخش ۲: ارزیابی کاندیدای کف فعال (برای EQ صعودی) ---
       if (m_activeMajorLowCandidate.bar_index != -1)
       {
-         // شرط ابطال ۱: آیا کف جدیدتری از کاندیدای ما تشکیل شده؟
+         // شرط ابطال 1: آیا کف جدیدتری از کاندیدای ما تشکیل شده؟
          if (GetSwingLow(0).time > m_activeMajorLowCandidate.time)
          {
             LogEvent("کاندیدای کف ماژور " + TimeToString(m_activeMajorLowCandidate.time) + " توسط کف جدیدتر باطل شد.", m_enableLogging, "[SMC-EQ]");
@@ -1635,6 +1636,7 @@ private:
    string           m_timeframeSuffix;      // پسوند تایم‌فریم کوتاه شده برای نامگذاری اشیاء
    bool             m_showDrawing;          // کنترل نمایش ترسیمات مینور روی چارت
    int              m_aoFractalLength;      // طول فرکتال AO (تعداد میله‌های اطراف، مثلاً 3)
+   bool             m_enableMinorOB_FVG_Check; // فعال/غیرفعال کردن شرط FVG برای شناسایی OB مینور (ورودی جدید سازنده)
 
    //--- هندل اندیکاتور
    int              m_ao_handle;            // هندل اندیکاتور Awesome Oscillator (بدون نمایش)
@@ -1649,11 +1651,18 @@ private:
    datetime         m_lastLowTime;             // زمان آخرین کف ذخیره شده (برای اسکن)
    datetime         m_lastProcessedBarTime;    // زمان آخرین کندل پردازش شده (برای تشخیص NewBar)
 
+   //--- آرایه‌های ذخیره‌سازی برای Order Blocks مینور
+   OrderBlock       m_minorUnmitigatedOBs[];   // آرایه OBهای مصرف نشده مینور (unmitigated، سری)
+   OrderBlock       m_minorMitigatedOBs[];     // آرایه OBهای مصرف شده مینور (mitigated، سری)
+   
+   //--- متغیرهای کنترلی برای Order Blocks مینور
+   bool             m_isCurrentlyMitigatingMinorOB; // وضعیت لحظه‌ای: آیا قیمت در حال مصرف یک OB مینور است؟
+
 public:
    //+------------------------------------------------------------------+
    //| سازنده کلاس (Constructor)                                       |
    //+------------------------------------------------------------------+
-   MinorStructure(const string symbol, const ENUM_TIMEFRAMES timeframe, const long chartId, const bool enableLogging_in, const bool showDrawing, const int aoFractalLength_in)
+   MinorStructure(const string symbol, const ENUM_TIMEFRAMES timeframe, const long chartId, const bool enableLogging_in, const bool showDrawing, const int aoFractalLength_in, const bool enableMinorOB_FVG_Check_in)
    {
       m_symbol = symbol;
       m_timeframe = timeframe;
@@ -1661,6 +1670,7 @@ public:
       m_enableLogging = enableLogging_in;
       m_showDrawing = showDrawing;
       m_aoFractalLength = aoFractalLength_in;
+      m_enableMinorOB_FVG_Check = enableMinorOB_FVG_Check_in; // مقداردهی ورودی جدید
       
       // تنظیم پسوند تایم فریم برای نمایش MTF (کوتاه شده)
       m_timeframeSuffix = " (" + TimeFrameToStringShort(timeframe) + ")";
@@ -1679,11 +1689,18 @@ public:
       ArrayResize(m_minorSwingLows_Array, 0, 10);  // رزرو اولیه برای بهینه‌سازی
       ArrayResize(m_eqPatterns_Array, 0, 10);      // رزرو اولیه برای بهینه‌سازی
       
+      // مقداردهی اولیه آرایه‌های OB مینور (سری با ظرفیت رزرو شده)
+      ArraySetAsSeries(m_minorUnmitigatedOBs, true);
+      ArraySetAsSeries(m_minorMitigatedOBs, true);
+      ArrayResize(m_minorUnmitigatedOBs, 0, 10); // رزرو اولیه
+      ArrayResize(m_minorMitigatedOBs, 0, 10);   // رزرو اولیه
+      
       m_activeHighCandidate.bar_index = -1;
       m_activeLowCandidate.bar_index = -1;
       m_lastHighTime = 0;
       m_lastLowTime = 0;
       m_lastProcessedBarTime = 0;
+      m_isCurrentlyMitigatingMinorOB = false; // مقداردهی اولیه
 
       // پاکسازی اشیاء قبلی مربوط به این کلاس روی چارت
       if (m_showDrawing)
@@ -1717,7 +1734,7 @@ public:
          for(int i = total - 1; i >= 0; i--)
          {
             string name = ObjectName(m_chartId, i);
-            if(StringFind(name, m_timeframeSuffix) != -1 && (StringFind(name, "Minor_") != -1 || StringFind(name, "Confirmed_") != -1 || StringFind(name, "EQ_") != -1))
+            if(StringFind(name, m_timeframeSuffix) != -1 && (StringFind(name, "Minor_") != -1 || StringFind(name, "Confirmed_") != -1 || StringFind(name, "EQ_") != -1 || StringFind(name, "MinorOB_") != -1))
             {
                ObjectDelete(m_chartId, name);
             }
@@ -1725,6 +1742,15 @@ public:
       }
       if (m_ao_handle != INVALID_HANDLE) IndicatorRelease(m_ao_handle); // آزادسازی هندل برای بهینه‌سازی منابع MT5
       LogEvent("کلاس MinorStructure متوقف شد.", m_enableLogging, "[MINOR]");
+   }
+   
+   //+------------------------------------------------------------------+
+   //| تابع جدید: پردازش تیک جدید برای مدیریت OB مینور (میتگیشن و ابطال لحظه‌ای) |
+   //+------------------------------------------------------------------+
+   bool ProcessNewTick()
+   {
+      ProcessMinorOrderBlocks(); // فراخوانی مدیریت چرخه حیات OBهای مینور
+      return m_isCurrentlyMitigatingMinorOB; // بازگشت وضعیت مصرف لحظه‌ای برای استفاده اکسپرت
    }
    
    //+------------------------------------------------------------------+
@@ -2262,6 +2288,189 @@ private:
       ObjectDelete(m_chartId, eqTextName);
    }
    
+   //--- تابع جدید: شناسایی Order Block مینور بر اساس الگوریتم مشخص شده (با اصلاح منطق FVG)
+   void IdentifyMinorOrderBlock(const SwingPoint &newSwing, const bool isHigh)
+   {
+      bool isBullish = !isHigh; // برای سقف جدید (isHigh=true)، OB نزولی (عرضه، isBullish=false) و بالعکس
+      
+      int startScan = newSwing.bar_index + 1; // شروع اسکن از کندل قبل از سوئینگ جدید
+      int endScan = isHigh ? GetMinorSwingHigh(1).bar_index : GetMinorSwingLow(1).bar_index;
+      
+      if (endScan == -1 || startScan > endScan) return; // محدوده نامعتبر یا سوئینگ قبلی وجود ندارد
+      
+      // اسکن معکوس از جدیدتر (startScan) به قدیمی‌تر (endScan)
+      for (int i = startScan; i <= endScan; i++)
+      {
+         bool candidate = false;
+
+         if (isBullish) // OB صعودی (تقاضا) - پس از کف جدید (isHigh=false)
+         {
+            // شرط ۱: کندل نزولی (رنگ مخالف)
+            if (iClose(m_symbol, m_timeframe, i) < iOpen(m_symbol, m_timeframe, i))
+            {
+               // شرط ۲: جمع‌آوری نقدینگی (Low پایین‌تر از Low کندل قبل)
+               if (iLow(m_symbol, m_timeframe, i) < iLow(m_symbol, m_timeframe, i + 1))
+               {
+                  candidate = true;
+
+                  // شرط ۳: ایجاد گپ FVG ساده (اختیاری)
+                  if (m_enableMinorOB_FVG_Check)
+                  {
+                     if (i < 2) candidate = false;
+                     else if (iLow(m_symbol, m_timeframe, i - 2) <= iHigh(m_symbol, m_timeframe, i)) candidate = false;
+                  }
+               }
+            }
+         }
+         else // OB نزولی (عرضه) - پس از سقف جدید (isHigh=true)
+         {
+            // شرط ۱: کندل صعودی (رنگ مخالف)
+            if (iClose(m_symbol, m_timeframe, i) > iOpen(m_symbol, m_timeframe, i))
+            {
+               // شرط ۲: جمع‌آوری نقدینگی (High بالاتر از High کندل قبل)
+               if (iHigh(m_symbol, m_timeframe, i) > iHigh(m_symbol, m_timeframe, i + 1))
+               {
+                  candidate = true;
+
+                  // شرط ۳: ایجاد گپ FVG ساده (اختیاری)
+                  if (m_enableMinorOB_FVG_Check)
+                  {
+                     if (i < 2) candidate = false;
+                     else if (iHigh(m_symbol, m_timeframe, i - 2) >= iLow(m_symbol, m_timeframe, i)) candidate = false;
+                  }
+               }
+            }
+         }
+
+         if (candidate)
+         {
+            // ایجاد و اضافه کردن OB جدید
+            OrderBlock newOB;
+            newOB.isBullish = isBullish;
+            newOB.highPrice = iHigh(m_symbol, m_timeframe, i);
+            newOB.lowPrice = iLow(m_symbol, m_timeframe, i);
+            newOB.time = iTime(m_symbol, m_timeframe, i);
+            newOB.bar_index = i;
+
+            AddMinorUnmitigatedOB(newOB);
+            LogEvent("OB مینور جدید " + (isBullish ? "صعودی (تقاضا)" : "نزولی (عرضه)") + " در زمان " + TimeToString(newOB.time) + " شناسایی شد.", m_enableLogging, "[MINOR-OB]");
+            break; // فقط اولین (جدیدترین) کاندیدا را انتخاب کن
+         }
+      }
+   }
+   
+   //--- تابع جدید: اضافه کردن OB جدید به آرایه unmitigated مینور با مدیریت ظرفیت (حداکثر ۱۰)
+   void AddMinorUnmitigatedOB(const OrderBlock &newOB)
+   {
+      // مدیریت ظرفیت: اگر بیش از ۱۰ شد، قدیمی‌ترین را حذف کن
+      if (ArraySize(m_minorUnmitigatedOBs) >= 10)
+      {
+         int lastIndex = ArraySize(m_minorUnmitigatedOBs) - 1;
+         ArrayRemove(m_minorUnmitigatedOBs, lastIndex, 1);
+         LogEvent("ظرفیت unmitigated OB مینور تکمیل. قدیمی‌ترین OB حذف شد.", m_enableLogging, "[MINOR-OB]");
+      }
+
+      // درج دستی OB جدید در ابتدای آرایه (سری)
+      int oldSize = ArraySize(m_minorUnmitigatedOBs);
+      ArrayResize(m_minorUnmitigatedOBs, oldSize + 1);
+      for (int j = oldSize; j > 0; j--)
+      {
+         m_minorUnmitigatedOBs[j] = m_minorUnmitigatedOBs[j - 1];
+      }
+      m_minorUnmitigatedOBs[0] = newOB;
+   }
+   
+   //--- تابع جدید: اضافه کردن OB به آرایه mitigated مینور با مدیریت ظرفیت (حداکثر ۱۰)
+   void AddMinorMitigatedOB(const OrderBlock &ob)
+   {
+      // مدیریت ظرفیت: اگر بیش از ۱۰ شد، قدیمی‌ترین را حذف کن
+      if (ArraySize(m_minorMitigatedOBs) >= 10)
+      {
+         int lastIndex = ArraySize(m_minorMitigatedOBs) - 1;
+         ArrayRemove(m_minorMitigatedOBs, lastIndex, 1);
+         LogEvent("ظرفیت mitigated OB مینور تکمیل. قدیمی‌ترین OB مصرف شده حذف شد.", m_enableLogging, "[MINOR-OB]");
+      }
+
+      // درج دستی OB در ابتدای آرایه
+      int oldSize = ArraySize(m_minorMitigatedOBs);
+      ArrayResize(m_minorMitigatedOBs, oldSize + 1);
+      for (int j = oldSize; j > 0; j--)
+      {
+         m_minorMitigatedOBs[j] = m_minorMitigatedOBs[j - 1];
+      }
+      m_minorMitigatedOBs[0] = ob;
+   }
+   
+   //--- تابع جدید: مدیریت چرخه حیات OBهای مینور (میتگیشن و ابطال با قیمت‌های لحظه‌ای)
+   void ProcessMinorOrderBlocks()
+   {
+      double currentAsk = SymbolInfoDouble(m_symbol, SYMBOL_ASK);
+      double currentBid = SymbolInfoDouble(m_symbol, SYMBOL_BID);
+      m_isCurrentlyMitigatingMinorOB = false; // ریست وضعیت لحظه‌ای
+
+      // مرحله ۱: چک میتگیشن (مصرف) برای OBهای unmitigated
+      for (int i = 0; i < ArraySize(m_minorUnmitigatedOBs); i++)
+      {
+         OrderBlock ob = m_minorUnmitigatedOBs[i];
+         bool mitigated = false;
+
+         // چک وارد شدن قیمت به OB (میتگیشن)
+         if (ob.isBullish && ob.lowPrice <= currentAsk && currentAsk <= ob.highPrice) mitigated = true;
+         if (!ob.isBullish && ob.lowPrice <= currentBid && currentBid <= ob.highPrice) mitigated = true;
+
+         if (mitigated)
+         {
+            // انتقال به آرایه mitigated
+            AddMinorMitigatedOB(ob);
+            m_isCurrentlyMitigatingMinorOB = true;
+
+            // حذف از آرایه unmitigated
+            ArrayRemove(m_minorUnmitigatedOBs, i, 1);
+            i--;
+            LogEvent("OB مینور " + (ob.isBullish ? "صعودی" : "نزولی") + " در زمان " + TimeToString(ob.time) + " مصرف (mitigated) شد.", m_enableLogging, "[MINOR-OB]");
+         }
+      }
+
+      // مرحله ۲: چک ابطال (invalidation) برای هر دو آرایه unmitigated و mitigated
+      // اول unmitigated
+      for (int i = 0; i < ArraySize(m_minorUnmitigatedOBs); i++)
+      {
+         OrderBlock ob = m_minorUnmitigatedOBs[i];
+         bool invalidated = false;
+
+         // چک عبور قیمت از OB (ابطال)
+         if (ob.isBullish && currentBid < ob.lowPrice) invalidated = true;
+         if (!ob.isBullish && currentAsk > ob.highPrice) invalidated = true;
+
+         if (invalidated)
+         {
+            // حذف از آرایه (بدون پاک کردن گرافیکی، چون پیش‌فرض رسم نمی‌شود)
+            ArrayRemove(m_minorUnmitigatedOBs, i, 1);
+            i--;
+            LogEvent("OB مینور " + (ob.isBullish ? "صعودی" : "نزولی") + " در زمان " + TimeToString(ob.time) + " ابطال (invalidated) شد.", m_enableLogging, "[MINOR-OB]");
+         }
+      }
+
+      // سپس mitigated
+      for (int i = 0; i < ArraySize(m_minorMitigatedOBs); i++)
+      {
+         OrderBlock ob = m_minorMitigatedOBs[i];
+         bool invalidated = false;
+
+         // چک عبور قیمت از OB (ابطال)
+         if (ob.isBullish && currentBid < ob.lowPrice) invalidated = true;
+         if (!ob.isBullish && currentAsk > ob.highPrice) invalidated = true;
+
+         if (invalidated)
+         {
+            // حذف از آرایه (بدون پاک کردن گرافیکی)
+            ArrayRemove(m_minorMitigatedOBs, i, 1);
+            i--;
+            LogEvent("OB مینور مصرف شده " + (ob.isBullish ? "صعودی" : "نزولی") + " در زمان " + TimeToString(ob.time) + " ابطال (invalidated) شد.", m_enableLogging, "[MINOR-OB]");
+         }
+      }
+   }
+   
    //--- تابع اصلاح شده: اضافه کردن نقطه مینور (با ورودی SwingPoint کامل و مدیریت تکرار و ظرفیت)
    bool AddMinorPoint(const SwingPoint &newPoint, const bool isHigh)
    {
@@ -2312,6 +2521,9 @@ private:
          m_activeHighCandidate = newPoint;
          LogEvent("سقف مینور " + TimeToString(newPoint.time) + " به عنوان کاندیدای فعال جدید برای EQ تنظیم شد.", m_enableLogging, "[MINOR]");
          
+         // فراخوانی شناسایی OB مینور
+         IdentifyMinorOrderBlock(newPoint, true);
+         
          return true;
       }
       else
@@ -2343,6 +2555,9 @@ private:
          m_activeLowCandidate = newPoint;
          LogEvent("کف مینور " + TimeToString(newPoint.time) + " به عنوان کاندیدای فعال جدید برای EQ تنظیم شد.", m_enableLogging, "[MINOR]");
          
+         // فراخوانی شناسایی OB مینور
+         IdentifyMinorOrderBlock(newPoint, false);
+         
          return true;
       }
       
@@ -2350,6 +2565,57 @@ private:
    }
 
 public:
+   //+------------------------------------------------------------------+
+   //| تابع جدید: رسم خاص یک OB مینور (عنداللزوم)                     |
+   //+------------------------------------------------------------------+
+   void DrawSpecificMinorOB(const int index, const bool draw, const bool isUnmitigated)
+   {
+      OrderBlock ob;
+      if (isUnmitigated)
+      {
+         if (index < 0 || index >= ArraySize(m_minorUnmitigatedOBs)) return;
+         ob = m_minorUnmitigatedOBs[index];
+      }
+      else
+      {
+         if (index < 0 || index >= ArraySize(m_minorMitigatedOBs)) return;
+         ob = m_minorMitigatedOBs[index];
+      }
+
+      string typeStr = ob.isBullish ? "Bullish" : "Bearish";
+      string objName = "MinorOB_" + TimeToString(ob.time) + "_" + typeStr + m_timeframeSuffix;
+      string textName = objName + "_Text";
+
+      if (!draw)
+      {
+         ObjectDelete(m_chartId, objName);
+         ObjectDelete(m_chartId, textName);
+         return;
+      }
+
+      color obColor = C'245,245,245'; // سفید شفاف
+      datetime endTime = D'2030.01.01 00:00'; // امتداد زون
+
+      // ایجاد مستطیل
+      ObjectCreate(m_chartId, objName, OBJ_RECTANGLE, 0, ob.time, ob.highPrice, endTime, ob.lowPrice);
+      ObjectSetInteger(m_chartId, objName, OBJPROP_COLOR, obColor);
+      ObjectSetInteger(m_chartId, objName, OBJPROP_FILL, true);
+      ObjectSetInteger(m_chartId, objName, OBJPROP_BACK, true); // پشت کندل‌ها
+
+      // محاسبه موقعیت اولیه وسط برای متن
+      datetime currentTime = iTime(NULL, PERIOD_CURRENT, 0);
+      datetime midTime = ob.time + (currentTime - ob.time) / 2;
+      double midPrice = (ob.highPrice + ob.lowPrice) / 2;
+
+      // ایجاد متن OB با پسوند تایم فریم
+      ObjectCreate(m_chartId, textName, OBJ_TEXT, 0, midTime, midPrice);
+      string text = isUnmitigated ? "MinorOB" + m_timeframeSuffix : "MinorOB$" + m_timeframeSuffix;
+      ObjectSetString(m_chartId, textName, OBJPROP_TEXT, text); 
+      ObjectSetInteger(m_chartId, textName, OBJPROP_COLOR, clrBlack);
+      ObjectSetInteger(m_chartId, textName, OBJPROP_FONTSIZE, 8);
+      ObjectSetInteger(m_chartId, textName, OBJPROP_ANCHOR, ANCHOR_CENTER);
+   }
+   
    //+------------------------------------------------------------------+
    //| توابع دسترسی عمومی (Accessors)                                  |
    //+------------------------------------------------------------------+
@@ -2388,6 +2654,27 @@ public:
       EQPattern empty; empty.time_formation = 0;
       return empty;
    }
+
+   //--- توابع دسترسی به OBهای مینور مصرف نشده (unmitigated)
+   int GetMinorUnmitigatedOBCount() const { return ArraySize(m_minorUnmitigatedOBs); }
+   OrderBlock GetMinorUnmitigatedOB(const int index) const 
+   { 
+      if (index >= 0 && index < ArraySize(m_minorUnmitigatedOBs)) return m_minorUnmitigatedOBs[index]; 
+      OrderBlock empty; empty.isBullish = false; empty.highPrice = 0; empty.lowPrice = 0; empty.time = 0; empty.bar_index = -1; 
+      return empty; 
+   }
+   
+   //--- توابع دسترسی به OBهای مینور مصرف شده (mitigated)
+   int GetMinorMitigatedOBCount() const { return ArraySize(m_minorMitigatedOBs); }
+   OrderBlock GetMinorMitigatedOB(const int index) const 
+   { 
+      if (index >= 0 && index < ArraySize(m_minorMitigatedOBs)) return m_minorMitigatedOBs[index]; 
+      OrderBlock empty; empty.isBullish = false; empty.highPrice = 0; empty.lowPrice = 0; empty.time = 0; empty.bar_index = -1; 
+      return empty; 
+   }
+   
+   //--- وضعیت لحظه‌ای مصرف OB مینور
+   bool IsCurrentlyMitigatingMinorOB() const { return m_isCurrentlyMitigatingMinorOB; }
 };
 
 //==================================================================//
@@ -2420,12 +2707,12 @@ private:
    LiquidityEvent   m_liquidityHistory[]; // آرایه سری، ظرفیت ۵۰
 
    //--- متغیرهای حالت برای ماشین حالت SMS/CF
-   enum ENUM_SMS_CF_STATE {
+   enum ENUM_SMS_CF_CF_STATE {
       STATE_IDLE,                     // حالت بیکار، منتظر CHoCH
       STATE_WAITING_FOR_OPPOSING_BOS, // CHoCH رخ داده، منتظر BoS مخالف
       STATE_WAITING_FOR_CONFIRMING_BREAK // SMS تایید شده، منتظر شکست تایید کننده CF
    };
-   ENUM_SMS_CF_STATE m_trapState;        // حالت فعلی ماشین
+   ENUM_SMS_CF_CF_STATE m_trapState;     // حالت فعلی ماشین
    datetime         m_lastKnownCHoCH;   // زمان آخرین CHoCH دیده شده در دنباله
    datetime         m_lastKnownBoS;     // زمان BoS مخالف (که SMS را تایید کرد)
    TREND_TYPE       m_preCHoCHTrend;    // روند ماژور *قبل* از CHoCH اولیه
@@ -2948,3 +3235,4 @@ public:
    }
 };
 //+------------------------------------------------------------------+
+```
