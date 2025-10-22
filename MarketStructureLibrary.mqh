@@ -1307,18 +1307,27 @@ private:
          string trendText; color trendColor;
          switch(m_currentTrend)
          {
-            case TREND_BULLISH: 
-               {
-                  trendText = "Bullish Trend (HH/HL)"; trendColor = clrDeepSkyBlue; LogEvent("وضعیت روند به صعودی تغییر یافت.", m_enableLogging, "[SMC]"); break;
-               }
-            case TREND_BEARISH: 
-               {
-                  trendText = "Bearish Trend (LL/LH)"; trendColor = clrOrangeRed; LogEvent("وضعیت روند به نزولی تغییر یافت.", m_enableLogging, "[SMC]"); break;
-               }
-            default: 
-               {
-                  trendText = "No Trend / Ranging"; trendColor = clrGray; LogEvent("وضعیت روند به بدون روند تغییر یافت.", m_enableLogging, "[SMC]");
-               }
+            case TREND_BULLISH:
+            {
+               trendText = "Bullish Trend (HH/HL)";
+               trendColor = clrDeepSkyBlue;
+               LogEvent("وضعیت روند به صعودی تغییر یافت.", m_enableLogging, "[SMC]");
+               break;
+            }
+            case TREND_BEARISH:
+            {
+               trendText = "Bearish Trend (LL/LH)";
+               trendColor = clrOrangeRed;
+               LogEvent("وضعیت روند به نزولی تغییر یافت.", m_enableLogging, "[SMC]");
+               break;
+            }
+            default:
+            {
+               trendText = "No Trend / Ranging";
+               trendColor = clrGray;
+               LogEvent("وضعیت روند به بدون روند تغییر یافت.", m_enableLogging, "[SMC]");
+               break;
+            }
          }
          
          // محاسبه موقعیت نمایش لیبل بر اساس تایم فریم (اصلاح خطای سینتکسی)
@@ -2901,7 +2910,7 @@ private:
          {
             double angle_rad = atan2(deltaPricePoints * SymbolInfoDouble(m_symbol, SYMBOL_POINT) / tickSize, deltaTimeSeconds);
             double angle_deg = angle_rad * 180.0 / M_PI;
-            ObjectSetInteger(m_chartId, textName, OBJPROP_ANGLE, -angle_deg);
+            ObjectSetDouble(m_chartId, textName, OBJPROP_ANGLE, -angle_deg);
          }
       }
    }
@@ -3156,6 +3165,7 @@ private:
             }
             break;
          case STATE_WAITING_FOR_CONFIRMING_BREAK:
+         {
             datetime latestBreak = MathMax(currentCHoCH, currentBoS);
             if (latestBreak > m_lastKnownBoS)
             {
@@ -3175,7 +3185,7 @@ private:
                if (currentBoS > m_lastKnownBoS) m_lastKnownBoS = currentBoS;
             }
             break;
-      }
+      }}
       return changed;
    }
 
