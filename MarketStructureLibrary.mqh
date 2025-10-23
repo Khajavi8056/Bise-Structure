@@ -26,6 +26,94 @@
 #property version   "3.00" // نسخه با اضافه کردن قابلیت نقدینگی یکپارچه و EQ ماژور
 
 //+------------------------------------------------------------------+
+//| تنظیمات رنگ‌ها (برای تغییر آسان بدون جستجو در کد)               |
+//+------------------------------------------------------------------+
+const color COLOR_FVG_BULLISH = clrBurlyWood; // سبز کمرنگ برای FVG صعودی (شفاف/هاله)
+const color COLOR_FVG_BEARISH = clrBurlyWood; // قرمز کمرنگ برای FVG نزولی (شفاف/هاله)
+const color COLOR_OB_ZONE = C'245,245,245';     // سفید کمرنگ برای زون OB (شفاف/هاله)
+const color COLOR_OB_TEXT = clrBlack;           // رنگ متن OB
+const color COLOR_SWING_HIGH = clrDodgerBlue;   // رنگ سقف سوئینگ
+const color COLOR_SWING_LOW = clrRed;           // رنگ کف سوئینگ
+const color COLOR_BREAK_CHoCH = clrCrimson;     // رنگ شکست CHoCH
+const color COLOR_BREAK_BoS_BULL = clrSeaGreen; // رنگ شکست BoS صعودی
+const color COLOR_BREAK_BoS_BEAR = clrOrange;   // رنگ شکست BoS نزولی
+const color COLOR_TREND_BULL = clrDeepSkyBlue;  // رنگ لیبل روند صعودی
+const color COLOR_TREND_BEAR = clrOrangeRed;    // رنگ لیبل روند نزولی
+const color COLOR_TREND_NONE = clrGray;         // رنگ لیبل بدون روند
+const color COLOR_FIB_TRACK_BULL = clrDodgerBlue; // رنگ فیبو ردیاب صعودی
+const color COLOR_FIB_TRACK_BEAR = clrOrangeRed;  // رنگ فیبو ردیاب نزولی
+const color COLOR_LABEL_TEXT = clrBlack;    // رنگ متن لیبل‌ها
+const color COLOR_MINOR_SWING = clrYellow;      // رنگ نقاط مینور
+const color COLOR_EQ_BULL = clrBlue;            // رنگ EQ صعودی
+const color COLOR_EQ_BEAR = clrPink;            // رنگ EQ نزولی
+const color COLOR_EQ_ZONE = clrLightGray;       // رنگ زون EQ
+const color COLOR_SMS_TRAP = C'128,0,128';      // رنگ تله SMS
+const color COLOR_CF_TRAP = C'255,140,0';       // رنگ تله CF
+const color COLOR_PDH = clrGreen;               // رنگ PDH
+const color COLOR_PDL = clrRed;                 // رنگ PDL
+const color COLOR_PWH = clrDarkGreen;           // رنگ PWH
+const color COLOR_PWL = clrDarkRed;             // رنگ PWL
+const color COLOR_PMH = clrForestGreen;         // رنگ PMH
+const color COLOR_PML = clrFireBrick;           // رنگ PML
+const color COLOR_PYH = clrLimeGreen;           // رنگ PYH
+const color COLOR_PYL = clrIndianRed;           // رنگ PYL
+
+//+------------------------------------------------------------------+
+//| تنظیمات لاگ (سیستم لاگ حرفه‌ای و طبقه‌بندی شده)                 |
+//+------------------------------------------------------------------+
+enum LOG_LEVEL
+{
+   LOG_FULL,       // تمام لاگ‌ها (هر حرکت، محاسبه، اتفاق)
+   LOG_PERFORMANCE,// لاگ‌های عملکردی مهم (بدون تکرار، مرتب مثل جدول)
+   LOG_ERROR       // فقط خطاها و هشدارها
+};
+
+const LOG_LEVEL DEFAULT_LOG_LEVEL = LOG_ERROR; // سطح پیش‌فرض
+
+// کدهای خطا (برای لاگ‌های خطا)
+const int ERROR_CODE_101 = 101; // خطای دسترسی به داده (مثل iHigh/iLow)
+const int ERROR_CODE_102 = 102; // خطای ایجاد آبجکت گرافیکی
+const int ERROR_CODE_103 = 103; // خطای وابستگی کلاس (پوینتر نامعتبر)
+const int ERROR_CODE_104 = 104; // خطای ظرفیت آرایه (over capacity)
+const int ERROR_CODE_105 = 105; // خطای شناسایی ساختار (invalid detection)
+const int ERROR_CODE_106 = 106; // خطای ابطال (invalidation error)
+const int ERROR_CODE_107 = 107; // خطای هندل اندیکاتور
+const int ERROR_CODE_108 = 108; // خطای کپی بافر
+const int ERROR_CODE_109 = 109; // خطای همپوشانی لیبل
+
+// کدهای عملکرد (برای لاگ‌های عملکردی)
+const int PERF_CODE_201 = 201; // شناسایی FVG جدید
+const int PERF_CODE_202 = 202; // ابطال FVG
+const int PERF_CODE_203 = 203; // شناسایی سوئینگ جدید
+const int PERF_CODE_204 = 204; // شکست ساختار (BoS/CHoCH)
+const int PERF_CODE_205 = 205; // تغییر روند
+const int PERF_CODE_206 = 206; // شناسایی OB جدید
+const int PERF_CODE_207 = 207; // مصرف OB (mitigation)
+const int PERF_CODE_208 = 208; // ابطال OB
+const int PERF_CODE_209 = 209; // شناسایی EQ جدید
+const int PERF_CODE_210 = 210; // ابطال EQ
+const int PERF_CODE_211 = 211; // شناسایی مینور جدید
+const int PERF_CODE_212 = 212; // به‌روزرسانی سطوح دوره‌ای
+const int PERF_CODE_213 = 213; // شناسایی تله SMS/CF
+const int PERF_CODE_214 = 214; // ثبت رویداد نقدینگی
+
+//+------------------------------------------------------------------+
+//| تابع لاگ مرکزی (با سطح‌بندی، کد و فرمت جدولی)                   |
+//+------------------------------------------------------------------+
+void CentralLog(const LOG_LEVEL level, const LOG_LEVEL currentLevel, const int code, const string prefix, const string message, const bool isError = false)
+{
+   if (currentLevel == LOG_ERROR && !isError) return; // فقط خطاها در سطح ERROR
+   if (currentLevel == LOG_PERFORMANCE && level != LOG_PERFORMANCE && !isError) return; // فقط عملکردی و خطاها در سطح PERFORMANCE
+   // در FULL همه چاپ می‌شوند
+
+   string logType = isError ? "ERROR" : (level == LOG_PERFORMANCE ? "PERF" : "INFO");
+   string timeStr = TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS);
+   string codeStr = (code > 0) ? IntegerToString(code) : "-";
+   string formatted = StringFormat("%s | %s | %s | %s | %s", timeStr, logType, codeStr, prefix, message);
+   Print(formatted);
+}
+
+//+------------------------------------------------------------------+
 //| تعاریف سراسری برای عناصر گرافیکی (برای خوانایی و زیبایی بصری)   |
 //+------------------------------------------------------------------+
 const int BASE_LABEL_FONT_SIZE = 7; // سایز فونت پایه برای اکثر لیبل‌ها
@@ -178,15 +266,6 @@ string TimeFrameToStringShort(ENUM_TIMEFRAMES tf)
    }
 }
 
-//--- تابع کمکی برای لاگ‌گیری (با رفع خطای تبدیل نوع)
-void LogEvent(const string message, const bool enabled, const string prefix = "")
-{
-   if(enabled)
-   {
-      Print(prefix, message);
-   }
-}
-
 //==================================================================//
 //                   کلاس ۲: مدیریت FVG (FVGManager)                  //
 //==================================================================//
@@ -198,6 +277,7 @@ private:
    ENUM_TIMEFRAMES  m_timeframe;            // تایم فریم اختصاصی این آبجکت
    long             m_chartId;              // ID چارت اجرایی اکسپرت
    bool             m_enableLogging;        // فعال/غیرفعال بودن لاگ (ورودی کپی شده از سازنده)
+   LOG_LEVEL        m_logLevel;             // سطح لاگ
    string           m_timeframeSuffix;      // پسوند تایم‌فریم کوتاه شده (مثلاً "(4H)") برای نامگذاری اشیاء
    bool             m_showDrawing;          // کنترل نمایش ترسیمات FVG روی چارت
 
@@ -214,8 +294,8 @@ public:
       m_symbol = symbol;
       m_timeframe = timeframe;
       m_chartId = chartId;
-      // اصلاح هشدار 'hiding global variable' با استفاده از نام ورودی متفاوت
       m_enableLogging = enableLogging_in;
+      m_logLevel = DEFAULT_LOG_LEVEL;
       m_showDrawing = showDrawing;
       
       // تنظیم پسوند تایم فریم برای نمایش MTF (کوتاه شده)
@@ -239,7 +319,7 @@ public:
          }
       }
       
-      LogEvent("کلاس FVGManager برای نماد " + m_symbol + " و تایم فریم " + EnumToString(m_timeframe) + " آغاز به کار کرد.", m_enableLogging, "[FVG]");
+      CentralLog(LOG_FULL, m_logLevel, 0, "[FVG]", "کلاس FVGManager برای نماد " + m_symbol + " و تایم فریم " + EnumToString(m_timeframe) + " آغاز به کار کرد.");
    }
 
    //+------------------------------------------------------------------+
@@ -260,7 +340,7 @@ public:
             }
          }
       }
-      LogEvent("کلاس FVGManager متوقف شد.", m_enableLogging, "[FVG]");
+      CentralLog(LOG_FULL, m_logLevel, 0, "[FVG]", "کلاس FVGManager متوقف شد.");
    }
    
    //+------------------------------------------------------------------+
@@ -270,11 +350,12 @@ public:
    //--- ۱. بررسی ابطال FVG در لحظه (با قیمت‌های ASK/BID) - هر تیک اجرا می‌شود
    bool ProcessNewTick()
    {
+      CentralLog(LOG_FULL, m_logLevel, 0, "[FVG]", "شروع پردازش تیک جدید.");
       double currentAsk = SymbolInfoDouble(m_symbol, SYMBOL_ASK);
       double currentBid = SymbolInfoDouble(m_symbol, SYMBOL_BID);
       bool invalidatedNow = false;
 
-      // حلقه از جدیدترین (0) تا قدیمی‌ترین (ArraySize-1) می‌رود
+      // حلقه از جدیدترین (0) به قدیمی‌ترین (ArraySize-1) می‌رود
       for(int i = 0; i < ArraySize(m_fvgArray); i++)
       {
          if(m_fvgArray[i].consumed) continue;
@@ -295,24 +376,26 @@ public:
                 ObjectDelete(m_chartId, objName);
                 ObjectDelete(m_chartId, objName + "_Text");
             }
-            LogEvent("FVG از نوع " + typeStr + " در زمان " + TimeToString(m_fvgArray[i].time) + " ابطال و حذف شد.", m_enableLogging, "[FVG]");
-
+            CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_202, "[FVG]", "FVG از نوع " + typeStr + " در زمان " + TimeToString(m_fvgArray[i].time) + " ابطال و حذف شد.");
             ArrayRemove(m_fvgArray, i, 1);
             i--; // چون یک عنصر حذف شد، باید اندیس را یکی کم کنیم
             invalidatedNow = true;
          }
       }
+      CentralLog(LOG_FULL, m_logLevel, 0, "[FVG]", "پایان پردازش تیک جدید.");
       return invalidatedNow;
    }
    
    //--- ۲. اجرای منطق FVG در کلوز کندل جدید
    bool ProcessNewBar()
    {
+      CentralLog(LOG_FULL, m_logLevel, 0, "[FVG]", "شروع پردازش بار جدید.");
       bool newFVGFound = false;
       
       if (IdentifyFVG()) newFVGFound = true;
       if (m_showDrawing) UpdateFVGTexPositions(); // به‌روزرسانی موقعیت متن‌ها
       
+      CentralLog(LOG_FULL, m_logLevel, 0, "[FVG]", "پایان پردازش بار جدید.");
       return newFVGFound;
    }
 
@@ -402,6 +485,7 @@ private:
              ObjectDelete(m_chartId, objNameOld + "_Text");
          }
          ArrayRemove(m_fvgArray, lastIndex, 1);
+         CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_204, "[FVG]", "ظرفیت FVG تکمیل. قدیمی‌ترین حذف شد.");
       }
 
       // مقداردهی FVG جدید
@@ -423,7 +507,7 @@ private:
 
       if (m_showDrawing) drawFVG(m_fvgArray[0]);
       string typeStr = isBullish ? "Bullish" : "Bearish";
-      LogEvent("FVG جدید از نوع " + typeStr + " در زمان " + TimeToString(time) + " شناسایی شد.", m_enableLogging, "[FVG]");
+      CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_201, "[FVG]", "FVG جدید از نوع " + typeStr + " در زمان " + TimeToString(time) + " شناسایی شد.");
    }
    
    //--- تابع: به‌روزرسانی موقعیت متن‌های FVG برای ماندن در وسط زون (دقیقاً مطابق نیاز کاربر)
@@ -455,7 +539,7 @@ private:
       string objName = "FVG_" + TimeToString(fvg.time) + "_" + typeStr + m_timeframeSuffix;
       string textName = objName + "_Text";
 
-      color fvgColor = fvg.isBullish ? C'144,238,144' : C'255,160,160'; // سبز کمرنگ/قرمز کمرنگ
+      color fvgColor = fvg.isBullish ? COLOR_FVG_BULLISH : COLOR_FVG_BEARISH;
 
       datetime endTime = D'2030.01.01 00:00'; // امتداد زون
 
@@ -474,7 +558,7 @@ private:
       string suffix = GetDisplaySuffix(m_timeframe, m_chartId);
       ObjectCreate(m_chartId, textName, OBJ_TEXT, 0, midTime, midPrice);
       ObjectSetString(m_chartId, textName, OBJPROP_TEXT, "FVG" + suffix); 
-      ObjectSetInteger(m_chartId, textName, OBJPROP_COLOR, clrAliceBlue);
+      ObjectSetInteger(m_chartId, textName, OBJPROP_COLOR, COLOR_LABEL_TEXT);
       ObjectSetInteger(m_chartId, textName, OBJPROP_FONTSIZE, BASE_LABEL_FONT_SIZE);
       ObjectSetInteger(m_chartId, textName, OBJPROP_ANCHOR, ANCHOR_CENTER);
    }
@@ -534,6 +618,7 @@ private:
    ENUM_TIMEFRAMES  m_timeframe;            // تایم فریم اختصاصی این آبجکت
    long             m_chartId;              // ID چارت اجرایی اکسپرت
    bool             m_enableLogging;        // فعال/غیرفعال بودن لاگ
+   LOG_LEVEL        m_logLevel;             // سطح لاگ
    string           m_timeframeSuffix;      // پسوند تایم‌فریم کوتاه شده
    bool             m_showDrawing;          // کنترل نمایش ترسیمات ساختار روی چارت
    int              m_fibUpdateLevel;       // سطح اصلاح فیبو (مثلاً 35)
@@ -575,8 +660,8 @@ public:
       m_symbol = symbol;
       m_timeframe = timeframe;
       m_chartId = chartId;
-      // اصلاح هشدار 'hiding global variable'
       m_enableLogging = enableLogging_in;
+      m_logLevel = DEFAULT_LOG_LEVEL;
       m_showDrawing = showDrawing;
       m_fibUpdateLevel = fibUpdateLevel_in;
       m_fractalLength = fractalLength_in;
@@ -634,7 +719,7 @@ public:
       m_lastMajorEQInvalidationCheck = 0;
       m_lastMajorEQDetectionCheck = 0;
       
-      LogEvent("کلاس MarketStructure برای نماد " + m_symbol + " و تایم فریم " + EnumToString(m_timeframe) + " آغاز به کار کرد.", m_enableLogging, "[SMC]");
+      CentralLog(LOG_FULL, m_logLevel, 0, "[SMC]", "کلاس MarketStructure برای نماد " + m_symbol + " و تایم فریم " + EnumToString(m_timeframe) + " آغاز به کار کرد.");
    }
 
    //+------------------------------------------------------------------+
@@ -655,7 +740,7 @@ public:
             }
          }
       }
-      LogEvent("کلاس MarketStructure متوقف شد.", m_enableLogging, "[SMC]");
+      CentralLog(LOG_FULL, m_logLevel, 0, "[SMC]", "کلاس MarketStructure متوقف شد.");
    }
    
    //+------------------------------------------------------------------+
@@ -663,7 +748,9 @@ public:
    //+------------------------------------------------------------------+
    bool ProcessNewTick()
    {
+      CentralLog(LOG_FULL, m_logLevel, 0, "[SMC]", "شروع پردازش تیک جدید برای OB.");
       ProcessOrderBlocks(); // فراخوانی مدیریت چرخه حیات OBها
+      CentralLog(LOG_FULL, m_logLevel, 0, "[SMC]", "پایان پردازش تیک جدید برای OB.");
       return m_isCurrentlyMitigatingOB; // بازگشت وضعیت مصرف لحظه‌ای برای استفاده اکسپرت
    }
    
@@ -672,6 +759,7 @@ public:
    //+------------------------------------------------------------------+
    bool ProcessNewBar()
    {
+      CentralLog(LOG_FULL, m_logLevel, 0, "[SMC]", "شروع پردازش بار جدید.");
       bool structureChanged = false;
       
       ProcessOrderBlocks(); // مدیریت OBها در ابتدای پردازش کندل جدید (برای ابطال/میتگیشن)
@@ -704,6 +792,7 @@ public:
       ProcessMajorEQInvalidation();
       ProcessMajorEQDetection();
       
+      CentralLog(LOG_FULL, m_logLevel, 0, "[SMC]", "پایان پردازش بار جدید.");
       return structureChanged;
    }
 
@@ -711,6 +800,7 @@ private:
    //--- شناسایی ساختار اولیه بازار (بر مبنای فرکتال)
    void IdentifyInitialStructure()
    {
+      CentralLog(LOG_FULL, m_logLevel, 0, "[SMC]", "شروع شناسایی ساختار اولیه.");
       int barsCount = iBars(m_symbol, m_timeframe);
       if(barsCount < m_fractalLength * 2 + 1) return;
       
@@ -739,11 +829,13 @@ private:
 
          if(ArraySize(m_swingHighs_Array) > 0 && ArraySize(m_swingLows_Array) > 0) break;
       }
+      CentralLog(LOG_FULL, m_logLevel, 0, "[SMC]", "پایان شناسایی ساختار اولیه.");
    }
    
    //--- بررسی شکست سقف یا کف (BoS/CHoCH) و شناسایی OB بلافاصله پس از آن
    void CheckForBreakout()
    {
+      CentralLog(LOG_FULL, m_logLevel, 0, "[SMC]", "شروع چک شکست ساختار.");
       if(m_isTrackingHigh || m_isTrackingLow) return;
       
       double close_1 = iClose(m_symbol, m_timeframe, 1);
@@ -756,7 +848,7 @@ private:
          bool isCHoCH = (m_currentTrend == TREND_BEARISH);
          string breakType = isCHoCH ? "CHoCH" : "BoS";
          if (isCHoCH) m_lastCHoCHTime = iTime(m_symbol, m_timeframe, 1); else m_lastBoSTime = iTime(m_symbol, m_timeframe, 1);
-         LogEvent(">>> رویداد: شکست سقف (" + breakType + ") در قیمت " + DoubleToString(close_1, _Digits) + " رخ داد.", m_enableLogging, "[SMC]");
+         CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_204, "[SMC]", ">>> رویداد: شکست سقف (" + breakType + ") در قیمت " + DoubleToString(close_1, _Digits) + " رخ داد.");
          if (m_showDrawing) drawBreak(lastHigh, iTime(m_symbol, m_timeframe, 1), close_1, true, isCHoCH);
 
          m_pivotLowForTracking = FindOppositeSwing(lastHigh.time, iTime(m_symbol, m_timeframe, 1), false); 
@@ -765,7 +857,7 @@ private:
          IdentifyOrderBlock(true, iBarShift(m_symbol, m_timeframe, iTime(m_symbol, m_timeframe, 1), false), m_pivotLowForTracking.bar_index);
 
          m_isTrackingHigh = true; m_isTrackingLow = false;
-         LogEvent("--> فاز جدید: [شکار سقف] فعال شد. نقطه 100% فیبو (ثابت) در کف " + DoubleToString(m_pivotLowForTracking.price, _Digits) + " ثبت شد.", m_enableLogging, "[SMC]");
+         CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_203, "[SMC]", "--> فاز جدید: [شکار سقف] فعال شد. نقطه 100% فیبو (ثابت) در کف " + DoubleToString(m_pivotLowForTracking.price, _Digits) + " ثبت شد.");
       }
       //--- شکست کف (BoS/CHoCH نزولی) - شناسایی OB نزولی (عرضه)
       else if(close_1 < lastLow.price)
@@ -773,7 +865,7 @@ private:
          bool isCHoCH = (m_currentTrend == TREND_BULLISH);
          string breakType = isCHoCH ? "CHoCH" : "BoS";
          if (isCHoCH) m_lastCHoCHTime = iTime(m_symbol, m_timeframe, 1); else m_lastBoSTime = iTime(m_symbol, m_timeframe, 1);
-         LogEvent(">>> رویداد: شکست کف (" + breakType + ") در قیمت " + DoubleToString(close_1, _Digits) + " رخ داد.", m_enableLogging, "[SMC]");
+         CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_204, "[SMC]", ">>> رویداد: شکست کف (" + breakType + ") در قیمت " + DoubleToString(close_1, _Digits) + " رخ داد.");
          if (m_showDrawing) drawBreak(lastLow, iTime(m_symbol, m_timeframe, 1), close_1, false, isCHoCH);
 
          m_pivotHighForTracking = FindOppositeSwing(lastLow.time, iTime(m_symbol, m_timeframe, 1), true); 
@@ -782,14 +874,19 @@ private:
          IdentifyOrderBlock(false, iBarShift(m_symbol, m_timeframe, iTime(m_symbol, m_timeframe, 1), false), m_pivotHighForTracking.bar_index);
 
          m_isTrackingLow = true; m_isTrackingHigh = false;
-         LogEvent("--> فاز جدید: [شکار کف] فعال شد. نقطه 100% فیبو (ثابت) در سقف " + DoubleToString(m_pivotHighForTracking.price, _Digits) + " ثبت شد.", m_enableLogging, "[SMC]");
+         CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_203, "[SMC]", "--> فاز جدید: [شکار کف] فعال شد. نقطه 100% فیبو (ثابت) در سقف " + DoubleToString(m_pivotHighForTracking.price, _Digits) + " ثبت شد.");
       }
+      CentralLog(LOG_FULL, m_logLevel, 0, "[SMC]", "پایان چک شکست ساختار.");
    }
    
    //--- تابع جدید: شناسایی Order Block بر اساس الگوریتم مشخص شده (با اصلاح منطق FVG)
    void IdentifyOrderBlock(const bool isBullish, const int breakBar, const int pivotBarIndex)
    {
-      if (breakBar < 1 || pivotBarIndex < 0 || breakBar >= pivotBarIndex) return; // محدوده نامعتبر
+      CentralLog(LOG_FULL, m_logLevel, 0, "[SMC-OB]", "شروع شناسایی OB.");
+      if (breakBar < 1 || pivotBarIndex < 0 || breakBar >= pivotBarIndex) {
+         CentralLog(LOG_ERROR, m_logLevel, ERROR_CODE_105, "[SMC-OB]", "محدوده نامعتبر برای شناسایی OB.", true);
+         return;
+      }
 
       int startScan = breakBar + 1; // شروع اسکن از کندل قبل از شکست
       int endScan = pivotBarIndex;  // پایان اسکن در کندل پیوت (100% فیبو)
@@ -812,8 +909,8 @@ private:
                   // شرط ۳: ایجاد گپ FVG ساده (اختیاری) - اصلاح شده برای چک گپ واقعی (عدم همپوشانی)
                   if (m_enableOB_FVG_Check)
                   {
-                     if (i < 2) candidate = false; // اطمینان از وجود کندل‌های ک
-                  else if (iLow(m_symbol, m_timeframe, i - 2) <= iHigh(m_symbol, m_timeframe, i)) candidate = false;// اگر همپوشانی وجود داشته باشد، رد کن (گپ باید کامل با=شد: Low(i-2) > High(i))
+                     if (i < 2) candidate = false; // اطمینان از وجود کندل‌های کافی
+                     else if (iLow(m_symbol, m_timeframe, i - 2) <= iHigh(m_symbol, m_timeframe, i)) candidate = false;// اگر همپوشانی وجود داشته باشد، رد کن (گپ باید کامل باشد: Low(i-2) > High(i))
                   }
                }
             }
@@ -849,10 +946,11 @@ private:
             newOB.bar_index = i;
 
             AddUnmitigatedOB(newOB);
-            LogEvent("OB جدید " + (isBullish ? "صعودی (تقاضا)" : "نزولی (عرضه)") + " در زمان " + TimeToString(newOB.time) + " شناسایی شد.", m_enableLogging, "[SMC-OB]");
+            CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_206, "[SMC-OB]", "OB جدید " + (isBullish ? "صعودی (تقاضا)" : "نزولی (عرضه)") + " در زمان " + TimeToString(newOB.time) + " شناسایی شد.");
             break; // فقط اولین (جدیدترین) کاندیدا را انتخاب کن و حلقه را متوقف کن
          }
       }
+      CentralLog(LOG_FULL, m_logLevel, 0, "[SMC-OB]", "پایان شناسایی OB.");
    }
    
    //--- تابع جدید: اضافه کردن OB جدید به آرایه unmitigated با مدیریت ظرفیت (حداکثر ۱۰)
@@ -870,7 +968,7 @@ private:
             ObjectDelete(m_chartId, objNameOld + "_Text");
          }
          ArrayRemove(m_unmitigatedOBs, lastIndex, 1);
-         LogEvent("ظرفیت unmitigated OB تکمیل. قدیمی‌ترین OB حذف شد.", m_enableLogging, "[SMC-OB]");
+         CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_204, "[SMC-OB]", "ظرفیت unmitigated OB تکمیل. قدیمی‌ترین OB حذف شد.");
       }
 
       // درج دستی OB جدید در ابتدای آرایه (سری)
@@ -888,6 +986,7 @@ private:
    //--- تابع جدید: مدیریت چرخه حیات OBها (میتگیشن و ابطال با قیمت‌های لحظه‌ای)
    void ProcessOrderBlocks()
    {
+      CentralLog(LOG_FULL, m_logLevel, 0, "[SMC-OB]", "شروع پردازش چرخه حیات OB.");
       double currentAsk = SymbolInfoDouble(m_symbol, SYMBOL_ASK);
       double currentBid = SymbolInfoDouble(m_symbol, SYMBOL_BID);
       m_isCurrentlyMitigatingOB = false; // ریست وضعیت لحظه‌ای در ابتدای هر تیک/بار
@@ -911,7 +1010,7 @@ private:
             // حذف از آرایه unmitigated
             ArrayRemove(m_unmitigatedOBs, i, 1);
             i--; // تنظیم اندیس پس از حذف
-            LogEvent("OB " + (ob.isBullish ? "صعودی" : "نزولی") + " در زمان " + TimeToString(ob.time) + " مصرف (mitigated) شد.", m_enableLogging, "[SMC-OB]");
+            CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_207, "[SMC-OB]", "OB " + (ob.isBullish ? "صعودی" : "نزولی") + " در زمان " + TimeToString(ob.time) + " مصرف (mitigated) شد.");
          }
       }
 
@@ -934,7 +1033,7 @@ private:
             // حذف از آرایه
             ArrayRemove(m_unmitigatedOBs, i, 1);
             i--;
-            LogEvent("OB " + (ob.isBullish ? "صعودی" : "نزولی") + " در زمان " + TimeToString(ob.time) + " ابطال (invalidated) شد.", m_enableLogging, "[SMC-OB]");
+            CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_208, "[SMC-OB]", "OB " + (ob.isBullish ? "صعودی" : "نزولی") + " در زمان " + TimeToString(ob.time) + " ابطال (invalidated) شد.");
          }
       }
 
@@ -956,9 +1055,10 @@ private:
             // حذف از آرایه
             ArrayRemove(m_mitigatedOBs, i, 1);
             i--;
-            LogEvent("OB مصرف شده " + (ob.isBullish ? "صعودی" : "نزولی") + " در زمان " + TimeToString(ob.time) + " ابطال (invalidated) شد.", m_enableLogging, "[SMC-OB]");
+            CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_208, "[SMC-OB]", "OB مصرف شده " + (ob.isBullish ? "صعودی" : "نزولی") + " در زمان " + TimeToString(ob.time) + " ابطال (invalidated) شد.");
          }
       }
+      CentralLog(LOG_FULL, m_logLevel, 0, "[SMC-OB]", "پایان پردازش چرخه حیات OB.");
    }
    
    //--- تابع جدید: اضافه کردن OB به آرایه mitigated با مدیریت ظرفیت (حداکثر ۱۰) و آپدیت گرافیکی
@@ -970,7 +1070,7 @@ private:
          int lastIndex = ArraySize(m_mitigatedOBs) - 1;
          if (m_showDrawing) deleteOBDrawingObjects(m_mitigatedOBs[lastIndex], true);
          ArrayRemove(m_mitigatedOBs, lastIndex, 1);
-         LogEvent("ظرفیت mitigated OB تکمیل. قدیمی‌ترین OB مصرف شده حذف شد.", m_enableLogging, "[SMC-OB]");
+         CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_204, "[SMC-OB]", "ظرفیت mitigated OB تکمیل. قدیمی‌ترین OB مصرف شده حذف شد.");
       }
 
       // درج دستی OB در ابتدای آرایه
@@ -986,14 +1086,14 @@ private:
       if (m_showDrawing) updateOBToMitigated(m_mitigatedOBs[0]);
    }
    
-   //--- تابع جدید: رسم OB (با قابلیت MTF، مستطیل سفید شفاف و متن)
+   //--- تابع جدید: رسم OB (با قابلیت MTF، مستطیل سفید شفاف و متن در وسط)
    void drawOrderBlock(const OrderBlock &ob)
    {
       string typeStr = ob.isBullish ? "Bullish" : "Bearish";
       string objName = "OB_" + TimeToString(ob.time) + "_" + typeStr + m_timeframeSuffix;
       string textName = objName + "_Text";
 
-      color obColor = C'245,245,245'; // سفید شفاف
+      color obColor = COLOR_OB_ZONE; // رنگ شفاف
       datetime endTime = D'2030.01.01 00:00'; // امتداد زون
 
       // ایجاد مستطیل
@@ -1011,7 +1111,7 @@ private:
       string suffix = GetDisplaySuffix(m_timeframe, m_chartId);
       ObjectCreate(m_chartId, textName, OBJ_TEXT, 0, midTime, midPrice);
       ObjectSetString(m_chartId, textName, OBJPROP_TEXT, "OB" + suffix); 
-      ObjectSetInteger(m_chartId, textName, OBJPROP_COLOR, clrBlack); // رنگ متن برای تمایز
+      ObjectSetInteger(m_chartId, textName, OBJPROP_COLOR, COLOR_OB_TEXT);
       ObjectSetInteger(m_chartId, textName, OBJPROP_FONTSIZE, BASE_LABEL_FONT_SIZE);
       ObjectSetInteger(m_chartId, textName, OBJPROP_ANCHOR, ANCHOR_CENTER);
    }
@@ -1041,20 +1141,24 @@ private:
    //--- یافتن نقطه محوری مقابل (پیوت - 100% فیبو)
    SwingPoint FindOppositeSwing(const datetime brokenSwingTime, const datetime breakTime, const bool findHigh)
    {
-       double extremePrice = findHigh ? 0 : DBL_MAX;
-       double extremeBodyPrice = findHigh ? 0 : DBL_MAX;
-       datetime extremeTime = 0;
-       int extremeIndex = -1;
+      CentralLog(LOG_FULL, m_logLevel, 0, "[SMC]", "شروع یافتن پیوت مقابل.");
+      double extremePrice = findHigh ? 0 : DBL_MAX;
+      double extremeBodyPrice = findHigh ? 0 : DBL_MAX;
+      datetime extremeTime = 0;
+      int extremeIndex = -1;
 
-       int startBar = iBarShift(m_symbol, m_timeframe, breakTime, false);
-       int endBar = iBarShift(m_symbol, m_timeframe, brokenSwingTime, false);
+      int startBar = iBarShift(m_symbol, m_timeframe, breakTime, false);
+      int endBar = iBarShift(m_symbol, m_timeframe, brokenSwingTime, false);
 
-       SwingPoint errorResult; errorResult.price = 0; errorResult.time = 0; errorResult.bar_index = -1; errorResult.body_price = 0;
+      SwingPoint errorResult; errorResult.price = 0; errorResult.time = 0; errorResult.bar_index = -1; errorResult.body_price = 0;
 
-       if(startBar == -1 || endBar == -1 || startBar >= endBar) return errorResult;
+      if(startBar == -1 || endBar == -1 || startBar >= endBar) {
+         CentralLog(LOG_ERROR, m_logLevel, ERROR_CODE_105, "[SMC]", "محدوده نامعتبر برای یافتن پیوت مقابل.", true);
+         return errorResult;
+      }
 
-       for (int i = startBar + 1; i <= endBar; i++)
-       {
+      for (int i = startBar + 1; i <= endBar; i++)
+      {
            if (findHigh)
            {
                if (iHigh(m_symbol, m_timeframe, i) > extremePrice) { 
@@ -1075,30 +1179,32 @@ private:
                double bodyLow = MathMin(iOpen(m_symbol, m_timeframe, i), iClose(m_symbol, m_timeframe, i));
                if (bodyLow < extremeBodyPrice) extremeBodyPrice = bodyLow;
            }
-       }
+      }
 
-       SwingPoint result; result.price = extremePrice; result.time = extremeTime; result.bar_index = extremeIndex; result.body_price = extremeBodyPrice;
+      SwingPoint result; result.price = extremePrice; result.time = extremeTime; result.bar_index = extremeIndex; result.body_price = extremeBodyPrice;
 
-       if (extremeIndex != -1)
-       {
+      if (extremeIndex != -1)
+      {
            // ثبت نقطه 100% فیبو به عنوان Swing Point جدید و رسم آن
            if (findHigh) AddSwingHigh(extremePrice, extremeTime, extremeIndex, extremeBodyPrice); 
            else AddSwingLow(extremePrice, extremeTime, extremeIndex, extremeBodyPrice);
+           CentralLog(LOG_FULL, m_logLevel, 0, "[SMC]", "پایان یافتن پیوت مقابل.");
            return result;
-       }
-       return errorResult;
+      }
+      CentralLog(LOG_ERROR, m_logLevel, ERROR_CODE_105, "[SMC]", "پیوت مقابل پیدا نشد.", true);
+      return errorResult;
    }
    
    //--- یافتن سقف/کف مطلق در یک محدوده زمانی (برای 0% فیبو)
    SwingPoint FindExtremePrice(const int startBar, const int endBar, const bool findHigh) const
    {
-       double extremePrice = findHigh ? 0 : DBL_MAX;
-       double extremeBodyPrice = findHigh ? 0 : DBL_MAX;
-       datetime extremeTime = 0;
-       int extremeIndex = -1;
+      double extremePrice = findHigh ? 0 : DBL_MAX;
+      double extremeBodyPrice = findHigh ? 0 : DBL_MAX;
+      datetime extremeTime = 0;
+      int extremeIndex = -1;
 
-       for (int i = startBar; i <= endBar; i++)
-       {
+      for (int i = startBar; i <= endBar; i++)
+      {
            if (findHigh)
            {
                if (iHigh(m_symbol, m_timeframe, i) > extremePrice) { 
@@ -1119,15 +1225,16 @@ private:
                double bodyLow = MathMin(iOpen(m_symbol, m_timeframe, i), iClose(m_symbol, m_timeframe, i));
                if (bodyLow < extremeBodyPrice) extremeBodyPrice = bodyLow;
            }
-       }
+      }
 
-       SwingPoint result; result.price = extremePrice; result.time = extremeTime; result.bar_index = extremeIndex; result.body_price = extremeBodyPrice;
-       return result;
+      SwingPoint result; result.price = extremePrice; result.time = extremeTime; result.bar_index = extremeIndex; result.body_price = extremeBodyPrice;
+      return result;
    }
    
    //--- ردیابی و تایید Swing Point جدید با آپدیت 0% فیبو (منطق ۳۵٪ اصلاح)
    bool CheckForNewSwingPoint()
    {
+       CentralLog(LOG_FULL, m_logLevel, 0, "[SMC]", "شروع چک سوئینگ پوینت جدید.");
        //--- ۱. ردیابی سقف جدید (HH/LH)
        if (m_isTrackingHigh)
        {
@@ -1145,7 +1252,7 @@ private:
 
            if (close_1 <= fibLevel) // شرط تایید (بسته شدن در 35% یا پایین‌تر)
            {
-               LogEvent("<<< تایید شد: شرط اصلاح " + IntegerToString(m_fibUpdateLevel) + "٪ برای سقف جدید برقرار شد.", m_enableLogging, "[SMC]");
+               CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_203, "[SMC]", "<<< تایید شد: شرط اصلاح " + IntegerToString(m_fibUpdateLevel) + "٪ برای سقف جدید برقرار شد.");
                AddSwingHigh(current0Per.price, current0Per.time, current0Per.bar_index, current0Per.body_price);
                m_isTrackingHigh = false;
                return true;
@@ -1169,62 +1276,64 @@ private:
 
            if (close_1 >= fibLevel) // شرط تایید (بسته شدن در 35% یا بالاتر)
            {
-               LogEvent("<<< تایید شد: شرط اصلاح " + IntegerToString(m_fibUpdateLevel) + "٪ برای کف جدید برقرار شد.", m_enableLogging, "[SMC]");
+               CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_203, "[SMC]", "<<< تایید شد: شرط اصلاح " + IntegerToString(m_fibUpdateLevel) + "٪ برای کف جدید برقرار شد.");
                AddSwingLow(current0Per.price, current0Per.time, current0Per.bar_index, current0Per.body_price);
                m_isTrackingLow = false;
                return true;
            }
        }
+       CentralLog(LOG_FULL, m_logLevel, 0, "[SMC]", "پایان چک سوئینگ پوینت جدید.");
        return false;
    }
 
    //--- تابع: ترسیم فیبوناچی متحرک (ردیابی)
    void DrawTrackingFibonacci()
    {
-       SwingPoint p100, p0;
-       bool isBullish = m_isTrackingHigh;
+      SwingPoint p100, p0;
+      bool isBullish = m_isTrackingHigh;
 
-       // تعیین نقاط 100% و 0%
-       if (m_isTrackingHigh)
-       {
-           p100 = m_pivotLowForTracking;
-           int startBar = iBarShift(m_symbol, m_timeframe, p100.time, false);
-           p0 = FindExtremePrice(1, startBar, true);
-           if (p0.bar_index == -1 || p0.price <= p100.price) { ObjectDelete(m_chartId, "Tracking_Fib" + m_timeframeSuffix); return; }
-       }
-       else if (m_isTrackingLow)
-       {
-           p100 = m_pivotHighForTracking;
-           int startBar = iBarShift(m_symbol, m_timeframe, p100.time, false);
-           p0 = FindExtremePrice(1, startBar, false);
-           if (p0.bar_index == -1 || p0.price >= p100.price) { ObjectDelete(m_chartId, "Tracking_Fib" + m_timeframeSuffix); return; }
-       }
-       else { ObjectDelete(m_chartId, "Tracking_Fib" + m_timeframeSuffix); return; }
+      // تعیین نقاط 100% و 0%
+      if (m_isTrackingHigh)
+      {
+          p100 = m_pivotLowForTracking;
+          int startBar = iBarShift(m_symbol, m_timeframe, p100.time, false);
+          p0 = FindExtremePrice(1, startBar, true);
+          if (p0.bar_index == -1 || p0.price <= p100.price) { ObjectDelete(m_chartId, "Tracking_Fib" + m_timeframeSuffix); return; }
+      }
+      else if (m_isTrackingLow)
+      {
+          p100 = m_pivotHighForTracking;
+          int startBar = iBarShift(m_symbol, m_timeframe, p100.time, false);
+          p0 = FindExtremePrice(1, startBar, false);
+          if (p0.bar_index == -1 || p0.price >= p100.price) { ObjectDelete(m_chartId, "Tracking_Fib" + m_timeframeSuffix); return; }
+      }
+      else { ObjectDelete(m_chartId, "Tracking_Fib" + m_timeframeSuffix); return; }
 
-       string objName = "Tracking_Fib" + m_timeframeSuffix;
-       ObjectDelete(m_chartId, objName);
+      string objName = "Tracking_Fib" + m_timeframeSuffix;
+      ObjectDelete(m_chartId, objName);
 
-       ObjectCreate(m_chartId, objName, OBJ_FIBO, 0, p100.time, p100.price, p0.time, p0.price);
-       ObjectSetInteger(m_chartId, objName, OBJPROP_COLOR, isBullish ? clrDodgerBlue : clrOrangeRed);
-       ObjectSetInteger(m_chartId, objName, OBJPROP_RAY_RIGHT, true);
-       ObjectSetInteger(m_chartId, objName, OBJPROP_WIDTH, 1);
+      ObjectCreate(m_chartId, objName, OBJ_FIBO, 0, p100.time, p100.price, p0.time, p0.price);
+      ObjectSetInteger(m_chartId, objName, OBJPROP_COLOR, isBullish ? COLOR_FIB_TRACK_BULL : COLOR_FIB_TRACK_BEAR);
+      ObjectSetInteger(m_chartId, objName, OBJPROP_RAY_RIGHT, true);
+      ObjectSetInteger(m_chartId, objName, OBJPROP_WIDTH, 1);
 
-       // تنظیم سطوح (با رفع خطای تبدیل نوع ضمنی)
-       ObjectSetDouble(m_chartId, objName, OBJPROP_LEVELVALUE, 0, 0.0);
-       ObjectSetString(m_chartId, objName, OBJPROP_LEVELTEXT, 0, "0% (Movable)" + m_timeframeSuffix);
+      // تنظیم سطوح (با رفع خطای تبدیل نوع ضمنی)
+      ObjectSetDouble(m_chartId, objName, OBJPROP_LEVELVALUE, 0, 0.0);
+      ObjectSetString(m_chartId, objName, OBJPROP_LEVELTEXT, 0, "0% (Movable)" + m_timeframeSuffix);
 
-       ObjectSetDouble(m_chartId, objName, OBJPROP_LEVELVALUE, 1, (double)m_fibUpdateLevel / 100.0);
-       ObjectSetString(m_chartId, objName, OBJPROP_LEVELTEXT, 1, IntegerToString(m_fibUpdateLevel) + "% (Confirmation)" + m_timeframeSuffix);
+      ObjectSetDouble(m_chartId, objName, OBJPROP_LEVELVALUE, 1, (double)m_fibUpdateLevel / 100.0);
+      ObjectSetString(m_chartId, objName, OBJPROP_LEVELTEXT, 1, IntegerToString(m_fibUpdateLevel) + "% (Confirmation)" + m_timeframeSuffix);
 
-       ObjectSetDouble(m_chartId, objName, OBJPROP_LEVELVALUE, 2, 1.0);
-       ObjectSetString(m_chartId, objName, OBJPROP_LEVELTEXT, 2, "100% (Fixed Pivot)" + m_timeframeSuffix);
+      ObjectSetDouble(m_chartId, objName, OBJPROP_LEVELVALUE, 2, 1.0);
+      ObjectSetString(m_chartId, objName, OBJPROP_LEVELTEXT, 2, "100% (Fixed Pivot)" + m_timeframeSuffix);
 
-       for(int i = 3; i < 10; i++) ObjectSetDouble(m_chartId, objName, OBJPROP_LEVELVALUE, i, 0.0);
+      for(int i = 3; i < 10; i++) ObjectSetDouble(m_chartId, objName, OBJPROP_LEVELVALUE, i, 0.0);
    }
 
    //--- اضافه کردن سقف جدید و ترسیم آن 
    void AddSwingHigh(const double price, const datetime time, const int bar_index, const double body_price)
    {
+      CentralLog(LOG_FULL, m_logLevel, 0, "[SMC]", "شروع اضافه کردن سقف جدید.");
       if(ArraySize(m_swingHighs_Array) >= 2)
       {
          if (m_showDrawing)
@@ -1248,15 +1357,17 @@ private:
 
       // آپدیت کاندیدای فعال برای EQ ماژور نزولی
       m_activeMajorHighCandidate = m_swingHighs_Array[0];
-      LogEvent("سقف ماژور " + TimeToString(m_swingHighs_Array[0].time) + " به عنوان کاندیدای EQ ماژور تنظیم شد.", m_enableLogging, "[SMC-EQ]");
+      CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_203, "[SMC-EQ]", "سقف ماژور " + TimeToString(m_swingHighs_Array[0].time) + " به عنوان کاندیدای EQ ماژور تنظیم شد.");
 
       if (m_showDrawing) drawSwingPoint(m_swingHighs_Array[0], true);
-      LogEvent("سقف جدید در قیمت " + DoubleToString(price, _Digits) + " ثبت شد.", m_enableLogging, "[SMC]");
+      CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_203, "[SMC]", "سقف جدید در قیمت " + DoubleToString(price, _Digits) + " ثبت شد.");
+      CentralLog(LOG_FULL, m_logLevel, 0, "[SMC]", "پایان اضافه کردن سقف جدید.");
    }
 
    //--- اضافه کردن کف جدید و ترسیم آن 
    void AddSwingLow(const double price, const datetime time, const int bar_index, const double body_price)
    {
+      CentralLog(LOG_FULL, m_logLevel, 0, "[SMC]", "شروع اضافه کردن کف جدید.");
       if(ArraySize(m_swingLows_Array) >= 2)
       {
          if (m_showDrawing)
@@ -1280,15 +1391,17 @@ private:
 
       // آپدیت کاندیدای فعال برای EQ ماژور صعودی
       m_activeMajorLowCandidate = m_swingLows_Array[0];
-      LogEvent("کف ماژور " + TimeToString(m_swingLows_Array[0].time) + " به عنوان کاندیدای EQ ماژور تنظیم شد.", m_enableLogging, "[SMC-EQ]");
+      CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_203, "[SMC-EQ]", "کف ماژور " + TimeToString(m_swingLows_Array[0].time) + " به عنوان کاندیدای EQ ماژور تنظیم شد.");
 
       if (m_showDrawing) drawSwingPoint(m_swingLows_Array[0], false);
-      LogEvent("کف جدید در قیمت " + DoubleToString(price, _Digits) + " ثبت شد.", m_enableLogging, "[SMC]");
+      CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_203, "[SMC]", "کف جدید در قیمت " + DoubleToString(price, _Digits) + " ثبت شد.");
+      CentralLog(LOG_FULL, m_logLevel, 0, "[SMC]", "پایان اضافه کردن کف جدید.");
    }
 
    //--- به‌روزرسانی لیبل روند (با پسوند تایم فریم و موقعیت مناسب)
    bool UpdateTrendLabel()
    {
+      CentralLog(LOG_FULL, m_logLevel, 0, "[SMC]", "شروع به‌روزرسانی لیبل روند.");
       TREND_TYPE oldTrend = m_currentTrend;
 
       if(ArraySize(m_swingHighs_Array) >= 2 && ArraySize(m_swingLows_Array) >= 2)
@@ -1310,22 +1423,22 @@ private:
             case TREND_BULLISH:
             {
                trendText = "Bullish Trend (HH/HL)";
-               trendColor = clrDeepSkyBlue;
-               LogEvent("وضعیت روند به صعودی تغییر یافت.", m_enableLogging, "[SMC]");
+               trendColor = COLOR_TREND_BULL;
+               CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_205, "[SMC]", "وضعیت روند به صعودی تغییر یافت.");
                break;
             }
             case TREND_BEARISH:
             {
                trendText = "Bearish Trend (LL/LH)";
-               trendColor = clrOrangeRed;
-               LogEvent("وضعیت روند به نزولی تغییر یافت.", m_enableLogging, "[SMC]");
+               trendColor = COLOR_TREND_BEAR;
+               CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_205, "[SMC]", "وضعیت روند به نزولی تغییر یافت.");
                break;
             }
             default:
             {
                trendText = "No Trend / Ranging";
-               trendColor = clrGray;
-               LogEvent("وضعیت روند به بدون روند تغییر یافت.", m_enableLogging, "[SMC]");
+               trendColor = COLOR_TREND_NONE;
+               CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_205, "[SMC]", "وضعیت روند به بدون روند تغییر یافت.");
                break;
             }
          }
@@ -1352,10 +1465,12 @@ private:
          ObjectSetInteger(m_chartId, m_trendObjectName, OBJPROP_XDISTANCE, 10);
          ObjectSetInteger(m_chartId, m_trendObjectName, OBJPROP_YDISTANCE, y_offset); // استفاده از محاسبه ساده شده و شیفت منطقی
 
-         ObjectSetInteger(m_chartId, m_trendObjectName, OBJPROP_COLOR, trendColor);
+         ObjectSetInteger(m_chartId,m_trendObjectName, OBJPROP_COLOR, trendColor);
          ObjectSetInteger(m_chartId, m_trendObjectName, OBJPROP_FONTSIZE, 12);
+         CentralLog(LOG_FULL, m_logLevel, 0, "[SMC]", "پایان به‌روزرسانی لیبل روند.");
          return true;
       }
+      CentralLog(LOG_FULL, m_logLevel, 0, "[SMC]", "پایان به‌روزرسانی لیبل روند بدون تغییر.");
       return false;
    }
 
@@ -1367,7 +1482,7 @@ private:
 
       ObjectCreate(m_chartId, objName, OBJ_ARROW, 0, sp.time, sp.price);
       ObjectSetInteger(m_chartId, objName, OBJPROP_ARROWCODE, 77);
-      ObjectSetInteger(m_chartId, objName, OBJPROP_COLOR, isHigh ? clrDodgerBlue : clrRed);
+      ObjectSetInteger(m_chartId, objName, OBJPROP_COLOR, isHigh ? COLOR_SWING_HIGH : COLOR_SWING_LOW);
       ObjectSetInteger(m_chartId, objName, OBJPROP_ANCHOR, isHigh ? ANCHOR_BOTTOM : ANCHOR_TOP);
    }
 
@@ -1375,7 +1490,7 @@ private:
    void drawBreak(const SwingPoint &brokenSwing, const datetime breakTime, const double breakPrice, const bool isHighBreak, const bool isCHoCH)
    {
        string breakType = isCHoCH ? "CHoCH" : "BoS";
-       color breakColor = isCHoCH ? clrCrimson : (isHighBreak ? clrSeaGreen : clrOrange);
+       color breakColor = isCHoCH ? COLOR_BREAK_CHoCH : (isHighBreak ? COLOR_BREAK_BoS_BULL : COLOR_BREAK_BoS_BEAR);
        string objName = "Break_" + TimeToString(brokenSwing.time) + m_timeframeSuffix;
        string textName = objName + "_Text";
        ObjectDelete(m_chartId, objName);
@@ -1439,7 +1554,7 @@ private:
       if (currentTime == m_lastMajorEQInvalidationCheck) return;
       m_lastMajorEQInvalidationCheck = currentTime;
 
-      // حلقه را از آخر به اول می‌زنیم تا حذف کردن یک عنصر، باعث بهم ریختن اندیس‌ها نشود
+      // حلقه از آخر به اول برای جلوگیری از بهم ریختن اندیس‌ها
       for (int i = ArraySize(m_majorEQPatterns_Array) - 1; i >= 0; i--)
       {
          MajorEQPattern eq = m_majorEQPatterns_Array[i];
@@ -1462,9 +1577,8 @@ private:
 
          if (isInvalidated)
          {
-            LogEvent("الگوی EQ ماژور در زمان " + TimeToString(eq.time_formation) + " با بسته شدن قیمت خارج از زون باطل شد.", m_enableLogging, "[SMC-EQ]");
-
-            // پاک کردن تمام اشیاء گرافیکی مربوط به این EQ - هماهنگ با CLiquidityManager (نام‌گذاری Liq_EQ_Major_...)
+            CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_210, "[SMC-EQ]", "الگوی EQ ماژور در زمان " + TimeToString(eq.time_formation) + " با بسته شدن قیمت خارج از زون باطل شد.");
+            // پاک کردن اشیاء گرافیکی
             string baseName = "Liq_EQ_Major_" + TimeToString(eq.source_swing.time) + m_timeframeSuffix;
             string lineName = baseName + "_Line";
             string textName = baseName + "_Text";
@@ -1491,7 +1605,7 @@ private:
          // شرط ابطال 1: آیا سقف جدیدتری از کاندیدای ما تشکیل شده؟
          if (GetSwingHigh(0).time > m_activeMajorHighCandidate.time)
          {
-            LogEvent("کاندیدای سقف ماژور " + TimeToString(m_activeMajorHighCandidate.time) + " توسط سقف جدیدتر باطل شد.", m_enableLogging, "[SMC-EQ]");
+            CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_210, "[SMC-EQ]", "کاندیدای سقف ماژور " + TimeToString(m_activeMajorHighCandidate.time) + " توسط سقف جدیدتر باطل شد.");
             m_activeMajorHighCandidate = GetSwingHigh(0); // کاندیدا به سقف جدید آپدیت می‌شود
             return; // در این تیک کاری با این کاندیدا نداریم
          }
@@ -1503,7 +1617,7 @@ private:
          // شرط ابطال ۲: آیا کندل بسته شده فعلی بالای زون بسته شده؟
          if (iClose(m_symbol, m_timeframe, 1) > zoneHigh)
          {
-            LogEvent("کاندیدای سقف ماژور " + TimeToString(m_activeMajorHighCandidate.time) + " با بسته شدن قیمت بالای زون باطل شد.", m_enableLogging, "[SMC-EQ]");
+            CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_210, "[SMC-EQ]", "کاندیدای سقف ماژور " + TimeToString(m_activeMajorHighCandidate.time) + " با بسته شدن قیمت بالای زون باطل شد.");
             m_activeMajorHighCandidate.bar_index = -1; // کاندیدا غیرفعال می‌شود
             return;
          }
@@ -1536,7 +1650,7 @@ private:
                   int lastIndex = ArraySize(m_majorEQPatterns_Array) - 1;
                   MajorEQPattern oldestEQ = m_majorEQPatterns_Array[lastIndex];
 
-                  LogEvent("ظرفیت EQ ماژور تکمیل. قدیمی‌ترین الگو در زمان " + TimeToString(oldestEQ.time_formation) + " حذف می‌شود.", m_enableLogging, "[SMC-EQ]");
+                  CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_204, "[SMC-EQ]", "ظرفیت EQ ماژور تکمیل. قدیمی‌ترین الگو در زمان " + TimeToString(oldestEQ.time_formation) + " حذف می‌شود.");
 
                   // پاک کردن اشیاء گرافیکی الگوی قدیمی
                   string baseNameOld = "Liq_EQ_Major_" + TimeToString(oldestEQ.source_swing.time) + m_timeframeSuffix;
@@ -1549,7 +1663,7 @@ private:
                   ArrayRemove(m_majorEQPatterns_Array, lastIndex, 1);
                }
                
-               LogEvent("الگوی EQ ماژور نزولی تایید شد.", m_enableLogging, "[SMC-EQ]");
+               CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_209, "[SMC-EQ]", "الگوی EQ ماژور نزولی تایید شد.");
 
                m_activeMajorHighCandidate.bar_index = -1; // کاندیدا پس از موفقیت، غیرفعال می‌شود
             }
@@ -1562,7 +1676,7 @@ private:
          // شرط ابطال 1: آیا کف جدیدتری از کاندیدای ما تشکیل شده؟
          if (GetSwingLow(0).time > m_activeMajorLowCandidate.time)
          {
-            LogEvent("کاندیدای کف ماژور " + TimeToString(m_activeMajorLowCandidate.time) + " توسط کف جدیدتر باطل شد.", m_enableLogging, "[SMC-EQ]");
+            CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_210, "[SMC-EQ]", "کاندیدای کف ماژور " + TimeToString(m_activeMajorLowCandidate.time) + " توسط کف جدیدتر باطل شد.");
             m_activeMajorLowCandidate = GetSwingLow(0); // کاندیدا به کف جدید آپدیت می‌شود
             return; // در این تیک کاری با این کاندیدا نداریم
          }
@@ -1574,7 +1688,7 @@ private:
          // شرط ابطال ۲: آیا کندل بسته شده فعلی پایین زون بسته شده؟
          if (iClose(m_symbol, m_timeframe, 1) < zoneLow)
          {
-            LogEvent("کاندیدای کف ماژور " + TimeToString(m_activeMajorLowCandidate.time) + " با بسته شدن قیمت پایین زون باطل شد.", m_enableLogging, "[SMC-EQ]");
+            CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_210, "[SMC-EQ]", "کاندیدای کف ماژور " + TimeToString(m_activeMajorLowCandidate.time) + " با بسته شدن قیمت پایین زون باطل شد.");
             m_activeMajorLowCandidate.bar_index = -1; // کاندیدا غیرفعال می‌شود
             return;
          }
@@ -1607,7 +1721,7 @@ private:
                   int lastIndex = ArraySize(m_majorEQPatterns_Array) - 1;
                   MajorEQPattern oldestEQ = m_majorEQPatterns_Array[lastIndex];
 
-                  LogEvent("ظرفیت EQ ماژور تکمیل. قدیمی‌ترین الگو در زمان " + TimeToString(oldestEQ.time_formation) + " حذف می‌شود.", m_enableLogging, "[SMC-EQ]");
+                  CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_204, "[SMC-EQ]", "ظرفیت EQ ماژور تکمیل. قدیمی‌ترین الگو در زمان " + TimeToString(oldestEQ.time_formation) + " حذف می‌شود.");
 
                   // پاک کردن اشیاء گرافیکی الگوی قدیمی
                   string baseNameOld = "Liq_EQ_Major_" + TimeToString(oldestEQ.source_swing.time) + m_timeframeSuffix;
@@ -1620,7 +1734,7 @@ private:
                   ArrayRemove(m_majorEQPatterns_Array, lastIndex, 1);
                }
                
-               LogEvent("الگوی EQ ماژور صعودی تایید شد.", m_enableLogging, "[SMC-EQ]");
+               CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_209, "[SMC-EQ]", "الگوی EQ ماژور صعودی تایید شد.");
 
                m_activeMajorLowCandidate.bar_index = -1; // کاندیدا پس از موفقیت، غیرفعال می‌شود
             }
@@ -1701,6 +1815,7 @@ private:
    ENUM_TIMEFRAMES  m_timeframe;            // تایم فریم اختصاصی این آبجکت
    long             m_chartId;              // ID چارت اجرایی اکسپرت
    bool             m_enableLogging;        // فعال/غیرفعال بودن لاگ
+   LOG_LEVEL        m_logLevel;             // سطح لاگ
    string           m_timeframeSuffix;      // پسوند تایم‌فریم کوتاه شده برای نامگذاری اشیاء
    bool             m_showDrawing;          // کنترل نمایش ترسیمات مینور روی چارت
    int              m_aoFractalLength;      // طول فرکتال AO (تعداد میله‌های اطراف، مثلاً 3)
@@ -1736,6 +1851,7 @@ public:
       m_timeframe = timeframe;
       m_chartId = chartId;
       m_enableLogging = enableLogging_in;
+      m_logLevel = DEFAULT_LOG_LEVEL;
       m_showDrawing = showDrawing;
       m_aoFractalLength = aoFractalLength_in;
       m_enableMinorOB_FVG_Check = enableMinorOB_FVG_Check_in; // مقداردهی ورودی جدید
@@ -1747,7 +1863,7 @@ public:
       m_ao_handle = iAO(m_symbol, m_timeframe);
       if (m_ao_handle == INVALID_HANDLE)
       {
-         if (m_enableLogging) Print("[MINOR] خطا در ایجاد هندل Awesome Oscillator.");
+         CentralLog(LOG_ERROR, m_logLevel, ERROR_CODE_107, "[MINOR]", "خطا در ایجاد هندل Awesome Oscillator.", true);
       }
 
       ArraySetAsSeries(m_minorSwingHighs_Array, true);
@@ -1787,7 +1903,7 @@ public:
       // اسکن اولیه برای یافتن مینورهای اولیه
       ScanInitialMinors();
       
-      LogEvent("کلاس MinorStructure برای نماد " + m_symbol + " و تایم فریم " + EnumToString(m_timeframe) + " آغاز به کار کرد.", m_enableLogging, "[MINOR]");
+      CentralLog(LOG_FULL, m_logLevel, 0, "[MINOR]", "کلاس MinorStructure برای نماد " + m_symbol + " و تایم فریم " + EnumToString(m_timeframe) + " آغاز به کار کرد.");
    }
 
    //+------------------------------------------------------------------+
@@ -1802,14 +1918,14 @@ public:
          for(int i = total - 1; i >= 0; i--)
          {
             string name = ObjectName(m_chartId, i);
-            if(StringFind(name, m_timeframeSuffix) != -1 && (StringFind(name, "Minor_") != -1 || StringFind(name, "Confirmed_") != -1 || StringFind(name, "EQ_") != -1 || StringFind(name, "MinorOB_") != -1))
+            if(StringFind(name, m_timeframeSuffix) != -1 && (StringFind(name, "Minor_") != -1 || StringFind(name, "Confirmed_") != -1 || StringFind(name, "EQ_") != -1 || StringFind(name, "MinorOB_" ) != -1))
             {
                ObjectDelete(m_chartId, name);
             }
          }
       }
       if (m_ao_handle != INVALID_HANDLE) IndicatorRelease(m_ao_handle); // آزادسازی هندل برای بهینه‌سازی منابع MT5
-      LogEvent("کلاس MinorStructure متوقف شد.", m_enableLogging, "[MINOR]");
+      CentralLog(LOG_FULL, m_logLevel, 0, "[MINOR]", "کلاس MinorStructure متوقف شد.");
    }
    
    //+------------------------------------------------------------------+
@@ -1817,7 +1933,9 @@ public:
    //+------------------------------------------------------------------+
    bool ProcessNewTick()
    {
+      CentralLog(LOG_FULL, m_logLevel, 0, "[MINOR-OB]", "شروع پردازش تیک جدید برای OB مینور.");
       ProcessMinorOrderBlocks(); // فراخوانی مدیریت چرخه حیات OBهای مینور
+      CentralLog(LOG_FULL, m_logLevel, 0, "[MINOR-OB]", "پایان پردازش تیک جدید برای OB مینور.");
       return m_isCurrentlyMitigatingMinorOB; // بازگشت وضعیت مصرف لحظه‌ای برای استفاده اکسپرت
    }
    
@@ -1830,6 +1948,8 @@ public:
       if (currentBarTime == m_lastProcessedBarTime) return false; // جلوگیری از اجرای تکراری بدون کندل جدید
       m_lastProcessedBarTime = currentBarTime;
 
+      CentralLog(LOG_FULL, m_logLevel, 0, "[MINOR]", "شروع پردازش بار جدید.");
+
       bool newMinorFound = false;
       
       // کش کردن بافر AO برای کل بازه اسکن (بهینه‌سازی برای جلوگیری از CopyBuffer تکراری)
@@ -1838,7 +1958,7 @@ public:
       ArraySetAsSeries(aoBuffer, true);
       if (CopyBuffer(m_ao_handle, 0, 0, barsCount, aoBuffer) <= 0)
       {
-         if (m_enableLogging) Print("[MINOR] خطا در کش کردن بافر AO: ", GetLastError());
+         CentralLog(LOG_ERROR, m_logLevel, ERROR_CODE_108, "[MINOR]", "خطا در کش کردن بافر AO: " + IntegerToString(GetLastError()), true);
          return false;
       }
       
@@ -1854,8 +1974,10 @@ public:
       // شناسایی الگوی EQ جدید
       ProcessEQDetection();
       
-      if (newMinorFound && m_enableLogging) LogEvent("مینور جدید شناسایی شد.", m_enableLogging, "[MINOR]");
-      
+      if (newMinorFound)
+         CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_211, "[MINOR]", "مینور جدید شناسایی شد.");
+
+      CentralLog(LOG_FULL, m_logLevel, 0, "[MINOR]", "پایان پردازش بار جدید.");
       return newMinorFound;
    }
 
@@ -1863,6 +1985,7 @@ private:
    //--- تابع: اسکن اولیه برای یافتن حداقل یک سقف و یک کف مینور (از جدید به قدیم)
    void ScanInitialMinors()
    {
+      CentralLog(LOG_FULL, m_logLevel, 0, "[MINOR]", "شروع اسکن اولیه مینورها.");
       int barsCount = iBars(m_symbol, m_timeframe);
       if (barsCount < 2 * m_aoFractalLength + 1) return; // حداقل کندل لازم موجود نیست
       
@@ -1873,7 +1996,7 @@ private:
       ArraySetAsSeries(aoBuffer, true);
       if (CopyBuffer(m_ao_handle, 0, 0, initialScanLimit + 1, aoBuffer) <= 0)
       {
-         if (m_enableLogging) Print("[MINOR] خطا در کش کردن بافر AO برای اسکن اولیه: ", GetLastError());
+         CentralLog(LOG_ERROR, m_logLevel, ERROR_CODE_108, "[MINOR]", "خطا در کش کردن بافر AO برای اسکن اولیه: " + IntegerToString(GetLastError()), true);
          return;
       }
       
@@ -1890,7 +2013,7 @@ private:
             {
                foundHigh = true;
                m_lastHighTime = adjusted.time;
-               if (m_enableLogging) LogEvent("سقف مینور اولیه شناسایی شد.", m_enableLogging, "[MINOR]");
+               CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_211, "[MINOR]", "سقف مینور اولیه شناسایی شد.");
             }
          }
          
@@ -1901,7 +2024,7 @@ private:
             {
                foundLow = true;
                m_lastLowTime = adjusted.time;
-               if (m_enableLogging) LogEvent("کف مینور اولیه شناسایی شد.", m_enableLogging, "[MINOR]");
+               CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_211, "[MINOR]", "کف مینور اولیه شناسایی شد.");
             }
          }
          
@@ -1911,13 +2034,15 @@ private:
       // اگر چیزی پیدا نشد، صبر تا حداقل کندل لازم و لاگ (بدون تکرار اسکن در سازنده)
       if (!foundHigh || !foundLow)
       {
-         if (m_enableLogging) Print("[MINOR] در اسکن اولیه، مینور کامل پیدا نشد. منتظر کندل‌های بیشتر.");
+         CentralLog(LOG_ERROR, m_logLevel, ERROR_CODE_105, "[MINOR]", "در اسکن اولیه، مینور کامل پیدا نشد. منتظر کندل‌های بیشتر.", true);
       }
+      CentralLog(LOG_FULL, m_logLevel, 0, "[MINOR]", "پایان اسکن اولیه مینورها.");
    }
    
    //--- تابع: اسکن برای سقف/کف مینور (از قدیم به جدید، با کش بافر)
    bool ScanForMinors(const double &aoBuffer[], const bool isHigh)
    {
+      CentralLog(LOG_FULL, m_logLevel, 0, "[MINOR]", "شروع اسکن مینورها.");
       int barsCount = iBars(m_symbol, m_timeframe);
       datetime lastTime = isHigh ? m_lastHighTime : m_lastLowTime;
       int startShift = (lastTime == 0) ? barsCount - 1 : iBarShift(m_symbol, m_timeframe, lastTime, false);
@@ -1941,6 +2066,7 @@ private:
          }
       }
       
+      CentralLog(LOG_FULL, m_logLevel, 0, "[MINOR]", "پایان اسکن مینورها.");
       return newFound;
    }
    
@@ -2070,11 +2196,11 @@ private:
       
       bestFractal.body_price = bestBodyPrice;
       
-      if (m_enableLogging && bestFractal.bar_index != centerShift)
+      if (bestFractal.bar_index != centerShift)
       {
-         LogEvent((isHigh ? "سقف" : "کف") + " مینور: قیمت اولیه " + DoubleToString(isHigh ? iHigh(m_symbol, m_timeframe, centerShift) : iLow(m_symbol, m_timeframe, centerShift), _Digits) + 
+         CentralLog(LOG_FULL, m_logLevel, 0, "[MINOR]", (isHigh ? "سقف" : "کف") + " مینور: قیمت اولیه " + DoubleToString(isHigh ? iHigh(m_symbol, m_timeframe, centerShift) : iLow(m_symbol, m_timeframe, centerShift), _Digits) + 
                   " در زمان " + TimeToString(iTime(m_symbol, m_timeframe, centerShift)) + "، پس از ریگلاژ به " + DoubleToString(bestFractal.price, _Digits) + 
-                  " (بدنه: " + DoubleToString(bestBodyPrice, _Digits) + ") در زمان " + TimeToString(bestFractal.time), m_enableLogging, "[MINOR]");
+                  " (بدنه: " + DoubleToString(bestBodyPrice, _Digits) + ") در زمان " + TimeToString(bestFractal.time));
       }
       
       return bestFractal;
@@ -2121,10 +2247,9 @@ private:
 
          if (isInvalidated)
          {
-            LogEvent("الگوی EQ در زمان " + TimeToString(eq.time_formation) + " با بسته شدن قیمت خارج از زون باطل شد.", m_enableLogging, "[MINOR]");
+            CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_210, "[MINOR]", "الگوی EQ در زمان " + TimeToString(eq.time_formation) + " با بسته شدن قیمت خارج از زون باطل شد.");
 
             // پاک کردن تمام اشیاء گرافیکی مربوط به این EQ
-            //deleteEQObjects(eq); // کامنت شده برای حذف رسم تکراری برای
             string baseName = "Liq_EQ_Minor_" + TimeToString(eq.source_swing.time) + m_timeframeSuffix;
             string lineName = baseName + "_Line";
             string textName = baseName + "_Text";
@@ -2146,7 +2271,7 @@ private:
          // شرط ابطال 1: آیا سقف جدیدتری از کاندیدای ما تشکیل شده؟
          if (GetMinorHighsCount() > 0 && GetMinorSwingHigh(0).time > m_activeHighCandidate.time)
          {
-            LogEvent("کاندیدای سقف " + TimeToString(m_activeHighCandidate.time) + " توسط سقف جدیدتر باطل شد.", m_enableLogging, "[MINOR]");
+            CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_210, "[MINOR]", "کاندیدای سقف " + TimeToString(m_activeHighCandidate.time) + " توسط سقف جدیدتر باطل شد.");
             m_activeHighCandidate = GetMinorSwingHigh(0); // کاندیدا به سقف جدید آپدیت می‌شود
             return; // در این تیک کاری با این کاندیدا نداریم
          }
@@ -2158,7 +2283,7 @@ private:
          // شرط ابطال 2: آیا کندل بسته شده فعلی بالای زون بسته شده؟
          if (iClose(m_symbol, m_timeframe, 1) > zoneHigh)
          {
-            LogEvent("کاندیدای سقف " + TimeToString(m_activeHighCandidate.time) + " با بسته شدن قیمت بالای زون باطل شد.", m_enableLogging, "[MINOR]");
+            CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_210, "[MINOR]", "کاندیدای سقف " + TimeToString(m_activeHighCandidate.time) + " با بسته شدن قیمت بالای زون باطل شد.");
             m_activeHighCandidate.bar_index = -1; // کاندیدا غیرفعال می‌شود
             return;
          }
@@ -2191,10 +2316,9 @@ private:
                   int lastIndex = ArraySize(m_eqPatterns_Array) - 1;
                   EQPattern oldestEQ = m_eqPatterns_Array[lastIndex];
 
-                  LogEvent("ظرفیت EQ تکمیل. قدیمی‌ترین الگو در زمان " + TimeToString(oldestEQ.time_formation) + " حذف می‌شود.", m_enableLogging, "[MINOR]");
+                  CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_204, "[MINOR]", "ظرفیت EQ تکمیل. قدیمی‌ترین الگو در زمان " + TimeToString(oldestEQ.time_formation) + " حذف می‌شود.");
 
                   // پاک کردن اشیاء گرافیکی الگوی قدیمی با تابع کمکی
-                  //deleteEQObjects(oldestEQ); // کامنت شده برای حذف رسم تکراری
                   string baseNameOld = "Liq_EQ_Minor_" + TimeToString(oldestEQ.source_swing.time) + m_timeframeSuffix;
                   string lineNameOld = baseNameOld + "_Line";
                   string textNameOld = baseNameOld + "_Text";
@@ -2205,8 +2329,7 @@ private:
                   ArrayRemove(m_eqPatterns_Array, lastIndex, 1);
                }
                
-               //if (m_showDrawing) drawConfirmedEQ(m_eqPatterns_Array[0]); // کامنت شده برای حذف رسم تکراری
-               LogEvent("الگوی EQ نزولی تایید و رسم شد.", m_enableLogging, "[MINOR]");
+               CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_209, "[MINOR]", "الگوی EQ نزولی تایید شد.");
 
                m_activeHighCandidate.bar_index = -1; // کاندیدا پس از موفقیت، غیرفعال می‌شود
             }
@@ -2219,7 +2342,7 @@ private:
          // شرط ابطال 1: آیا کف جدیدتری از کاندیدای ما تشکیل شده؟
          if (GetMinorLowsCount() > 0 && GetMinorSwingLow(0).time > m_activeLowCandidate.time)
          {
-            LogEvent("کاندیدای کف " + TimeToString(m_activeLowCandidate.time) + " توسط کف جدیدتر باطل شد.", m_enableLogging, "[MINOR]");
+            CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_210, "[MINOR]", "کاندیدای کف " + TimeToString(m_activeLowCandidate.time) + " توسط کف جدیدتر باطل شد.");
             m_activeLowCandidate = GetMinorSwingLow(0); // کاندیدا به کف جدید آپدیت می‌شود
             return; // در این تیک کاری با این کاندیدا نداریم
          }
@@ -2231,7 +2354,7 @@ private:
          // شرط ابطال 2: آیا کندل بسته شده فعلی پایین زون بسته شده؟
          if (iClose(m_symbol, m_timeframe, 1) < zoneLow)
          {
-            LogEvent("کاندیدای کف " + TimeToString(m_activeLowCandidate.time) + " با بسته شدن قیمت پایین زون باطل شد.", m_enableLogging, "[MINOR]");
+            CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_210, "[MINOR]", "کاندیدای کف " + TimeToString(m_activeLowCandidate.time) + " با بسته شدن قیمت پایین زون باطل شد.");
             m_activeLowCandidate.bar_index = -1; // کاندیدا غیرفعال می‌شود
             return;
          }
@@ -2264,10 +2387,9 @@ private:
                   int lastIndex = ArraySize(m_eqPatterns_Array) - 1;
                   EQPattern oldestEQ = m_eqPatterns_Array[lastIndex];
 
-                  LogEvent("ظرفیت EQ تکمیل. قدیمی‌ترین الگو در زمان " + TimeToString(oldestEQ.time_formation) + " حذف می‌شود.", m_enableLogging, "[MINOR]");
+                  CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_204, "[MINOR]", "ظرفیت EQ تکمیل. قدیمی‌ترین الگو در زمان " + TimeToString(oldestEQ.time_formation) + " حذف می‌شود.");
 
                   // پاک کردن اشیاء گرافیکی الگوی قدیمی با تابع کمکی
-                  //deleteEQObjects(oldestEQ); // کامنت شده برای حذف رسم تکراری
                   string baseNameOld = "Liq_EQ_Minor_" + TimeToString(oldestEQ.source_swing.time) + m_timeframeSuffix;
                   string lineNameOld = baseNameOld + "_Line";
                   string textNameOld = baseNameOld + "_Text";
@@ -2278,8 +2400,7 @@ private:
                   ArrayRemove(m_eqPatterns_Array, lastIndex, 1);
                }
                
-               //if (m_showDrawing) drawConfirmedEQ(m_eqPatterns_Array[0]); // کامنت شده برای حذف رسم تکراری
-               LogEvent("الگوی EQ صعودی تایید و رسم شد.", m_enableLogging, "[MINOR]");
+               CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_209, "[MINOR]", "الگوی EQ صعودی تایید شد.");
 
                m_activeLowCandidate.bar_index = -1; // کاندیدا پس از موفقیت، غیرفعال می‌شود
             }
@@ -2298,11 +2419,11 @@ private:
 
       if (!ObjectCreate(m_chartId, objName, OBJ_ARROW, 0, sp.time, drawPrice))
       {
-         if (m_enableLogging) Print("[MINOR] خطا در ایجاد شیء: ", GetLastError());
+         CentralLog(LOG_ERROR, m_logLevel, ERROR_CODE_102, "[MINOR]", "خطا در ایجاد شیء: " + IntegerToString(GetLastError()), true);
          return;
       }
       ObjectSetInteger(m_chartId, objName, OBJPROP_ARROWCODE, isHigh ? 217 : 218); // 217: فلش رو به پایین (سقف)، 218: فلش رو به بالا (کف)
-      ObjectSetInteger(m_chartId, objName, OBJPROP_COLOR, clrYellow);
+      ObjectSetInteger(m_chartId, objName, OBJPROP_COLOR, COLOR_MINOR_SWING);
       ObjectSetInteger(m_chartId, objName, OBJPROP_WIDTH, 1);
       ObjectSetInteger(m_chartId, objName, OBJPROP_ANCHOR, isHigh ? ANCHOR_TOP : ANCHOR_BOTTOM);
    }
@@ -2313,19 +2434,19 @@ private:
       // --- بخش اول: رسم زون خاکستری که حالا تایید شده ---
       string obName = "Confirmed_OB_" + TimeToString(eq.source_swing.time) + m_timeframeSuffix;
       datetime endTime = D'2030.01.01 00:00';
-      color obColor = clrLightGray; // رنگ خاکستری روشن برای هر دو حالت
+      color obColor = COLOR_EQ_ZONE; // رنگ خاکستری روشن برای هر دو حالت
       double highZone = eq.isBullish ? eq.source_swing.body_price : eq.source_swing.price;
       double lowZone = eq.isBullish ? eq.source_swing.price : eq.source_swing.body_price;
 
-    /*  ObjectCreate(m_chartId, obName, OBJ_RECTANGLE, 0, eq.source_swing.time, highZone, endTime, lowZone);
+      ObjectCreate(m_chartId, obName, OBJ_RECTANGLE, 0, eq.source_swing.time, highZone, endTime, lowZone);
       ObjectSetInteger(m_chartId, obName, OBJPROP_COLOR, obColor);
       ObjectSetInteger(m_chartId, obName, OBJPROP_FILL, true);
       ObjectSetInteger(m_chartId, obName, OBJPROP_BACK, true);
-*///کامنت شده تا فعلان زون رسم نشود 
+
       // --- بخش دوم: رسم خط چین و لیبل EQ ---
       string eqLineName = "EQ_Line_" + TimeToString(eq.time_formation) + m_timeframeSuffix;
       string eqTextName = "EQ_Text_" + TimeToString(eq.time_formation) + m_timeframeSuffix;
-      color eqColor = eq.isBullish ? clrBlue : clrPink; // سبز برای کف، قرمز برای سقف
+      color eqColor = eq.isBullish ? COLOR_EQ_BULL : COLOR_EQ_BEAR; // سبز برای کف، قرمز برای سقف
 
       // نقطه چین از سقف اصلی تا High/Low کندل تایید
       ObjectCreate(m_chartId, eqLineName, OBJ_TREND, 0, eq.source_swing.time, eq.source_swing.price, eq.time_formation, eq.price_entry);
@@ -2359,12 +2480,16 @@ private:
    //--- تابع جدید: شناسایی Order Block مینور بر اساس الگوریتم مشخص شده (با اصلاح منطق FVG)
    void IdentifyMinorOrderBlock(const SwingPoint &newSwing, const bool isHigh)
    {
+      CentralLog(LOG_FULL, m_logLevel, 0, "[MINOR-OB]", "شروع شناسایی OB مینور.");
       bool isBullish = !isHigh; // برای سقف جدید (isHigh=true)، OB نزولی (عرضه، isBullish=false) و بالعکس
       
       int startScan = newSwing.bar_index + 1; // شروع اسکن از کندل قبل از سوئینگ جدید
       int endScan = isHigh ? GetMinorSwingHigh(1).bar_index : GetMinorSwingLow(1).bar_index;
       
-      if (endScan == -1 || startScan > endScan) return; // محدوده نامعتبر یا سوئینگ قبلی وجود ندارد
+      if (endScan == -1 || startScan > endScan) {
+         CentralLog(LOG_ERROR, m_logLevel, ERROR_CODE_105, "[MINOR-OB]", "محدوده نامعتبر برای شناسایی OB مینور.", true);
+         return; // محدوده نامعتبر یا سوئینگ قبلی وجود ندارد
+      }
       
       // اسکن معکوس از جدیدتر (startScan) به قدیمی‌تر (endScan)
       for (int i = startScan; i <= endScan; i++)
@@ -2421,10 +2546,11 @@ private:
             newOB.bar_index = i;
 
             AddMinorUnmitigatedOB(newOB);
-            LogEvent("OB مینور جدید " + (isBullish ? "صعودی (تقاضا)" : "نزولی (عرضه)") + " در زمان " + TimeToString(newOB.time) + " شناسایی شد.", m_enableLogging, "[MINOR-OB]");
+            CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_206, "[MINOR-OB]", "OB مینور جدید " + (isBullish ? "صعودی (تقاضا)" : "نزولی (عرضه)") + " در زمان " + TimeToString(newOB.time) + " شناسایی شد.");
             break; // فقط اولین (جدیدترین) کاندیدا را انتخاب کن
          }
       }
+      CentralLog(LOG_FULL, m_logLevel, 0, "[MINOR-OB]", "پایان شناسایی OB مینور.");
    }
    
    //--- تابع جدید: اضافه کردن OB جدید به آرایه unmitigated مینور با مدیریت ظرفیت (حداکثر ۱۰)
@@ -2435,7 +2561,7 @@ private:
       {
          int lastIndex = ArraySize(m_minorUnmitigatedOBs) - 1;
          ArrayRemove(m_minorUnmitigatedOBs, lastIndex, 1);
-         LogEvent("ظرفیت unmitigated OB مینور تکمیل. قدیمی‌ترین OB حذف شد.", m_enableLogging, "[MINOR-OB]");
+         CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_204, "[MINOR-OB]", "ظرفیت unmitigated OB مینور تکمیل. قدیمی‌ترین OB حذف شد.");
       }
 
       // درج دستی OB جدید در ابتدای آرایه (سری)
@@ -2456,7 +2582,7 @@ private:
       {
          int lastIndex = ArraySize(m_minorMitigatedOBs) - 1;
          ArrayRemove(m_minorMitigatedOBs, lastIndex, 1);
-         LogEvent("ظرفیت mitigated OB مینور تکمیل. قدیمی‌ترین OB مصرف شده حذف شد.", m_enableLogging, "[MINOR-OB]");
+         CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_204, "[MINOR-OB]", "ظرفیت mitigated OB مینور تکمیل. قدیمی‌ترین OB مصرف شده حذف شد.");
       }
 
       // درج دستی OB در ابتدای آرایه
@@ -2495,7 +2621,7 @@ private:
             // حذف از آرایه unmitigated
             ArrayRemove(m_minorUnmitigatedOBs, i, 1);
             i--;
-            LogEvent("OB مینور " + (ob.isBullish ? "صعودی" : "نزولی") + " در زمان " + TimeToString(ob.time) + " مصرف (mitigated) شد.", m_enableLogging, "[MINOR-OB]");
+            CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_207, "[MINOR-OB]", "OB مینور " + (ob.isBullish ? "صعودی" : "نزولی") + " در زمان " + TimeToString(ob.time) + " مصرف (mitigated) شد.");
          }
       }
 
@@ -2515,7 +2641,7 @@ private:
             // حذف از آرایه (بدون پاک کردن گرافیکی، چون پیش‌فرض رسم نمی‌شود)
             ArrayRemove(m_minorUnmitigatedOBs, i, 1);
             i--;
-            LogEvent("OB مینور " + (ob.isBullish ? "صعودی" : "نزولی") + " در زمان " + TimeToString(ob.time) + " ابطال (invalidated) شد.", m_enableLogging, "[MINOR-OB]");
+            CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_208, "[MINOR-OB]", "OB مینور " + (ob.isBullish ? "صعودی" : "نزولی") + " در زمان " + TimeToString(ob.time) + " ابطال (invalidated) شد.");
          }
       }
 
@@ -2534,7 +2660,7 @@ private:
             // حذف از آرایه (بدون پاک کردن گرافیکی)
             ArrayRemove(m_minorMitigatedOBs, i, 1);
             i--;
-            LogEvent("OB مینور مصرف شده " + (ob.isBullish ? "صعودی" : "نزولی") + " در زمان " + TimeToString(ob.time) + " ابطال (invalidated) شد.", m_enableLogging, "[MINOR-OB]");
+            CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_208, "[MINOR-OB]", "OB مینور مصرف شده " + (ob.isBullish ? "صعودی" : "نزولی") + " در زمان " + TimeToString(ob.time) + " ابطال (invalidated) شد.");
          }
       }
    }
@@ -2542,6 +2668,7 @@ private:
    //--- تابع اصلاح شده: اضافه کردن نقطه مینور (با ورودی SwingPoint کامل و مدیریت تکرار و ظرفیت)
    bool AddMinorPoint(const SwingPoint &newPoint, const bool isHigh)
    {
+      CentralLog(LOG_FULL, m_logLevel, 0, "[MINOR]", "شروع اضافه کردن نقطه مینور.");
       if (newPoint.time == 0 || newPoint.price == 0) return false;
       
       SwingPoint arr[];
@@ -2583,15 +2710,16 @@ private:
          }
          
          if (m_showDrawing) drawMinorSwingPoint(newPoint, true);
-         if (m_enableLogging) LogEvent("سقف مینور جدید در قیمت " + DoubleToString(newPoint.price, _Digits) + " شناسایی شد.", m_enableLogging, "[MINOR]");
+         CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_211, "[MINOR]", "سقف مینور جدید در قیمت " + DoubleToString(newPoint.price, _Digits) + " شناسایی شد.");
          
          // آپدیت کاندیدای فعال
          m_activeHighCandidate = newPoint;
-         LogEvent("سقف مینور " + TimeToString(newPoint.time) + " به عنوان کاندیدای فعال جدید برای EQ تنظیم شد.", m_enableLogging, "[MINOR]");
+         CentralLog(LOG_FULL, m_logLevel, 0, "[MINOR]", "سقف مینور " + TimeToString(newPoint.time) + " به عنوان کاندیدای فعال جدید برای EQ تنظیم شد.");
          
          // فراخوانی شناسایی OB مینور
          IdentifyMinorOrderBlock(newPoint, true);
          
+         CentralLog(LOG_FULL, m_logLevel, 0, "[MINOR]", "پایان اضافه کردن نقطه مینور.");
          return true;
       }
       else
@@ -2617,15 +2745,16 @@ private:
          }
          
          if (m_showDrawing) drawMinorSwingPoint(newPoint, false);
-         if (m_enableLogging) LogEvent("کف مینور جدید در قیمت " + DoubleToString(newPoint.price, _Digits) + " شناسایی شد.", m_enableLogging, "[MINOR]");
+         CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_211, "[MINOR]", "کف مینور جدید در قیمت " + DoubleToString(newPoint.price, _Digits) + " شناسایی شد.");
          
          // آپدیت کاندیدای فعال
          m_activeLowCandidate = newPoint;
-         LogEvent("کف مینور " + TimeToString(newPoint.time) + " به عنوان کاندیدای فعال جدید برای EQ تنظیم شد.", m_enableLogging, "[MINOR]");
+         CentralLog(LOG_FULL, m_logLevel, 0, "[MINOR]", "کف مینور " + TimeToString(newPoint.time) + " به عنوان کاندیدای فعال جدید برای EQ تنظیم شد.");
          
          // فراخوانی شناسایی OB مینور
          IdentifyMinorOrderBlock(newPoint, false);
          
+         CentralLog(LOG_FULL, m_logLevel, 0, "[MINOR]", "پایان اضافه کردن نقطه مینور.");
          return true;
       }
       
@@ -2661,7 +2790,7 @@ public:
          return;
       }
 
-      color obColor = C'245,245,245'; // سفید شفاف
+      color obColor = COLOR_OB_ZONE; // سفید شفاف
       datetime endTime = D'2030.01.01 00:00'; // امتداد زون
 
       // ایجاد مستطیل
@@ -2680,7 +2809,7 @@ public:
       string text = isUnmitigated ? "MinorOB" + suffix : "MinorOB$" + suffix;
       ObjectCreate(m_chartId, textName, OBJ_TEXT, 0, midTime, midPrice);
       ObjectSetString(m_chartId, textName, OBJPROP_TEXT, text); 
-      ObjectSetInteger(m_chartId, textName, OBJPROP_COLOR, clrBlack);
+      ObjectSetInteger(m_chartId, textName, OBJPROP_COLOR, COLOR_OB_TEXT);
       ObjectSetInteger(m_chartId, textName, OBJPROP_FONTSIZE, BASE_LABEL_FONT_SIZE);
       ObjectSetInteger(m_chartId, textName, OBJPROP_ANCHOR, ANCHOR_CENTER);
    }
@@ -2761,6 +2890,7 @@ private:
    ENUM_TIMEFRAMES  m_timeframe;       // تایم فریم اجرایی این آبجکت
    long             m_chartId;         // شناسه چارت
    bool             m_enableLogging;   // فعال/غیرفعال کردن لاگ‌ها
+   LOG_LEVEL        m_logLevel;        // سطح لاگ
    string           m_timeframeSuffix; // پسوند تایم فریم برای نامگذاری اشیاء
    bool             m_showDrawing;     // کنترل کلی نمایش ترسیمات این کلاس
 
@@ -2831,7 +2961,7 @@ private:
       }
       m_liquidityHistory[0] = newEvent;
 
-      LogEvent("رویداد نقدینگی " + EnumToString(type) + " ثبت شد.", m_enableLogging, "[LIQ]");
+      CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_214, "[LIQ]", "رویداد نقدینگی " + EnumToString(type) + " ثبت شد.");
    }
 
    //--- تابع کمکی: رسم سطوح دوره‌ای
@@ -2863,7 +2993,7 @@ private:
       string baseName = "Liq_EQ_" + (isMajor ? "Major_" : "Minor_") + TimeToString(source.time) + m_timeframeSuffix;
       string lineName = baseName + "_Line"; string textName = baseName + "_Text";
       ObjectDelete(m_chartId, lineName); ObjectDelete(m_chartId, textName);
-      color clr = (type == LIQ_EQL) ? clrBlue : clrPink;
+      color clr = (type == LIQ_EQL) ? COLOR_EQ_BULL : COLOR_EQ_BEAR;
       if (ObjectCreate(m_chartId, lineName, OBJ_TREND, 0, source.time, source.price, time_form, price_entry))
       {
          ObjectSetInteger(m_chartId, lineName, OBJPROP_STYLE, STYLE_DASHDOTDOT);
@@ -2920,7 +3050,7 @@ private:
    { 
       string objName = "Liq_Trap_" + EnumToString(type) + "_" + TimeToString(source.time) + m_timeframeSuffix;
       ObjectDelete(m_chartId, objName);
-      color clr = (type == LIQ_SMS) ? C'128,0,128' : C'255,140,0'; // Purple for SMS, Orange for CF
+      color clr = (type == LIQ_SMS) ? COLOR_SMS_TRAP : COLOR_CF_TRAP; // Purple for SMS, Orange for CF
       double price = source.price + (type == LIQ_SMS ? 1 : -1) * 10 * _Point; // کمی آفست برای دیده شدن
       if (ObjectCreate(m_chartId, objName, OBJ_TEXT, 0, source.time, price))
       {
@@ -2951,7 +3081,7 @@ private:
                m_pdh = pdh;
                SwingPoint emptySwing; // ساختار خالی برای فیلد source_swing
                RegisterLiquidityEvent(LIQ_PDH, false, currentDayStart, m_pdh, "PDH", emptySwing);
-               DrawPeriodicLevel(m_pdh, m_pdhLineName, "PDH", clrGreen, STYLE_DOT);
+               DrawPeriodicLevel(m_pdh, m_pdhLineName, "PDH", COLOR_PDH, STYLE_DOT);
                changed = true;
             }
             if (pdl != 0 && pdl != m_pdl)
@@ -2959,7 +3089,7 @@ private:
                m_pdl = pdl;
                SwingPoint emptySwing; // ساختار خالی برای فیلد source_swing
                RegisterLiquidityEvent(LIQ_PDL, true, currentDayStart, m_pdl, "PDL", emptySwing);
-               DrawPeriodicLevel(m_pdl, m_pdlLineName, "PDL", clrRed, STYLE_DOT);
+               DrawPeriodicLevel(m_pdl, m_pdlLineName, "PDL", COLOR_PDL, STYLE_DOT);
                changed = true;
             }
          }
@@ -2979,7 +3109,7 @@ private:
                m_pwh = pwh;
                SwingPoint emptySwing;
                RegisterLiquidityEvent(LIQ_PWH, false, currentWeekStart, m_pwh, "PWH", emptySwing);
-               DrawPeriodicLevel(m_pwh, m_pwhLineName, "PWH", clrDarkGreen, STYLE_DASHDOT);
+               DrawPeriodicLevel(m_pwh, m_pwhLineName, "PWH", COLOR_PWH, STYLE_DASHDOT);
                changed = true;
             }
             if (pwl != 0 && pwl != m_pwl)
@@ -2987,7 +3117,7 @@ private:
                m_pwl = pwl;
                SwingPoint emptySwing;
                RegisterLiquidityEvent(LIQ_PWL, true, currentWeekStart, m_pwl, "PWL", emptySwing);
-               DrawPeriodicLevel(m_pwl, m_pwlLineName, "PWL", clrDarkRed, STYLE_DASHDOT);
+               DrawPeriodicLevel(m_pwl, m_pwlLineName, "PWL", COLOR_PWL, STYLE_DASHDOT);
                changed = true;
             }
          }
@@ -3007,7 +3137,7 @@ private:
                m_pmh = pmh;
                SwingPoint emptySwing;
                RegisterLiquidityEvent(LIQ_PMH, false, currentMonthStart, m_pmh, "PMH", emptySwing);
-               DrawPeriodicLevel(m_pmh, m_pmhLineName, "PMH", clrForestGreen, STYLE_DASHDOTDOT);
+               DrawPeriodicLevel(m_pmh, m_pmhLineName, "PMH", COLOR_PMH, STYLE_DASHDOTDOT);
                changed = true;
             }
             if (pml != 0 && pml != m_pml)
@@ -3015,7 +3145,7 @@ private:
                m_pml = pml;
                SwingPoint emptySwing;
                RegisterLiquidityEvent(LIQ_PML, true, currentMonthStart, m_pml, "PML", emptySwing);
-               DrawPeriodicLevel(m_pml, m_pmlLineName, "PML", clrFireBrick, STYLE_DASHDOTDOT);
+               DrawPeriodicLevel(m_pml, m_pmlLineName, "PML", COLOR_PML, STYLE_DASHDOTDOT);
                changed = true;
             }
          }
@@ -3045,7 +3175,7 @@ private:
                   m_pyh = yearlyHigh;
                   SwingPoint emptySwing;
                   RegisterLiquidityEvent(LIQ_PYH, false, currentYearStart, m_pyh, "PYH", emptySwing);
-                  DrawPeriodicLevel(m_pyh, m_pyhLineName, "PYH", clrLimeGreen, STYLE_SOLID, 2);
+                  DrawPeriodicLevel(m_pyh, m_pyhLineName, "PYH", COLOR_PYH, STYLE_SOLID, 2);
                   changed = true;
                }
                if (yearlyLow != 0 && yearlyLow != m_pyl)
@@ -3053,7 +3183,7 @@ private:
                   m_pyl = yearlyLow;
                   SwingPoint emptySwing;
                   RegisterLiquidityEvent(LIQ_PYL, true, currentYearStart, m_pyl, "PYL", emptySwing);
-                  DrawPeriodicLevel(m_pyl, m_pylLineName, "PYL", clrIndianRed, STYLE_SOLID, 2);
+                  DrawPeriodicLevel(m_pyl, m_pylLineName, "PYL", COLOR_PYL, STYLE_SOLID, 2);
                   changed = true;
                }
             }
@@ -3103,7 +3233,7 @@ private:
             if (m_drawEQ && m_showDrawing) DrawEQEvent(minorEq.source_swing, minorEq.time_formation, minorEq.price_entry, type, false);
             changed = true;
          } else {
-            LogEvent("EQ مینور به دلیل همپوشانی با ماژور رسم نشد.", m_enableLogging, "[LIQ]");
+            CentralLog(LOG_FULL, m_logLevel, 0, "[LIQ]", "EQ مینور به دلیل همپوشانی با ماژور رسم نشد.");
          }
          m_lastSeenMinorEQTime = minorEq.time_formation; // همیشه آپدیت شود
       }
@@ -3131,7 +3261,7 @@ private:
                m_sms_source_swing = (currentTrend == TREND_BULLISH) ? m_major.GetSwingHigh(1) : m_major.GetSwingLow(1);
                if (m_sms_source_swing.time == 0) m_sms_source_swing = (currentTrend == TREND_BULLISH) ? lastHigh : lastLow;
                m_trapState = STATE_WAITING_FOR_OPPOSING_BOS;
-               LogEvent("وضعیت تله به STATE_WAITING_FOR_OPPOSING_BOS تغییر یافت.", m_enableLogging, "[LIQ]");
+               CentralLog(LOG_FULL, m_logLevel, 0, "[LIQ]", "وضعیت تله به STATE_WAITING_FOR_OPPOSING_BOS تغییر یافت.");
             }
             break;
          case STATE_WAITING_FOR_OPPOSING_BOS:
@@ -3146,12 +3276,12 @@ private:
                   if (m_cf_source_swing.time == 0) m_cf_source_swing = (currentTrend == TREND_BEARISH) ? lastLow : lastHigh;
                   m_trapState = STATE_WAITING_FOR_CONFIRMING_BREAK;
                   changed = true;
-                  LogEvent("تله SMS تایید شد.", m_enableLogging, "[LIQ]");
+                  CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_213, "[LIQ]", "تله SMS تایید شد.");
                }
                else
                {
                   m_trapState = STATE_IDLE;
-                  LogEvent("تله SMS تایید نشد.", m_enableLogging, "[LIQ]");
+                  CentralLog(LOG_FULL, m_logLevel, 0, "[LIQ]", "تله SMS تایید نشد.");
                }
             }
             else if (currentCHoCH > m_lastKnownCHoCH)
@@ -3161,7 +3291,7 @@ private:
                m_sms_source_swing = (currentTrend == TREND_BULLISH) ? m_major.GetSwingHigh(1) : m_major.GetSwingLow(1);
                if (m_sms_source_swing.time == 0) m_sms_source_swing = (currentTrend == TREND_BULLISH) ? lastHigh : lastLow;
                m_trapState = STATE_WAITING_FOR_OPPOSING_BOS;
-               LogEvent("تله ریست شد به دلیل CHoCH جدید.", m_enableLogging, "[LIQ]");
+               CentralLog(LOG_FULL, m_logLevel, 0, "[LIQ]", "تله ریست شد به دلیل CHoCH جدید.");
             }
             break;
          case STATE_WAITING_FOR_CONFIRMING_BREAK:
@@ -3174,11 +3304,11 @@ private:
                   RegisterLiquidityEvent(LIQ_CF, (currentTrend == TREND_BULLISH), m_cf_source_swing.time, m_cf_source_swing.price, "CF", m_cf_source_swing);
                   if (m_drawTraps && m_showDrawing) DrawTrapEvent(m_cf_source_swing, LIQ_CF);
                   changed = true;
-                  LogEvent("تله CF تایید شد.", m_enableLogging, "[LIQ]");
+                  CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_213, "[LIQ]", "تله CF تایید شد.");
                }
                else
                {
-                  LogEvent("تله CF تایید نشد.", m_enableLogging, "[LIQ]");
+                  CentralLog(LOG_FULL, m_logLevel, 0, "[LIQ]", "تله CF تایید نشد.");
                }
                m_trapState = STATE_IDLE;
                if (currentCHoCH > m_lastKnownCHoCH) m_lastKnownCHoCH = currentCHoCH;
@@ -3202,7 +3332,7 @@ public:
    {
       if (CheckPointer(major_ptr) == POINTER_INVALID || CheckPointer(minor_ptr) == POINTER_INVALID)
       {
-         LogEvent("خطای حیاتی: پوینترهای Major/Minor نامعتبر هستند!", true, "[LIQ]");
+         CentralLog(LOG_ERROR, DEFAULT_LOG_LEVEL, ERROR_CODE_103, "[LIQ]", "خطای حیاتی: پوینترهای Major/Minor نامعتبر هستند!", true);
          return;
       }
 
@@ -3212,6 +3342,7 @@ public:
       m_timeframe = timeframe;
       m_chartId = chartId;
       m_enableLogging = enableLogging_in;
+      m_logLevel = DEFAULT_LOG_LEVEL;
       m_showDrawing = showDrawing_in;
       m_drawEQ = drawEQ_in;
       m_drawTraps = drawTraps_in;
@@ -3262,7 +3393,7 @@ public:
          }
       }
 
-      LogEvent("کلاس CLiquidityManager برای نماد " + m_symbol + " و تایم فریم " + EnumToString(m_timeframe) + " آغاز به کار کرد.", m_enableLogging, "[LIQ]");
+      CentralLog(LOG_FULL, m_logLevel, 0, "[LIQ]", "کلاس CLiquidityManager برای نماد " + m_symbol + " و تایم فریم " + EnumToString(m_timeframe) + " آغاز به کار کرد.");
    }
 
    //+------------------------------------------------------------------+
@@ -3282,7 +3413,7 @@ public:
             }
          }
       }
-      LogEvent("کلاس CLiquidityManager متوقف شد.", m_enableLogging, "[LIQ]");
+      CentralLog(LOG_FULL, m_logLevel, 0, "[LIQ]", "کلاس CLiquidityManager متوقف شد.");
    }
 
    //+------------------------------------------------------------------+
@@ -3296,10 +3427,14 @@ public:
 
       if (CheckPointer(m_major) == POINTER_INVALID || CheckPointer(m_minor) == POINTER_INVALID) return false;
 
+      CentralLog(LOG_FULL, m_logLevel, 0, "[LIQ]", "شروع پردازش بار جدید.");
+
       bool changed = false;
       changed |= UpdatePeriodicLevels();
       changed |= ScanForEQ();
       changed |= ScanForStructuralTraps();
+
+      CentralLog(LOG_FULL, m_logLevel, 0, "[LIQ]", "پایان پردازش بار جدید.");
       return changed;
    }
 
