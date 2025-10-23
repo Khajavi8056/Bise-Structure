@@ -28,35 +28,35 @@
 //+------------------------------------------------------------------+
 //| تنظیمات رنگ‌ها (برای تغییر آسان بدون جستجو در کد)               |
 //+------------------------------------------------------------------+
-const color COLOR_FVG_BULLISH = clrBurlyWood; // سبز کمرنگ برای FVG صعودی (شفاف/هاله)
-const color COLOR_FVG_BEARISH = clrBurlyWood; // قرمز کمرنگ برای FVG نزولی (شفاف/هاله)
-const color COLOR_OB_ZONE = C'245,245,245';     // سفید کمرنگ برای زون OB (شفاف/هاله)
+const color COLOR_FVG_BULLISH = C'228,232,168'; // سبز کمرنگ برای FVG صعودی (شفاف/هاله)
+const color COLOR_FVG_BEARISH = C'228,232,168'; // قرمز کمرنگ برای FVG نزولی (شفاف/هاله)
+const color COLOR_OB_ZONE = C'224,213,103';     // سفید کمرنگ برای زون OB (شفاف/هاله)
 const color COLOR_OB_TEXT = clrBlack;           // رنگ متن OB
-const color COLOR_SWING_HIGH = clrDodgerBlue;   // رنگ سقف سوئینگ
-const color COLOR_SWING_LOW = clrRed;           // رنگ کف سوئینگ
-const color COLOR_BREAK_CHoCH = clrCrimson;     // رنگ شکست CHoCH
-const color COLOR_BREAK_BoS_BULL = clrSeaGreen; // رنگ شکست BoS صعودی
-const color COLOR_BREAK_BoS_BEAR = clrOrange;   // رنگ شکست BoS نزولی
-const color COLOR_TREND_BULL = clrDeepSkyBlue;  // رنگ لیبل روند صعودی
+const color COLOR_SWING_HIGH = clrBlack;   // رنگ سقف سوئینگ
+const color COLOR_SWING_LOW = clrBlack;           // رنگ کف سوئینگ
+const color COLOR_BREAK_CHoCH = clrBlack;     // رنگ شکست CHoCH
+const color COLOR_BREAK_BoS_BULL = clrBlack ; // رنگ شکست BoS صعودی
+const color COLOR_BREAK_BoS_BEAR = clrBlack;   // رنگ شکست BoS نزولی
+const color COLOR_TREND_BULL = clrGreen;  // رنگ لیبل روند صعودی
 const color COLOR_TREND_BEAR = clrOrangeRed;    // رنگ لیبل روند نزولی
 const color COLOR_TREND_NONE = clrGray;         // رنگ لیبل بدون روند
-const color COLOR_FIB_TRACK_BULL = clrDodgerBlue; // رنگ فیبو ردیاب صعودی
-const color COLOR_FIB_TRACK_BEAR = clrOrangeRed;  // رنگ فیبو ردیاب نزولی
+const color COLOR_FIB_TRACK_BULL =  C'254,240,165'; // رنگ فیبو ردیاب صعودی
+const color COLOR_FIB_TRACK_BEAR =  C'254,240,165';  // رنگ فیبو ردیاب نزولی
 const color COLOR_LABEL_TEXT = clrBlack;    // رنگ متن لیبل‌ها
-const color COLOR_MINOR_SWING = clrYellow;      // رنگ نقاط مینور
-const color COLOR_EQ_BULL = clrBlue;            // رنگ EQ صعودی
-const color COLOR_EQ_BEAR = clrPink;            // رنگ EQ نزولی
-const color COLOR_EQ_ZONE = clrLightGray;       // رنگ زون EQ
+const color COLOR_MINOR_SWING = clrBlack;      // رنگ نقاط مینور
+const color COLOR_EQ_BULL = clrBlack;            // رنگ EQ صعودی
+const color COLOR_EQ_BEAR = clrAntiqueWhite;            // رنگ EQ نزولی
+const color COLOR_EQ_ZONE = clrNONE;       // رنگ زون EQ
 const color COLOR_SMS_TRAP = C'128,0,128';      // رنگ تله SMS
 const color COLOR_CF_TRAP = C'255,140,0';       // رنگ تله CF
-const color COLOR_PDH = clrGreen;               // رنگ PDH
-const color COLOR_PDL = clrRed;                 // رنگ PDL
-const color COLOR_PWH = clrDarkGreen;           // رنگ PWH
-const color COLOR_PWL = clrDarkRed;             // رنگ PWL
-const color COLOR_PMH = clrForestGreen;         // رنگ PMH
-const color COLOR_PML = clrFireBrick;           // رنگ PML
-const color COLOR_PYH = clrLimeGreen;           // رنگ PYH
-const color COLOR_PYL = clrIndianRed;           // رنگ PYL
+const color COLOR_PDH = clrBlack;               // رنگ PDH
+const color COLOR_PDL = clrBlack;                 // رنگ PDL
+const color COLOR_PWH = clrBlack;           // رنگ PWH
+const color COLOR_PWL = clrBlack;             // رنگ PWL
+const color COLOR_PMH = clrBlack;         // رنگ PMH
+const color COLOR_PML = clrBlack;           // رنگ PML
+const color COLOR_PYH = clrBlack;           // رنگ PYH
+const color COLOR_PYL = clrBlack;           // رنگ PYL
 
 //+------------------------------------------------------------------+
 //| تنظیمات لاگ (سیستم لاگ حرفه‌ای و طبقه‌بندی شده)                 |
@@ -68,7 +68,7 @@ enum LOG_LEVEL
    LOG_ERROR       // فقط خطاها و هشدارها
 };
 
-const LOG_LEVEL DEFAULT_LOG_LEVEL = LOG_ERROR; // سطح پیش‌فرض
+const LOG_LEVEL DEFAULT_LOG_LEVEL = LOG_PERFORMANCE; // سطح پیش‌فرض
 
 // کدهای خطا (برای لاگ‌های خطا)
 const int ERROR_CODE_101 = 101; // خطای دسترسی به داده (مثل iHigh/iLow)
@@ -116,7 +116,7 @@ void CentralLog(const LOG_LEVEL level, const LOG_LEVEL currentLevel, const int c
 //+------------------------------------------------------------------+
 //| تعاریف سراسری برای عناصر گرافیکی (برای خوانایی و زیبایی بصری)   |
 //+------------------------------------------------------------------+
-const int BASE_LABEL_FONT_SIZE = 7; // سایز فونت پایه برای اکثر لیبل‌ها
+const int BASE_LABEL_FONT_SIZE = 8; // سایز فونت پایه برای اکثر لیبل‌ها
 const int SMALL_LABEL_FONT_SIZE = 6; // سایز فونت کوچکتر برای خطوط کوتاه
 const double VERTICAL_OFFSET_TICKS = 10.0; // ضریب آفست عمودی بر اساس اندازه تیک
 const double OVERLAP_TIME_THRESHOLD_BARS = 1.5; // آستانه زمانی برای تشخیص همپوشانی (به تعداد کندل)
@@ -718,7 +718,15 @@ public:
       m_activeMajorLowCandidate.bar_index = -1;
       m_lastMajorEQInvalidationCheck = 0;
       m_lastMajorEQDetectionCheck = 0;
-      
+       ChartSetInteger(0, CHART_SHOW_GRID, false);
+  
+   // تنظیم رنگ کندل‌ها
+   ChartSetInteger(0, CHART_COLOR_CANDLE_BULL, clrWhite);
+   ChartSetInteger(0, CHART_COLOR_CANDLE_BEAR, clrBlack);
+   ChartSetInteger(0, CHART_COLOR_CHART_UP, clrBlack);
+   ChartSetInteger(0, CHART_COLOR_CHART_DOWN, clrBlack);
+   ChartSetInteger(0,CHART_COLOR_FOREGROUND,clrBlack);
+  ChartSetInteger(0,CHART_COLOR_BACKGROUND, C'254,240,165'); 
       CentralLog(LOG_FULL, m_logLevel, 0, "[SMC]", "کلاس MarketStructure برای نماد " + m_symbol + " و تایم فریم " + EnumToString(m_timeframe) + " آغاز به کار کرد.");
    }
 
@@ -1250,7 +1258,7 @@ private:
            double fibLevel = current0Per.price - (range * (m_fibUpdateLevel / 100.0));
            double close_1 = iClose(m_symbol, m_timeframe, 1);
 
-           if (close_1 <= fibLevel) // شرط تایید (بسته شدن در 35% یا پایین‌تر)
+           if (close_1 <= fibLevel) // شرط تایی(بسته شدن در 35% یا پایین‌تر)
            {
                CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_203, "[SMC]", "<<< تایید شد: شرط اصلاح " + IntegerToString(m_fibUpdateLevel) + "٪ برای سقف جدید برقرار شد.");
                AddSwingHigh(current0Per.price, current0Per.time, current0Per.bar_index, current0Per.body_price);
@@ -1482,6 +1490,8 @@ private:
 
       ObjectCreate(m_chartId, objName, OBJ_ARROW, 0, sp.time, sp.price);
       ObjectSetInteger(m_chartId, objName, OBJPROP_ARROWCODE, 77);
+            ObjectSetInteger(m_chartId, objName, OBJPROP_WIDTH, 1);
+
       ObjectSetInteger(m_chartId, objName, OBJPROP_COLOR, isHigh ? COLOR_SWING_HIGH : COLOR_SWING_LOW);
       ObjectSetInteger(m_chartId, objName, OBJPROP_ANCHOR, isHigh ? ANCHOR_BOTTOM : ANCHOR_TOP);
    }
@@ -1514,7 +1524,7 @@ private:
        datetime midTime = brokenSwing.time + (breakTime - brokenSwing.time) / 2;
        double midPrice = brokenSwing.price;
        double tickSize = SymbolInfoDouble(m_symbol, SYMBOL_TRADE_TICK_SIZE);
-       double verticalOffset = tickSize * VERTICAL_OFFSET_TICKS;
+       double verticalOffset = tickSize * VERTICAL_OFFSET_TICKS*2;
        double textPrice = midPrice + (isHighBreak ? verticalOffset : -verticalOffset);
 
        // مدیریت همپوشانی
@@ -2422,7 +2432,7 @@ private:
          CentralLog(LOG_ERROR, m_logLevel, ERROR_CODE_102, "[MINOR]", "خطا در ایجاد شیء: " + IntegerToString(GetLastError()), true);
          return;
       }
-      ObjectSetInteger(m_chartId, objName, OBJPROP_ARROWCODE, isHigh ? 217 : 218); // 217: فلش رو به پایین (سقف)، 218: فلش رو به بالا (کف)
+      ObjectSetInteger(m_chartId, objName, OBJPROP_ARROWCODE, isHigh ? 218 : 217); // 217: فلش رو به پایین (سقف)، 218: فلش رو به بالا (کف)
       ObjectSetInteger(m_chartId, objName, OBJPROP_COLOR, COLOR_MINOR_SWING);
       ObjectSetInteger(m_chartId, objName, OBJPROP_WIDTH, 1);
       ObjectSetInteger(m_chartId, objName, OBJPROP_ANCHOR, isHigh ? ANCHOR_TOP : ANCHOR_BOTTOM);
