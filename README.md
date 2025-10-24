@@ -1,27 +1,5 @@
 # 📚 کتابخانه MarketStructureLibrary - ابزار جامع تحلیل بازار برای MQL5
 
-![Market Structure Library - EURUSD M15](https://github.com/Khajavi8056/Bise-Structure/blob/main/more/Strategy%20Tester%20Visualization%20_%20test%20structur%20on%20EURUSD,M15%20from%202025.01.01%20to%202025.10.23%2010_24_2025%207_48_28%20PM.png?raw=true)
-![Market Structure Library - FVG & OB](https://github.com/Khajavi8056/Bise-Structure/blob/main/more/Strategy%20Tester%20Visualization%20_%20test%20structur%20on%20EURUSD,M15%20from%202025.01.01%20to%202025.10.23%2010_24_2025%207_52_41%20PM.png?raw=true)
-![Market Structure Library - Liquidity & Pinbar](https://github.com/Khajavi8056/Bise-Structure/blob/main/more/Strategy%20Tester%20Visualization%20_%20test%20structur%20on%20EURUSD,M15%20from%202025.01.01%20to%202025.10.23%2010_24_2025%207_54_46%20PM.png?raw=true)
-
-<div align="center">
-  <img src="https://github.com/Khajavi8056/Bise-Structure/blob/main/more/Strategy%20Tester%20Visualization%20_%20test%20structur%20on%20EURUSD,M15%20from%202025.01.01%20to%202025.10.23%2010_24_2025%207_48_28%20PM.png?raw=true" width="32%" />
-  <img src="https://github.com/Khajavi8056/Bise-Structure/blob/main/more/Strategy%20Tester%20Visualization%20_%20test%20structur%20on%20EURUSD,M15%20from%202025.01.01%20to%202025.10.23%2010_24_2025%207_52_41%20PM.png?raw=true" width="32%" />
-  <img src="https://github.com/Khajavi8056/Bise-Structure/blob/main/more/Strategy%20Tester%20Visualization%20_%20test%20structur%20on%20EURUSD,M15%20from%202025.01.01%20to%202025.10.23%2010_24_2025%207_54_46%20PM.png?raw=true" width="32%" />
-</div>
-
-<script>
-  const images = document.querySelectorAll('div[align="center"] img');
-  let current = 0;
-  images.forEach((img, i) => img.style.display = i === 0 ? 'inline-block' : 'none');
-  setInterval(() => {
-    images[current].style.display = 'none';
-    current = (current + 1) % images.length;
-    images[current].style.display = 'inline-block';
-  }, 30000); // هر 30 ثانیه
-</script>
-
----
 **MarketStructureLibrary.mqh** یک کتابخانه قدرتمند و منعطف برای MetaTrader 5 است که برای تحلیل پیشرفته ساختار بازار، شناسایی شکاف ارزش منصفانه (FVG)، مدیریت نقاط محوری مینور، مدیریت نقدینگی بازار (شامل EQ، تله‌های ساختاری و سطوح دوره‌ای) و شناسایی پین‌بارها طراحی شده است. این کتابخانه با پشتیبانی از چند تایم‌فریم و چند نماد، ابزارهای قوی برای پیاده‌سازی مفاهیم Smart Money Concepts (SMC)، استراتژی‌های معاملاتی مبتنی بر FVG، ساختارهای مینور، نقدینگی و الگوهای پین‌بار در اختیار معامله‌گران و توسعه‌دهندگان قرار می‌دهد. 🚀
 
 **نسخه فعلی: 3.00** (به‌روزرسانی با اضافه شدن قابلیت نقدینگی یکپارچه، EQ ماژور/مینور، تله‌های SMS/CF، سطوح دوره‌ای، شناسایی پین‌بار و بهینه‌سازی‌های MT5)
