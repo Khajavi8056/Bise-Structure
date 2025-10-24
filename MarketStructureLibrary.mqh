@@ -96,6 +96,10 @@ const int PERF_CODE_211 = 211; // شناسایی مینور جدید
 const int PERF_CODE_212 = 212; // به‌روزرسانی سطوح دوره‌ای
 const int PERF_CODE_213 = 213; // شناسایی تله SMS/CF
 const int PERF_CODE_214 = 214; // ثبت رویداد نقدینگی
+ // آستانه تشخیص (مثلاً ۰.۶۶ یعنی سایه باید ۶۶٪ کل رنج باشه)
+   const double      PINBAR_SHADOW_RATIO_THRESHOLD = 0.66;
+   // آستانه بدنه (مثلاً ۰.۳۳ یعنی بدنه نباید از ۳۳٪ کل رنج بزرگتر باشه)
+   const double      PINBAR_BODY_RATIO_THRESHOLD = 0.33;
 
 //+------------------------------------------------------------------+
 //| تابع لاگ مرکزی (با سطح‌بندی، کد و فرمت جدولی)                   |
@@ -1528,7 +1532,7 @@ private:
        double textPrice = midPrice + (isHighBreak ? verticalOffset : -verticalOffset);
 
        // مدیریت همپوشانی
-       while (IsPositionOccupied(m_chartId, midTime, textPrice, m_timeframe))
+       while (IsPositionOccupied(m_chartId, midTime, textPrice,m_timeframe))
        {
           textPrice += (isHighBreak ? (verticalOffset / 2.0) : (-verticalOffset / 2.0));
        }
@@ -1713,7 +1717,7 @@ private:
                MajorEQPattern newEQ;
                newEQ.isBullish = true;
                newEQ.time_formation = iTime(m_symbol, m_timeframe, 1); // زمان تایید
-               newEQ.price_entry = iLow(m_symbol, m_timeframe, 1); // Low کندل تایید
+               newEQ.price_entry = iLow(m_symbol, m_timeframe, 1); // Low کندل ورود به زون
                newEQ.source_swing = m_activeMajorLowCandidate;
 
                // درج دستی به جای ArrayInsert
@@ -2974,7 +2978,7 @@ private:
       CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_214, "[LIQ]", "رویداد نقدینگی " + EnumToString(type) + " ثبت شد.");
    }
 
-   //--- تابع کمکی: رسم سطوح دوره‌ای
+   //--- تابع کمکی: رسم سطوح سطوح دوره‌ای
    void DrawPeriodicLevel(double price, const string objName, const string label, color clr, ENUM_LINE_STYLE style, int width = 1)
    {
       ObjectDelete(m_chartId, objName);
@@ -3267,7 +3271,7 @@ private:
             if (currentCHoCH > m_lastKnownCHoCH && currentCHoCH > m_lastKnownBoS)
             {
                m_lastKnownCHoCH = currentCHoCH;
-               m_preCHoCHTrend = (currentTrend == TREND_BULLISH) ? TREND_BEARISH : TREND_BULLISH;
+               m_preCHoCHTrend = (currentTrend ==TREND_BULLISH) ? TREND_BEARISH : TREND_BULLISH;
                m_sms_source_swing = (currentTrend == TREND_BULLISH) ? m_major.GetSwingHigh(1) : m_major.GetSwingLow(1);
                if (m_sms_source_swing.time == 0) m_sms_source_swing = (currentTrend == TREND_BULLISH) ? lastHigh : lastLow;
                m_trapState = STATE_WAITING_FOR_OPPOSING_BOS;
@@ -3475,6 +3479,272 @@ public:
       }
       LiquidityEvent empty; empty.time = 0;
       return empty;
+   }
+};
+
+//+------------------------------------------------------------------+
+//| کلاس شناسایی پین‌بار (تکی و ادغام شده)                          |
+//+------------------------------------------------------------------+
+// ساختار ۱: کندل مجازی (برای نگهداری نتیجه ادغام)
+// این ساختار، دیتای ۱، ۲ یا ۳ کندل ادغام شده رو نگه می‌داره
+struct VirtualCandle
+{
+   double   open;           // اوپنِ قدیمی‌ترین کندل
+   double   high;           // بالاترین High در مجموعه
+   double   low;            // پایین‌ترین Low در مجموعه
+   double   close;          // کلوزِ جدیدترین کندل
+   datetime time_oldest;    // زمانِ قدیمی‌ترین کندل (برای نام‌گذاری آبجکت)
+   datetime time_newest;    // زمانِ جدیدترین کندل (برای بررسی)
+   int      candle_count;   // چند کندل ادغام شدن؟ (۱، ۲ یا ۳)
+};
+
+// ساختار ۲: نتیجه پین‌بار (خروجی تابع)
+// این ساختار، مشخصات پین‌بار پیدا شده رو برمی‌گردونه
+struct PinbarResult
+{
+   bool           isBullish;      // صعودیه (Hammer) یا نزولی (Shooting Star)؟
+   VirtualCandle  candle_data;    // دیتای کندل مجازی که پین‌بار رو ساخته
+   string         type_name;      // اسم نوع: "Single C1", "Agg C2+C3", "Agg C1C2C3" و...
+};
+
+class CPinbarDetector
+{
+private:
+   // --- متغیرهای داخلی ---
+   string            m_symbol;
+   ENUM_TIMEFRAMES   m_period;
+   long              m_chartId;
+   string            m_timeframeSuffix;
+
+  
+
+   // --- توابع کمکی داخلی (Private) ---
+
+   // تابع اصلی ادغام کندل‌ها
+   // shift_newest: اندیس جدیدترین کندل (مثلاً ۱)
+   // count: تعداد کندل برای ادغام (مثلاً ۳)
+   VirtualCandle GetVirtualCandle(const int shift_newest, const int count)
+   {
+      VirtualCandle vc;
+      vc.candle_count = count;
+      vc.time_newest = iTime(m_symbol, m_period, shift_newest);
+      vc.time_oldest = iTime(m_symbol, m_period, shift_newest + count - 1);
+      
+      // اوپنِ قدیمی‌ترین و کلوزِ جدیدترین
+      vc.open = iOpen(m_symbol, m_period, shift_newest + count - 1);
+      vc.close = iClose(m_symbol, m_period, shift_newest);
+      
+      // پیدا کردن اکستریمم‌ها در پنجره
+      vc.high = 0;
+      vc.low = DBL_MAX;
+      for(int i = shift_newest; i < shift_newest + count; i++)
+      {
+         if(iHigh(m_symbol, m_period, i) > vc.high) vc.high = iHigh(m_symbol, m_period, i);
+         if(iLow(m_symbol, m_period, i) < vc.low)   vc.low = iLow(m_symbol, m_period, i);
+      }
+      
+      return vc;
+   }
+
+   // تابع اصلی ریاضیات پین‌بار
+   // 0 = پین‌بار نیست
+   // 1 = پین‌بار صعودی (Bullish)
+   // 2 = پین‌بار نزولی (Bearish)
+   int CheckPinbarLogic(VirtualCandle &vc)
+   {
+      double totalRange = vc.high - vc.low;
+      
+      // جلوگیری از خطای تقسیم بر صفر (کندل دوجی یا بدون حرکت)
+      if(totalRange < SymbolInfoDouble(m_symbol, SYMBOL_POINT)) return 0;
+      
+      double body = MathAbs(vc.open - vc.close);
+      
+      // شرط ۱: بدنه باید کوچک باشد
+      if((body / totalRange) < PINBAR_BODY_RATIO_THRESHOLD) return 0;
+      
+      // شرط ۲: یکی از سایه‌ها باید خیلی بلند باشد
+      double upperShadow = vc.high - MathMax(vc.open, vc.close);
+      double lowerShadow = MathMin(vc.open, vc.close) - vc.low;
+      
+      if((lowerShadow / totalRange) >= PINBAR_SHADOW_RATIO_THRESHOLD) return 1; // صعودی
+      if((upperShadow / totalRange) >= PINBAR_SHADOW_RATIO_THRESHOLD) return 2; // نزولی
+      
+      return 0; // پین‌بار نیست
+   }
+   
+   // تابع برای ساختن اسم منحصر به فرد آبجکت (برای جلوگیری از رسم تکراری)
+   string GetObjectName(PinbarResult &result)
+   {
+      // اسم باید شامل نوع، زمان شروع و تایم فریم باشد
+      // این تضمین می‌کنه که هر پین‌بار فقط یک بار رسم بشه
+      return "Pinbar_" + result.type_name + "_" + 
+             TimeToString(result.candle_data.time_oldest) + 
+             m_timeframeSuffix;
+   }
+
+   // تابع رسم علامت π
+   void DrawPinbar(PinbarResult &result)
+   {
+      string objName = GetObjectName(result);
+      
+      // چک کردن عدم وجود آبجکت (مهم‌ترین بخش برای جلوگیری از رسم تکراری)
+      if(ObjectFind(m_chartId, objName) != -1)
+      {
+         // آبجکت از قبل وجود داره، پس کاری نکن
+         return; 
+      }
+      
+      // محاسبه محل رسم
+      datetime drawTime = result.candle_data.time_oldest; // در شروع کندل مجازی رسم می‌کنیم
+      double drawPrice;
+      double tickSize = SymbolInfoDouble(m_symbol, SYMBOL_TRADE_TICK_SIZE);
+      
+      if(result.isBullish)
+      {
+         // زیر Low کندل مجازی
+         drawPrice = result.candle_data.low - (tickSize * 10); // ۱۰ تیک آفست
+      }
+      else
+      {
+         // بالای High کندل مجازی
+         drawPrice = result.candle_data.high + (tickSize * 10); // ۱۰ تیک آفست
+      }
+      
+      // ایجاد آبجکت متن
+      if(ObjectCreate(m_chartId, objName, OBJ_TEXT, 0, drawTime, drawPrice))
+      {
+         ObjectSetString(m_chartId, objName, OBJPROP_TEXT, "π");
+         ObjectSetInteger(m_chartId, objName, OBJPROP_COLOR, (result.isBullish ? clrGreen : clrRed));
+         ObjectSetInteger(m_chartId, objName, OBJPROP_FONTSIZE, 10);
+         ObjectSetInteger(m_chartId, objName, OBJPROP_ANCHOR, (result.isBullish ? ANCHOR_TOP : ANCHOR_BOTTOM));
+      }
+   }
+
+
+public:
+   // --- سازنده (Constructor) ---
+   CPinbarDetector(void) {} // سازنده ساده
+
+   // --- تابع اصلی و عمومی (Public) ---
+   
+   // تابع اصلی که از بیرون صدا زده می‌شه
+   // ورودی‌ها: نماد، تایم‌فریم، آیدی چارت، آیا رسم شود؟
+   // خروجی: تعداد پین‌بارهای پیدا شده (و پُر کردن آرایه results_array)
+   int DetectPinbars(string symbol, ENUM_TIMEFRAMES period, long chartId, bool draw, PinbarResult &results_array[])
+   {
+      // مقداردهی اولیه متغیرهای کلاس
+      m_symbol = symbol;
+      m_period = period;
+      m_chartId = chartId;
+      m_timeframeSuffix = " (" + TimeFrameToStringShort(period) + ")";
+      
+      // پاک کردن آرایه خروجی برای شروع تمیز
+      ArrayResize(results_array, 0);
+      
+      // بررسی وجود کندل کافی
+      if(iBars(m_symbol, m_period) < 4) return 0; // چون تا شیفت ۳ نیاز داریم
+
+      // آرایه‌ای برای نگهداری موقت نتایج
+      PinbarResult found_pins[];
+      int pin_count = 0;
+      
+      VirtualCandle vc;
+      int logic_result;
+
+      // --- شروع ۶ مرحله بررسی ---
+      
+      // ۱. چک تکی C1 (shift 1)
+      vc = GetVirtualCandle(1, 1);
+      logic_result = CheckPinbarLogic(vc);
+      if(logic_result > 0)
+      {
+         pin_count++;
+         ArrayResize(found_pins, pin_count);
+         found_pins[pin_count - 1].isBullish = (logic_result == 1);
+         found_pins[pin_count - 1].candle_data = vc;
+         found_pins[pin_count - 1].type_name = "Single_C1";
+      }
+
+      // ۲. چک تکی C2 (shift 2)
+      vc = GetVirtualCandle(2, 1);
+      logic_result = CheckPinbarLogic(vc);
+      if(logic_result > 0)
+      {
+         pin_count++;
+         ArrayResize(found_pins, pin_count);
+         found_pins[pin_count - 1].isBullish = (logic_result == 1);
+         found_pins[pin_count - 1].candle_data = vc;
+         found_pins[pin_count - 1].type_name = "Single_C2";
+      }
+
+      // ۳. چک تکی C3 (shift 3)
+      vc = GetVirtualCandle(3, 1);
+      logic_result = CheckPinbarLogic(vc);
+      if(logic_result > 0)
+      {
+         pin_count++;
+         ArrayResize(found_pins, pin_count);
+         found_pins[pin_count - 1].isBullish = (logic_result == 1);
+         found_pins[pin_count - 1].candle_data = vc;
+         found_pins[pin_count - 1].type_name = "Single_C3";
+      }
+
+      // ۴. چک ادغام C1+C2 (shift 1, count 2)
+      vc = GetVirtualCandle(1, 2);
+      logic_result = CheckPinbarLogic(vc);
+      if(logic_result > 0)
+      {
+         pin_count++;
+         ArrayResize(found_pins, pin_count);
+         found_pins[pin_count - 1].isBullish = (logic_result == 1);
+         found_pins[pin_count - 1].candle_data = vc;
+         found_pins[pin_count - 1].type_name = "Agg_C1C2";
+      }
+
+      // ۵. چک ادغام C2+C3 (shift 2, count 2)
+      vc = GetVirtualCandle(2, 2);
+      logic_result = CheckPinbarLogic(vc);
+      if(logic_result > 0)
+      {
+         pin_count++;
+         ArrayResize(found_pins, pin_count);
+         found_pins[pin_count - 1].isBullish = (logic_result == 1);
+         found_pins[pin_count - 1].candle_data = vc;
+         found_pins[pin_count - 1].type_name = "Agg_C2C3";
+      }
+
+      // ۶. چک ادغام C1+C2+C3 (shift 1, count 3)
+      vc = GetVirtualCandle(1, 3);
+      logic_result = CheckPinbarLogic(vc);
+      if(logic_result > 0)
+      {
+         pin_count++;
+         ArrayResize(found_pins, pin_count);
+         found_pins[pin_count - 1].isBullish = (logic_result == 1);
+         found_pins[pin_count - 1].candle_data = vc;
+         found_pins[pin_count - 1].type_name = "Agg_C1C2C3";
+      }
+      
+      // --- پایان بررسی ---
+      
+      // کپی کردن نتایج پیدا شده به آرایه خروجی
+      ArrayResize(results_array, pin_count);
+      for(int i = 0; i < pin_count; i++)
+      {
+         results_array[i] = found_pins[i];
+      }
+      
+      // اگر نیاز به رسم بود، حالا رسم کن
+      if(draw && pin_count > 0)
+      {
+         for(int i = 0; i < pin_count; i++)
+         {
+            DrawPinbar(results_array[i]);
+         }
+      }
+      
+      // برگرداندن تعداد پین‌بارهای پیدا شده
+      return pin_count;
    }
 };
 //+------------------------------------------------------------------+
