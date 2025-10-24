@@ -803,13 +803,17 @@ public:
       //--- ۴. پردازش الگوهای EQ ماژور
       ProcessMajorEQInvalidation();
       ProcessMajorEQDetection();
+
+      //--- ۵. به‌روزرسانی موقعیت متن‌های OB
+      if (m_showDrawing) UpdateOBTextPositions(); // این خط رو اضافه کن
       
       CentralLog(LOG_FULL, m_logLevel, 0, "[SMC]", "پایان پردازش بار جدید.");
       return structureChanged;
    }
 
 private:
-   //--- شناسایی ساختار اولیه بازار (بر مبنای فرکتال)
+   //---  شناسایی ساختار اولیه بازار (بر مبنای فرکتال)
+   //این  ساختار اولیه فقط برای بار اول و یکبار برای شروع چرخش منطق نیاز هست و سیستم با اولین شکست ساختار  یک خود ترمیمی نهفته دارد و در صورت که ان فرکتال ساد اولیه هم اشتباه باشد  با اغولین شکست اصلاح خواهدشد
    void IdentifyInitialStructure()
    {
       CentralLog(LOG_FULL, m_logLevel, 0, "[SMC]", "شروع شناسایی ساختار اولیه.");
@@ -1150,6 +1154,38 @@ private:
       ObjectDelete(m_chartId, textName);
    }
    
+   //--- تابع جدید: به‌روزرسانی موقعیت متن‌های OB برای ماندن در وسط زون
+   void UpdateOBTextPositions()
+   {
+      datetime currentTime = iTime(NULL, PERIOD_CURRENT, 0); 
+
+      // برای unmitigated OBها
+      for (int i = 0; i < ArraySize(m_unmitigatedOBs); i++)
+      {
+         OrderBlock ob = m_unmitigatedOBs[i];
+         string typeStr = ob.isBullish ? "Bullish" : "Bearish";
+         string textName = "OB_" + TimeToString(ob.time) + "_" + typeStr + m_timeframeSuffix + "_Text";
+
+         datetime midTime = ob.time + (currentTime - ob.time) / 2;
+         double midPrice = (ob.highPrice + ob.lowPrice) / 2;
+
+         ObjectMove(m_chartId, textName, 0, midTime, midPrice);
+      }
+
+      // برای mitigated OBها
+      for (int i = 0; i < ArraySize(m_mitigatedOBs); i++)
+      {
+         OrderBlock ob = m_mitigatedOBs[i];
+         string typeStr = ob.isBullish ? "Bullish" : "Bearish";
+         string textName = "OB_" + TimeToString(ob.time) + "_" + typeStr + m_timeframeSuffix + "_Text";
+
+         datetime midTime = ob.time + (currentTime - ob.time) / 2;
+         double midPrice = (ob.highPrice + ob.lowPrice) / 2;
+
+         ObjectMove(m_chartId, textName, 0, midTime, midPrice);
+      }
+   }
+
    //--- یافتن نقطه محوری مقابل (پیوت - 100% فیبو)
    SwingPoint FindOppositeSwing(const datetime brokenSwingTime, const datetime breakTime, const bool findHigh)
    {
@@ -1835,9 +1871,6 @@ private:
    int              m_aoFractalLength;      // طول فرکتال AO (تعداد میله‌های اطراف، مثلاً 3)
    bool             m_enableMinorOB_FVG_Check; // فعال/غیرفعال کردن شرط FVG برای شناسایی OB مینور (ورودی جدید سازنده)
 
-   //--- هندل اندیکاتور
-   int              m_ao_handle;            // هندل اندیکاتور Awesome Oscillator (بدون نمایش)
-
    //--- متغیرهای حالت
    SwingPoint       m_minorSwingHighs_Array[]; // آرایه سقف‌های مینور (سری، ظرفیت حداکثر ۱۰)
    SwingPoint       m_minorSwingLows_Array[];  // آرایه کف‌های مینور (سری، ظرفیت حداکثر ۱۰)
@@ -1872,13 +1905,6 @@ public:
       
       // تنظیم پسوند تایم فریم برای نمایش MTF (کوتاه شده)
       m_timeframeSuffix = " (" + TimeFrameToStringShort(timeframe) + ")";
-
-      // هندل AO بدون نمایش
-      m_ao_handle = iAO(m_symbol, m_timeframe);
-      if (m_ao_handle == INVALID_HANDLE)
-      {
-         CentralLog(LOG_ERROR, m_logLevel, ERROR_CODE_107, "[MINOR]", "خطا در ایجاد هندل Awesome Oscillator.", true);
-      }
 
       ArraySetAsSeries(m_minorSwingHighs_Array, true);
       ArraySetAsSeries(m_minorSwingLows_Array, true);
@@ -1938,7 +1964,6 @@ public:
             }
          }
       }
-      if (m_ao_handle != INVALID_HANDLE) IndicatorRelease(m_ao_handle); // آزادسازی هندل برای بهینه‌سازی منابع MT5
       CentralLog(LOG_FULL, m_logLevel, 0, "[MINOR]", "کلاس MinorStructure متوقف شد.");
    }
    
@@ -1966,21 +1991,11 @@ public:
 
       bool newMinorFound = false;
       
-      // کش کردن بافر AO برای کل بازه اسکن (بهینه‌سازی برای جلوگیری از CopyBuffer تکراری)
-      int barsCount = iBars(m_symbol, m_timeframe);
-      double aoBuffer[];
-      ArraySetAsSeries(aoBuffer, true);
-      if (CopyBuffer(m_ao_handle, 0, 0, barsCount, aoBuffer) <= 0)
-      {
-         CentralLog(LOG_ERROR, m_logLevel, ERROR_CODE_108, "[MINOR]", "خطا در کش کردن بافر AO: " + IntegerToString(GetLastError()), true);
-         return false;
-      }
-      
       // اسکن برای سقف‌های مینور
-      newMinorFound |= ScanForMinors(aoBuffer, true);
+      newMinorFound |= ScanForMinors(true);
       
       // اسکن برای کف‌های مینور
-      newMinorFound |= ScanForMinors(aoBuffer, false);
+      newMinorFound |= ScanForMinors(false);
       
       // ابطال الگوهای EQ تایید شده (مرگ بعد از زندگی)
       ProcessEQInvalidation();
@@ -2005,22 +2020,13 @@ private:
       
       int initialScanLimit = MathMin(200, barsCount - 1); // محدود به 100-200 کندل اخیر
       
-      // کش کردن بافر AO برای اسکن اولیه
-      double aoBuffer[];
-      ArraySetAsSeries(aoBuffer, true);
-      if (CopyBuffer(m_ao_handle, 0, 0, initialScanLimit + 1, aoBuffer) <= 0)
-      {
-         CentralLog(LOG_ERROR, m_logLevel, ERROR_CODE_108, "[MINOR]", "خطا در کش کردن بافر AO برای اسکن اولیه: " + IntegerToString(GetLastError()), true);
-         return;
-      }
-      
       bool foundHigh = false;
       bool foundLow = false;
       
-      // اسکن از جدیدترین (shift کوچک) به قدیمی‌تر (shift بزرگ)
+      // اسکن از جدیدترین (shift small) به قدیمی‌تر (shift large)
       for (int shift = m_aoFractalLength; shift <= initialScanLimit; shift++)
       {
-         if (!foundHigh && IsAOFractalHigh(shift, aoBuffer))
+         if (!foundHigh && IsAOFractalHigh(shift))
          {
             SwingPoint adjusted = AdjustMinorPoint(shift, true);
             if (adjusted.bar_index != -1 && AddMinorPoint(adjusted, true))
@@ -2031,7 +2037,7 @@ private:
             }
          }
          
-         if (!foundLow && IsAOFractalLow(shift, aoBuffer))
+         if (!foundLow && IsAOFractalLow(shift))
          {
             SwingPoint adjusted = AdjustMinorPoint(shift, false);
             if (adjusted.bar_index != -1 && AddMinorPoint(adjusted, false))
@@ -2053,8 +2059,8 @@ private:
       CentralLog(LOG_FULL, m_logLevel, 0, "[MINOR]", "پایان اسکن اولیه مینورها.");
    }
    
-   //--- تابع: اسکن برای سقف/کف مینور (از قدیم به جدید، با کش بافر)
-   bool ScanForMinors(const double &aoBuffer[], const bool isHigh)
+   //--- تابع: اسکن برای سقف/کف مینور (از قدیم به جدید)
+   bool ScanForMinors(const bool isHigh)
    {
       CentralLog(LOG_FULL, m_logLevel, 0, "[MINOR]", "شروع اسکن مینورها.");
       int barsCount = iBars(m_symbol, m_timeframe);
@@ -2067,7 +2073,7 @@ private:
       // اسکن از قدیمی‌ترین (startShift بزرگ) به جدیدترین (shift کوچک، تا m_aoFractalLength)
       for (int shift = startShift; shift >= m_aoFractalLength; shift--)
       {
-         bool isFractal = isHigh ? IsAOFractalHigh(shift, aoBuffer) : IsAOFractalLow(shift, aoBuffer);
+         bool isFractal = isHigh ? IsAOFractalHigh(shift) : IsAOFractalLow(shift);
          if (isFractal)
          {
             SwingPoint adjusted = AdjustMinorPoint(shift, isHigh);
@@ -2084,20 +2090,58 @@ private:
       return newFound;
    }
    
-   //--- تابع: بررسی شرط فرکتال برای سقف AO (بالاتر از اطراف، با کش بافر)
-   bool IsAOFractalHigh(const int centerShift, const double &aoBuffer[]) const
+   //--- تابع جدید: محاسبه دستی AO برای شیفت داده شده
+   double CalculateAO(const int shift) const
    {
-      if (centerShift < m_aoFractalLength || centerShift + m_aoFractalLength >= ArraySize(aoBuffer)) return false;
+      int short_period = 5;
+      int long_period = 34;
+      int total_bars_needed = long_period + shift + 1; // +1 برای ایمنی
+
+      double median_prices[];
+      ArrayResize(median_prices, total_bars_needed);
+      ArraySetAsSeries(median_prices, true);
+
+      for (int i = 0; i < total_bars_needed; i++)
+      {
+         int bar_shift = shift + i;
+         double high = iHigh(m_symbol, m_timeframe, bar_shift);
+         double low = iLow(m_symbol, m_timeframe, bar_shift);
+         median_prices[i] = (high + low) / 2.0;
+      }
+
+      // محاسبه SMA کوتاه
+      double sma_short = 0.0;
+      for (int i = 0; i < short_period; i++)
+      {
+         sma_short += median_prices[i];
+      }
+      sma_short /= short_period;
+
+      // محاسبه SMA بلند
+      double sma_long = 0.0;
+      for (int i = 0; i < long_period; i++)
+      {
+         sma_long += median_prices[i];
+      }
+      sma_long /= long_period;
+
+      return sma_short - sma_long;
+   }
+   
+   //--- بررسی شرط فرکتال برای سقف AO (بالاتر از اطراف)
+   bool IsAOFractalHigh(const int centerShift) const
+   {
+      if (centerShift < m_aoFractalLength) return false;
       
-      double ao_center = aoBuffer[centerShift];
+      double ao_center = CalculateAO(centerShift);
       if (ao_center == 0.0) return false;
 
       bool isHigh = true;
       
       for (int j = 1; j <= m_aoFractalLength; j++)
       {
-         double left = aoBuffer[centerShift + j]; // چون ArraySetAsSeries(true)، shift بزرگ‌تر = قدیمی‌تر
-         double right = aoBuffer[centerShift - j]; // shift کوچک‌تر = جدیدتر
+         double left = CalculateAO(centerShift + j); // قدیمی‌تر
+         double right = CalculateAO(centerShift - j); // جدیدتر
          if (left == 0.0 || right == 0.0 || ao_center <= left || ao_center <= right)
          {
             isHigh = false;
@@ -2107,20 +2151,20 @@ private:
       return isHigh;
    }
    
-   //--- تابع: بررسی شرط فرکتال برای کف AO (پایین‌تر از اطراف، با کش بافر)
-   bool IsAOFractalLow(const int centerShift, const double &aoBuffer[]) const
+   //--- بررسی شرط فرکتال برای کف AO (پایین‌تر از اطراف)
+   bool IsAOFractalLow(const int centerShift) const
    {
-      if (centerShift < m_aoFractalLength || centerShift + m_aoFractalLength >= ArraySize(aoBuffer)) return false;
+      if (centerShift < m_aoFractalLength) return false;
       
-      double ao_center = aoBuffer[centerShift];
+      double ao_center = CalculateAO(centerShift);
       if (ao_center == 0.0) return false;
 
       bool isLow = true;
       
       for (int j = 1; j <= m_aoFractalLength; j++)
       {
-         double left = aoBuffer[centerShift + j];
-         double right = aoBuffer[centerShift - j];
+         double left = CalculateAO(centerShift + j);
+         double right = CalculateAO(centerShift - j);
          if (left == 0.0 || right == 0.0 || ao_center >= left || ao_center >= right)
          {
             isLow = false;
@@ -2234,7 +2278,7 @@ private:
       // شرط قوی: بدنه بیش از 50% رنج کندل
       return (body > 0.5 * range);
    }
-   
+
    //--- تابع جدید: پردازش ابطال الگوهای EQ تایید شده (مرگ بعد از زندگی)
    void ProcessEQInvalidation()
    {
@@ -2480,12 +2524,10 @@ private:
    //--- تابع کمکی جدید: پاک کردن تمام اشیاء گرافیکی مربوط به یک الگوی EQ
    void deleteEQObjects(const EQPattern &eq)
    {
-      // ساختن نام دقیق آبجکت‌ها بر اساس اطلاعات الگو
       string obName = "Confirmed_OB_" + TimeToString(eq.source_swing.time) + m_timeframeSuffix;
       string eqLineName = "EQ_Line_" + TimeToString(eq.time_formation) + m_timeframeSuffix;
       string eqTextName = "EQ_Text_" + TimeToString(eq.time_formation) + m_timeframeSuffix;
 
-      // حذف هر سه آبجکت از چارت
       ObjectDelete(m_chartId, obName);
       ObjectDelete(m_chartId, eqLineName);
       ObjectDelete(m_chartId, eqTextName);
@@ -2991,7 +3033,7 @@ private:
       ObjectSetInteger(m_chartId, objName, OBJPROP_WIDTH, width);
       ObjectSetInteger(m_chartId, objName, OBJPROP_BACK, true);
 
-      if (ObjectCreate(m_chartId, objName + "_Text", OBJ_TEXT, 0, TimeCurrent() + PeriodSeconds() * 10, price))
+      if (ObjectCreate(m_chartId, objName + "_Text", OBJ_TEXT, 0, TimeCurrent(), price))
       {
          string suffix = GetDisplaySuffix(m_timeframe, m_chartId);
          ObjectSetString(m_chartId, objName + "_Text", OBJPROP_TEXT, label + suffix);
