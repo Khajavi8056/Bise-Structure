@@ -824,9 +824,9 @@ private:
 
          for(int j = 1; j <= m_fractalLength; j++)
          {
-             if(iHigh(m_symbol, m_timeframe, i) < iHigh(m_symbol, m_timeframe, i - j) || iHigh(m_symbol, m_timeframe, i) < iHigh(m_symbol, m_timeframe, i + j)) isSwingHigh = false;
+            if(iHigh(m_symbol, m_timeframe, i) < iHigh(m_symbol, m_timeframe, i - j) || iHigh(m_symbol, m_timeframe, i) < iHigh(m_symbol, m_timeframe, i + j)) isSwingHigh = false;
              if(iLow(m_symbol, m_timeframe, i) > iLow(m_symbol, m_timeframe, i - j) || iLow(m_symbol, m_timeframe, i) > iLow(m_symbol, m_timeframe, i + j)) isSwingLow = false;
-         }
+  }
 
          if(isSwingHigh && ArraySize(m_swingHighs_Array) == 0) 
          {
@@ -3747,4 +3747,6 @@ public:
       return pin_count;
    }
 };
+
+
 //+------------------------------------------------------------------+
