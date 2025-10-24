@@ -170,7 +170,7 @@ struct SwingPoint
 {
    double   price;      // قیمت دقیق سقف/کف (بالاترین/پایین‌ترین نقطه شدو)
    double   body_price; // قیمت بدنه در نقطه سقف/کف (بالاترین/پایین‌ترین قیمت Open/Close در کندل فرکتال)
-   datetime time;       // زمان کندلی که نقطه محوری در آن تشکیل شده
+   datetime time;       // زمان کندل که نقطه محوری در آن تشکیل شده
    int      bar_index;  // اندیس (شماره) کندل از دید متاتریدر
 };
 
@@ -805,15 +805,17 @@ public:
       ProcessMajorEQDetection();
 
       //--- ۵. به‌روزرسانی موقعیت متن‌های OB
-      if (m_showDrawing) UpdateOBTextPositions(); // این خط رو اضافه کن
+      if (m_showDrawing) UpdateOBTextPositions(); 
       
       CentralLog(LOG_FULL, m_logLevel, 0, "[SMC]", "پایان پردازش بار جدید.");
       return structureChanged;
    }
 
 private:
-   //---  شناسایی ساختار اولیه بازار (بر مبنای فرکتال)
-   //این  ساختار اولیه فقط برای بار اول و یکبار برای شروع چرخش منطق نیاز هست و سیستم با اولین شکست ساختار  یک خود ترمیمی نهفته دارد و در صورت که ان فرکتال ساد اولیه هم اشتباه باشد  با اغولین شکست اصلاح خواهدشد
+     //این  ساختار اولیه فقط برای بار اول و یکبار برای شروع چرخش منطق نیاز هست و سیستم با اولین شکست ساختار  یک خود ترمیمی نهفته دارد و در صورت که ان فرکتال ساد اولیه هم اشتباه باشد  با اغولین شکست اصلاح 
+
+   //--- شناسایی ساختار اولیه بازار (بر مبنای فرکتال)
+   // توجه: این فرکتال اولیه فقط برای بار اول و شروع چرخه منطقی استفاده می‌شود. با اولین شکست (CHoCH/BoS) ساختار واقعی شکل می‌گیرد و اگر اولیه اشتباه باشد، با ساختار جدید جایگزین می‌شود.
    void IdentifyInitialStructure()
    {
       CentralLog(LOG_FULL, m_logLevel, 0, "[SMC]", "شروع شناسایی ساختار اولیه.");
@@ -2247,9 +2249,7 @@ private:
          double close_i = iClose(m_symbol, m_timeframe, i);
          double bodyExt = isHigh ? MathMax(open_i, close_i) : MathMin(open_i, close_i);
          if ((isHigh && bodyExt > bestBodyPrice) || (!isHigh && bodyExt < bestBodyPrice))
-         {
             bestBodyPrice = bodyExt;
-         }
       }
       
       bestFractal.body_price = bestBodyPrice;
@@ -3043,6 +3043,23 @@ private:
       }
    }
 
+   //--- تابع جدید: به‌روزرسانی موقعیت لیبل‌های سطوح دوره‌ای (برای چسبیدن به لبه راست چارت)
+   void UpdatePeriodicLabelPositions()
+   {
+      datetime current_time = TimeCurrent();
+
+      string names[] = {m_pdhLineName, m_pdlLineName, m_pwhLineName, m_pwlLineName, m_pmhLineName, m_pmlLineName, m_pyhLineName, m_pylLineName};
+      for (int i = 0; i < ArraySize(names); i++)
+      {
+         string textName = names[i] + "_Text";
+         if (ObjectFind(m_chartId, textName) != -1)
+         {
+            double price = ObjectGetDouble(m_chartId, textName, OBJPROP_PRICE);
+            ObjectMove(m_chartId, textName, 0, current_time, price);
+         }
+      }
+   }
+
    //--- تابع کمکی: رسم رویداد EQ
    void DrawEQEvent(SwingPoint &source, datetime time_form, double price_entry, ENUM_LIQUIDITY_TYPE type, bool isMajor)
    {
@@ -3490,6 +3507,9 @@ public:
       changed |= ScanForEQ();
       changed |= ScanForStructuralTraps();
 
+      // به‌روزرسانی موقعیت لیبل‌های سطوح دوره‌ای برای چسبیدن به لبه راست
+      if (m_showDrawing) UpdatePeriodicLabelPositions();
+
       CentralLog(LOG_FULL, m_logLevel, 0, "[LIQ]", "پایان پردازش بار جدید.");
       return changed;
    }
@@ -3602,7 +3622,7 @@ private:
       double body = MathAbs(vc.open - vc.close);
       
       // شرط ۱: بدنه باید کوچک باشد
-      if((body / totalRange) < PINBAR_BODY_RATIO_THRESHOLD) return 0;
+      if((body / totalRange) >= PINBAR_BODY_RATIO_THRESHOLD) return 0;
       
       // شرط ۲: یکی از سایه‌ها باید خیلی بلند باشد
       double upperShadow = vc.high - MathMax(vc.open, vc.close);
