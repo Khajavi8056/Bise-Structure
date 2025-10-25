@@ -1890,12 +1890,6 @@ private:
    //--- متغیرهای کنترلی برای Order Blocks مینور
    bool             m_isCurrentlyMitigatingMinorOB; // وضعیت لحظه‌ای: آیا قیمت در حال مصرف یک OB مینور است؟
 
-   //--- متغیرهای جدید برای محاسبه بهینه AO
-   int              m_sma5_handle;          // هندل برای SMA(5)
-   int              m_sma34_handle;         // هندل برای SMA(34)
-   double           m_sma5_buffer[];        // بافر برای نگهداری دیتای SMA(5)
-   double           m_sma34_buffer[];       // بافر برای نگهداری دیتای SMA(34)
-
 public:
    //+------------------------------------------------------------------+
    //| سازنده کلاس (Constructor)                                       |
@@ -1933,21 +1927,6 @@ public:
       m_lastLowTime = 0;
       m_lastProcessedBarTime = 0;
       m_isCurrentlyMitigatingMinorOB = false; // مقداردهی اولیه
-
-      //--- مقداردهی اولیه هندل‌های AO
-      // تعریف هندل SMA 5 بر اساس قیمت میانه (High+Low)/2
-      m_sma5_handle = iMA(m_symbol, m_timeframe, 5, 0, MODE_SMA, PRICE_MEDIAN);
-      if(m_sma5_handle == INVALID_HANDLE)
-         CentralLog(LOG_ERROR, m_logLevel, ERROR_CODE_107, "[MINOR]", "خطای ایجاد هندل iMA(5) برای AO.", true);
-
-      // تعریف هندل SMA 34 بر اساس قیمت میانه
-      m_sma34_handle = iMA(m_symbol, m_timeframe, 34, 0, MODE_SMA, PRICE_MEDIAN);
-      if(m_sma34_handle == INVALID_HANDLE)
-         CentralLog(LOG_ERROR, m_logLevel, ERROR_CODE_107, "[MINOR]", "خطای ایجاد هندل iMA(34) برای AO.", true);
-         
-      // تنظیم بافرها به صورت سری (از جدید به قدیم)
-      ArraySetAsSeries(m_sma5_buffer, true);
-      ArraySetAsSeries(m_sma34_buffer, true);
 
       // پاکسازی اشیاء قبلی مربوط به این کلاس روی چارت
       if (m_showDrawing)
@@ -1987,9 +1966,6 @@ public:
             }
          }
       }
-      //--- آزادسازی هندل‌های AO
-      if(m_sma5_handle != INVALID_HANDLE) IndicatorRelease(m_sma5_handle);
-      if(m_sma34_handle != INVALID_HANDLE) IndicatorRelease(m_sma34_handle);
       CentralLog(LOG_FULL, m_logLevel, 0, "[MINOR]", "کلاس MinorStructure متوقف شد.");
    }
    
@@ -2015,14 +1991,6 @@ public:
 
       CentralLog(LOG_FULL, m_logLevel, 0, "[MINOR]", "شروع پردازش بار جدید.");
 
-      //--- بهینه‌سازی AO: دیتا را از هندل‌ها کپی می‌کنیم ---
-      if(!UpdateAOBuffers())
-      {
-         CentralLog(LOG_ERROR, m_logLevel, ERROR_CODE_108, "[MINOR]", "پردازش بار جدید مینور به دلیل خطای بافر AO متوقف شد.", true);
-         return false;
-      }
-      //--- پایان بخش بهینه‌سازی ---
-
       bool newMinorFound = false;
       
       // اسکن برای سقف‌های مینور
@@ -2045,36 +2013,6 @@ public:
    }
 
 private:
-   //--- تابع کمکی: کپی کردن دیتای AO از هندل‌ها به بافرها
-   bool UpdateAOBuffers()
-   {
-      // ما فقط به حدود ۲۰۰ کندل اخیر برای اسکن نیاز داریم
-      int barsToCopy = 200;
-      if(iBars(m_symbol, m_timeframe) < barsToCopy)
-      {
-         CentralLog(LOG_ERROR, m_logLevel, ERROR_CODE_101, "[MINOR-AO]", "کندل کافی برای محاسبه AO وجود ندارد.", true);
-         return false;
-      }
-
-      // تغییر اندازه بافرها
-      if(ArraySize(m_sma5_buffer) != barsToCopy) ArrayResize(m_sma5_buffer, barsToCopy);
-      if(ArraySize(m_sma34_buffer) != barsToCopy) ArrayResize(m_sma34_buffer, barsToCopy);
-
-      // کپی کردن دیتا از هندل‌ها
-      if(CopyBuffer(m_sma5_handle, 0, 0, barsToCopy, m_sma5_buffer) < barsToCopy)
-      {
-         CentralLog(LOG_ERROR, m_logLevel, ERROR_CODE_108, "[MINOR-AO]", "خطا در کپی بافر SMA(5).", true);
-         return false;
-      }
-      if(CopyBuffer(m_sma34_handle, 0, 0, barsToCopy, m_sma34_buffer) < barsToCopy)
-      {
-         CentralLog(LOG_ERROR, m_logLevel, ERROR_CODE_108, "[MINOR-AO]", "خطا در کپی بافر SMA(34).", true);
-         return false;
-      }
-      
-      return true;
-   }
-
    //--- تابع: اسکن اولیه برای یافتن حداقل یک سقف و یک کف مینور (از جدید به قدیم)
    void ScanInitialMinors()
    {
@@ -2123,25 +2061,41 @@ private:
       CentralLog(LOG_FULL, m_logLevel, 0, "[MINOR]", "پایان اسکن اولیه مینورها.");
    }
    
-   //--- تابع جدید: محاسبه AO (بهینه شده با هندل)
-   double CalculateAO(const int shift) const
+   //--- تابع: اسکن برای سقف/کف مینور (از قدیم به جدید)
+   bool ScanForMinors(const bool isHigh)
    {
-      // چک کردن اینکه آیا شیفت در محدوده بافر کپی شده ما هست یا نه
-      if(shift < 0 || shift >= ArraySize(m_sma5_buffer))
+      CentralLog(LOG_FULL, m_logLevel, 0, "[MINOR]", "شروع اسکن مینورها.");
+      int barsCount = iBars(m_symbol, m_timeframe);
+      datetime lastTime = isHigh ? m_lastHighTime : m_lastLowTime;
+      int startShift = (lastTime == 0) ? barsCount - 1 : iBarShift(m_symbol, m_timeframe, lastTime, false);
+      if (startShift < 0 || startShift < 2 * m_aoFractalLength + 1) return false; // بازه کافی نیست
+      
+      bool newFound = false;
+      
+      // اسکن از قدیمی‌ترین (startShift بزرگ) به جدیدترین (shift کوچک، تا m_aoFractalLength)
+      for (int shift = startShift; shift >= m_aoFractalLength; shift--)
       {
-         CentralLog(LOG_ERROR, m_logLevel, ERROR_CODE_101, "[MINOR-AO]", "درخواست شیفت خارج از محدوده بافر AO.", true);
-         return 0.0;
+         bool isFractal = isHigh ? IsAOFractalHigh(shift) : IsAOFractalLow(shift);
+         if (isFractal)
+         {
+            SwingPoint adjusted = AdjustMinorPoint(shift, isHigh);
+            if (adjusted.bar_index != -1 && AddMinorPoint(adjusted, isHigh))
+            {
+               if (isHigh) m_lastHighTime = adjusted.time;
+               else m_lastLowTime = adjusted.time;
+               newFound = true;
+            }
+         }
       }
       
-      // چک کردن دیتای EMPTY_VALUE (اگر اندیکاتور هنوز آماده نباشه)
-      if(m_sma5_buffer[shift] == EMPTY_VALUE || m_sma34_buffer[shift] == EMPTY_VALUE)
-      {
-         // این یک خطا نیست، بلکه دیتای خالی است
-         return 0.0;
-      }
-
-      // محاسبه نهایی AO
-      return (m_sma5_buffer[shift] - m_sma34_buffer[shift]);
+      CentralLog(LOG_FULL, m_logLevel, 0, "[MINOR]", "پایان اسکن مینورها.");
+      return newFound;
+   }
+   
+   //--- تابع: محاسبه AO (بهینه شده با iAO داخلی)
+   double CalculateAO(const int shift) const
+   {
+      return iAO(m_symbol, m_timeframe);
    }
    
    //--- بررسی شرط فرکتال برای سقف AO (بالاتر از اطراف)
@@ -2733,37 +2687,6 @@ private:
             CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_208, "[MINOR-OB]", "OB مینور مصرف شده " + (ob.isBullish ? "صعودی" : "نزولی") + " در زمان " + TimeToString(ob.time) + " ابطال (invalidated) شد.");
          }
       }
-   }
-   
-   //--- تابع: اسکن برای سقف/کف مینور (از قدیم به جدید)
-   bool ScanForMinors(const bool isHigh)
-   {
-      CentralLog(LOG_FULL, m_logLevel, 0, "[MINOR]", "شروع اسکن مینورها.");
-      int barsCount = iBars(m_symbol, m_timeframe);
-      datetime lastTime = isHigh ? m_lastHighTime : m_lastLowTime;
-      int startShift = (lastTime == 0) ? barsCount - 1 : iBarShift(m_symbol, m_timeframe, lastTime, false);
-      if (startShift < 0 || startShift < 2 * m_aoFractalLength + 1) return false; // بازه کافی نیست
-      
-      bool newFound = false;
-      
-      // اسکن از قدیمی‌ترین (startShift بزرگ) به جدیدترین (shift کوچک، تا m_aoFractalLength)
-      for (int shift = startShift; shift >= m_aoFractalLength; shift--)
-      {
-         bool isFractal = isHigh ? IsAOFractalHigh(shift) : IsAOFractalLow(shift);
-         if (isFractal)
-         {
-            SwingPoint adjusted = AdjustMinorPoint(shift, isHigh);
-            if (adjusted.bar_index != -1 && AddMinorPoint(adjusted, isHigh))
-            {
-               if (isHigh) m_lastHighTime = adjusted.time;
-               else m_lastLowTime = adjusted.time;
-               newFound = true;
-            }
-         }
-      }
-      
-      CentralLog(LOG_FULL, m_logLevel, 0, "[MINOR]", "پایان اسکن مینورها.");
-      return newFound;
    }
    
    //--- تابع اصلاح شده: اضافه کردن نقطه مینور (با ورودی SwingPoint کامل و مدیریت تکرار و ظرفیت)
@@ -3677,7 +3600,7 @@ private:
       if((upperShadow / totalRange) >= PINBAR_SHADOW_RATIO_THRESHOLD) return 2; // نزولی
       
       return 0; // پین‌بار نیست
-  }
+   }
    
    // تابع برای ساختن اسم منحصر به فرد آبجکت (برای جلوگیری از رسم تکراری)
    string GetObjectName(PinbarResult &result)
