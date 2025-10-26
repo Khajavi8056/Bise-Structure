@@ -23,7 +23,10 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2025, Khajavi - HipoAlgoritm"
 #property link      "https://github.com/Khajavi8056/"
-#property version   "3.00" // نسخه با اضافه کردن قابلیت نقدینگی یکپارچه و EQ ماژور
+#property version   "3.50" // نسخه با افزودن کلاس شناسایی واگرایی RSI
+
+#include <Indicators\BillWilliams.mqh> // برای CiRSI
+#include <Indicators\Oscilators.mqh>    // برای CiRSI (و CiAO)
 
 //+------------------------------------------------------------------+
 //| تنظیمات رنگ‌ها (برای تغییر آسان بدون جستجو در کد)               |
@@ -57,6 +60,7 @@ const color COLOR_PMH = clrBlack;         // رنگ PMH
 const color COLOR_PML = clrBlack;           // رنگ PML
 const color COLOR_PYH = clrBlack;           // رنگ PYH
 const color COLOR_PYL = clrBlack;           // رنگ PYL
+const color COLOR_DIVERGENCE = clrBlack; // رنگ خط و متن واگرایی RSI
 
 //+------------------------------------------------------------------+
 //| تنظیمات لاگ (سیستم لاگ حرفه‌ای و طبقه‌بندی شده)                 |
@@ -246,6 +250,41 @@ struct OrderBlock
    double   lowPrice;   // قیمت کف ناحیه OB (پایین‌ترین قیمت کندل)
    datetime time;       // زمان کندل OB
    int      bar_index;  // اندیس کندل OB
+};
+
+//--- ساختار داده برای نگهداری اطلاعات یک واگرایی شناسایی شده RSI
+struct DivergenceInfo
+{
+   bool        isBullish;       // نوع واگرایی: صعودی (true) یا نزولی (false)
+   datetime    time_start;      // زمان نقطه شروع واگرایی (سوئینگ قدیمی‌تر مینور)
+   double      price_start;     // قیمت در نقطه شروع
+   double      rsi_start;       // مقدار RSI ریگلاژ شده در نقطه شروع
+   datetime    time_end;        // زمان نقطه پایان واگرایی (سوئینگ جدیدتر مینور)
+   double      price_end;       // قیمت در نقطه پایان
+   double      rsi_end;         // مقدار RSI ریگلاژ شده در نقطه پایان
+   int         points_involved; // تعداد نقاط درگیر (فعلاً فقط ۲)
+};
+
+// ساختار ۱: کندل مجازی (برای نگهداری نتیجه ادغام)
+// این ساختار، دیتای ۱، ۲ یا ۳ کندل ادغام شده رو نگه می‌داره
+struct VirtualCandle
+{
+   double   open;           // اوپنِ قدیمی‌ترین کندل
+   double   high;           // بالاترین High در مجموعه
+   double   low;            // پایین‌ترین Low در مجموعه
+   double   close;          // کلوزِ جدیدترین کندل
+   datetime time_oldest;    // زمانِ قدیمی‌ترین کندل (برای نام‌گذاری آبجکت)
+   datetime time_newest;    // زمانِ جدیدترین کندل (برای بررسی)
+   int      candle_count;   // چند کندل ادغام شدن؟ (۱، ۲ یا ۳)
+};
+
+// ساختار ۲: نتیجه پین‌بار (خروجی تابع)
+// این ساختار، مشخصات پین‌بار پیدا شده رو برمی‌گردونه
+struct PinbarResult
+{
+   bool           isBullish;      // صعودیه (Hammer) یا نزولی (Shooting Star)؟
+   VirtualCandle  candle_data;    // دیتای کندل مجازی که پین‌بار رو ساخته
+   string         type_name;      // اسم نوع: "Single C1", "Agg C2+C3", "Agg C1C2C3" و...
 };
 
 //+------------------------------------------------------------------+
@@ -1872,6 +1911,7 @@ private:
    bool             m_showDrawing;          // کنترل نمایش ترسیمات مینور روی چارت
    int              m_aoFractalLength;      // طول فرکتال AO (تعداد میله‌های اطراف، مثلاً 3)
    bool             m_enableMinorOB_FVG_Check; // فعال/غیرفعال کردن شرط FVG برای شناسایی OB مینور (ورودی جدید سازنده)
+   CiAO             m_ao_indicator;        // آبجکت CiAO برای محاسبه Awesome Oscillator
 
    //--- متغیرهای حالت
    SwingPoint       m_minorSwingHighs_Array[]; // آرایه سقف‌های مینور (سری، ظرفیت حداکثر ۱۰)
@@ -1927,6 +1967,12 @@ public:
       m_lastLowTime = 0;
       m_lastProcessedBarTime = 0;
       m_isCurrentlyMitigatingMinorOB = false; // مقداردهی اولیه
+
+      // ایجاد آبجکت CiAO برای Awesome Oscillator
+      if (!m_ao_indicator.Create(m_symbol, m_timeframe))
+      {
+         CentralLog(LOG_ERROR, m_logLevel, ERROR_CODE_107, "[MINOR-AO]", "خطا در ایجاد CiAO برای Awesome Oscillator.", true);
+      }
 
       // پاکسازی اشیاء قبلی مربوط به این کلاس روی چارت
       if (m_showDrawing)
@@ -2092,10 +2138,26 @@ private:
       return newFound;
    }
    
-   //--- تابع: محاسبه AO (بهینه شده با iAO داخلی)
+   //--- تابع جدید: محاسبه AO (بهینه شده با کلاس استاندارد CiAO)
    double CalculateAO(const int shift) const
    {
-      return iAO(m_symbol, m_timeframe);
+      // اطمینان از اینکه آبجکت AO به درستی ایجاد شده
+      if(m_ao_indicator.Handle() == INVALID_HANDLE)
+      {
+         CentralLog(LOG_ERROR, m_logLevel, ERROR_CODE_107, "[MINOR-AO]", "تلاش برای محاسبه AO قبل از ایجاد موفق آبجکت.", true);
+         return 0.0;
+      }
+
+      // دریافت مستقیم مقدار AO برای شیفت مورد نظر از بافر اصلی اندیکاتور
+      double ao_value = m_ao_indicator.Main(shift); // <-- استفاده از آبجکت CiAO
+
+      // چک کردن دیتای EMPTY_VALUE
+      if(ao_value == EMPTY_VALUE)
+      {
+         return 0.0;
+      }
+
+      return ao_value;
    }
    
    //--- بررسی شرط فرکتال برای سقف AO (بالاتر از اطراف)
@@ -2706,7 +2768,7 @@ private:
       }
       
       // چک تکرار بر اساس زمان
-      for (int j = 0; j < ArraySize(arr); j++)
+      for (int j= 0; j < ArraySize(arr); j++)
       {
          if (arr[j].time == newPoint.time) return false;
       }
@@ -3515,28 +3577,6 @@ public:
 //+------------------------------------------------------------------+
 //| کلاس شناسایی پین‌بار (تکی و ادغام شده)                          |
 //+------------------------------------------------------------------+
-// ساختار ۱: کندل مجازی (برای نگهداری نتیجه ادغام)
-// این ساختار، دیتای ۱، ۲ یا ۳ کندل ادغام شده رو نگه می‌داره
-struct VirtualCandle
-{
-   double   open;           // اوپنِ قدیمی‌ترین کندل
-   double   high;           // بالاترین High در مجموعه
-   double   low;            // پایین‌ترین Low در مجموعه
-   double   close;          // کلوزِ جدیدترین کندل
-   datetime time_oldest;    // زمانِ قدیمی‌ترین کندل (برای نام‌گذاری آبجکت)
-   datetime time_newest;    // زمانِ جدیدترین کندل (برای بررسی)
-   int      candle_count;   // چند کندل ادغام شدن؟ (۱، ۲ یا ۳)
-};
-
-// ساختار ۲: نتیجه پین‌بار (خروجی تابع)
-// این ساختار، مشخصات پین‌بار پیدا شده رو برمی‌گردونه
-struct PinbarResult
-{
-   bool           isBullish;      // صعودیه (Hammer) یا نزولی (Shooting Star)؟
-   VirtualCandle  candle_data;    // دیتای کندل مجازی که پین‌بار رو ساخته
-   string         type_name;      // اسم نوع: "Single C1", "Agg C2+C3", "Agg C1C2C3" و...
-};
-
 class CPinbarDetector
 {
 private:
@@ -3778,5 +3818,279 @@ public:
    }
 };
 
+//==================================================================//
+//            کلاس ۵: شناسایی واگرایی RSI (RSIDivergenceDetector)     //
+//==================================================================//
+class RSIDivergenceDetector
+{
+private:
+   //--- وابستگی‌ها ---
+   MinorStructure  *m_minor;               // پوینتر به آبجکت ساختار مینور (از بیرون دریافت می‌شود)
+
+   //--- تنظیمات اصلی نمونه کلاس ---
+   string           m_symbol;               // نماد معاملاتی
+   ENUM_TIMEFRAMES  m_timeframe;            // تایم فریم اجرایی این نمونه
+   long             m_chartId;              // شناسه چارت برای ترسیمات
+   bool             m_enableLogging;        // آیا لاگ‌ها فعال باشند؟
+   LOG_LEVEL        m_logLevel;             // سطح جزئیات لاگ‌ها
+   string           m_timeframeSuffix;      // پسوند تایم‌فریم برای نامگذاری آبجکت‌ها
+   bool             m_showDrawing;          // آیا واگرایی‌های شناسایی شده رسم شوند؟
+
+   //--- تنظیمات اندیکاتور RSI ---
+   int              m_rsi_period;           // دوره محاسبه RSI (مثلاً 14)
+   int              m_rsi_price;            // نوع قیمت برای محاسبه RSI (مثلاً PRICE_CLOSE)
+   int              m_rsi_window;           // پنجره (تعداد کندل چپ و راست) برای ریگلاژ نقاط RSI
+
+   //--- آبجکت و بافر داخلی RSI ---
+   CiRSI            m_rsi_indicator;        // آبجکت استاندارد MQL5 برای محاسبه RSI
+   double           m_rsi_buffer[];         // بافر داخلی برای نگهداری مقادیر RSI (برای دسترسی سریع)
+
+   //--- ذخیره‌سازی نتایج ---
+   DivergenceInfo   m_divergences[];        // آرایه داینامیک و سری برای نگهداری واگرایی‌های اخیر
+   datetime         m_lastProcessedBarTime; // برای جلوگیری از پردازش تکراری روی یک کندل
+
+   //--- توابع کمکی داخلی (Private Methods) ---
+
+   // تابع برای به‌روزرسانی بافر داخلی RSI در هر کندل جدید
+   bool UpdateRsiBuffer()
+   {
+      if(m_rsi_indicator.Handle() == INVALID_HANDLE) return false;
+
+      int barsToCopy = 200 + m_rsi_window; // یا هر تعداد منطقی دیگه
+      if(iBars(m_symbol, m_timeframe) < barsToCopy) return false;
+
+      if(ArraySize(m_rsi_buffer) != barsToCopy) ArrayResize(m_rsi_buffer, barsToCopy);
+
+      // کپی کردن یکجای دیتا
+      if(m_rsi_indicator.GetData(0, 0, barsToCopy, m_rsi_buffer) < barsToCopy) // <--- تغییر اصلی اینجاست
+      {
+         CentralLog(LOG_ERROR, m_logLevel, ERROR_CODE_108, "[RSI Div]", "خطا در کپی بافر RSI.", true);
+         return false;
+      }
+      return true;
+   }
+
+   // تابع کلیدی برای پیدا کردن قله/دره واقعی RSI در یک پنجره اطراف کندل سوئینگ قیمت
+   double AdjustRsiSwing(const SwingPoint &priceSwing, const bool findHigh) const
+   {
+      int start = priceSwing.bar_index - m_rsi_window;
+      int end = priceSwing.bar_index + m_rsi_window;
+      start = MathMax(start, 0);
+      end = MathMin(end, ArraySize(m_rsi_buffer) - 1);
+      double extreme = findHigh ? -DBL_MAX : DBL_MAX;
+      bool hasValid = false;
+      for (int i = start; i <= end; i++)
+      {
+         if (m_rsi_buffer[i] == EMPTY_VALUE) continue;
+         hasValid = true;
+         if ((findHigh && m_rsi_buffer[i] > extreme) || (!findHigh && m_rsi_buffer[i] < extreme))
+         {
+            extreme = m_rsi_buffer[i];
+         }
+      }
+      if (!hasValid) return EMPTY_VALUE;
+      return extreme;
+   }
+
+   // تابع برای مقایسه شیب قیمت و شیب RSI بین دو نقطه برای تشخیص واگرایی
+   int CheckDivergence(const SwingPoint &priceNew, const double rsiNew,
+                       const SwingPoint &priceOld, const double rsiOld,
+                       const bool checkHighs) const // true=بررسی سقف‌ها, false=بررسی کف‌ها
+   {
+      double priceSlope = priceNew.price - priceOld.price;
+      double rsiSlope = rsiNew - rsiOld;
+      if (checkHighs) // بررسی سقف‌ها (برای واگرایی نزولی یا hidden صعودی)
+      {
+         if (priceSlope > 0 && rsiSlope < 0) return 2; // regular bearish (نزولی عادی)
+      }
+      else // بررسی کف‌ها (برای واگرایی صعودی یا hidden نزولی)
+      {
+         if (priceSlope < 0 && rsiSlope > 0) return 1; // regular bullish (صعودی عادی)
+      }
+      return 0; // هیچ واگرایی
+   }
+
+   // تابع برای افزودن واگرایی جدید به آرایه m_divergences (با مدیریت ظرفیت)
+   void AddDivergence(const DivergenceInfo &div)
+   {
+      // چک تکراری بر اساس time_end (جدیدترین نقطه)
+      for (int i = 0; i < ArraySize(m_divergences); i++)
+      {
+         if (m_divergences[i].time_end == div.time_end) return;
+      }
+      // درج در ابتدای آرایه
+      int oldSize = ArraySize(m_divergences);
+      ArrayResize(m_divergences, oldSize + 1);
+      for (int j = oldSize; j > 0; j--)
+      {
+         m_divergences[j] = m_divergences[j - 1];
+      }
+      m_divergences[0] = div;
+      // مدیریت ظرفیت (حداکثر 10)
+      if (ArraySize(m_divergences) > 10)
+      {
+         int lastIndex = ArraySize(m_divergences) - 1;
+         ArrayRemove(m_divergences, lastIndex, 1);
+      }
+   }
+
+   // تابع برای رسم خط و لیبل واگرایی روی چارت
+   void DrawDivergence(const DivergenceInfo &div)
+   {
+      string name = "RSIDiv_" + (div.isBullish ? "Bull_" : "Bear_") + TimeToString(div.time_start) + "_to_" + TimeToString(div.time_end) + m_timeframeSuffix;
+      string textName = name + "_Text";
+      // رسم خط روند
+      ObjectCreate(m_chartId, name, OBJ_TREND, 0, div.time_start, div.price_start, div.time_end, div.price_end);
+      ObjectSetInteger(m_chartId, name, OBJPROP_STYLE, STYLE_DOT);
+      ObjectSetInteger(m_chartId, name, OBJPROP_COLOR, COLOR_DIVERGENCE);
+      // رسم متن در وسط
+      datetime midTime = div.time_start + (div.time_end - div.time_start) / 2;
+      double midPrice = (div.price_start + div.price_end) / 2;
+      ObjectCreate(m_chartId, textName, OBJ_TEXT, 0, midTime, midPrice);
+      string suffix = GetDisplaySuffix(m_timeframe, m_chartId);
+      ObjectSetString(m_chartId, textName, OBJPROP_TEXT, (div.isBullish ? "RD+" : "RD-") + suffix);
+      ObjectSetInteger(m_chartId, textName, OBJPROP_COLOR, COLOR_DIVERGENCE);
+      ObjectSetInteger(m_chartId, textName, OBJPROP_ANCHOR, ANCHOR_CENTER);
+   }
+
+public:
+   //--- سازنده (Constructor) ---
+   // نیازمند دریافت پوینتر به آبجکت MinorStructure و تنظیمات اولیه
+   RSIDivergenceDetector(MinorStructure *minor_ptr,
+                         const string symbol, const ENUM_TIMEFRAMES timeframe, const long chartId,
+                         const bool enableLogging_in, const bool showDrawing_in,
+                         const int rsi_period_in = 14, const int rsi_price_in = PRICE_CLOSE,
+                         const int rsi_window_in = 5)
+   {
+      m_minor = minor_ptr;
+      m_symbol = symbol;
+      m_timeframe = timeframe;
+      m_chartId = chartId;
+      m_enableLogging = enableLogging_in;
+      m_logLevel = DEFAULT_LOG_LEVEL;
+      m_showDrawing = showDrawing_in;
+      m_rsi_period = rsi_period_in;
+      m_rsi_price = rsi_price_in;
+      m_rsi_window = rsi_window_in;
+      m_timeframeSuffix = " (" + TimeFrameToStringShort(timeframe) + ")";
+      if(!m_rsi_indicator.Create(m_symbol, m_timeframe, m_rsi_period, m_rsi_price))
+      {
+         CentralLog(LOG_ERROR, m_logLevel, ERROR_CODE_107, "[RSI Div]", "خطا در ایجاد CiRSI.", true);
+      }
+      ArraySetAsSeries(m_divergences, true);
+      ArrayResize(m_divergences, 0, 10);
+      m_lastProcessedBarTime = 0;
+      // پاکسازی آبجکت‌های قدیمی
+      int total = ObjectsTotal(m_chartId, 0, -1);
+      for (int i = total - 1; i >= 0; i--)
+      {
+         string name = ObjectName(m_chartId, i);
+         if (StringFind(name, "RSIDiv_" + m_timeframeSuffix) != -1)
+         {
+            ObjectDelete(m_chartId, name);
+         }
+      }
+   }
+
+   //--- مخرب (Destructor) ---
+   // وظیفه اصلی: پاک کردن آبجکت‌های گرافیکی رسم شده توسط این کلاس
+   ~RSIDivergenceDetector()
+   {
+      int total = ObjectsTotal(m_chartId, 0, -1);
+      for (int i = total - 1; i >= 0; i--)
+      {
+         string name = ObjectName(m_chartId, i);
+         if (StringFind(name, "RSIDiv_" + m_timeframeSuffix) != -1)
+         {
+            ObjectDelete(m_chartId, name);
+         }
+      }
+   }
+
+   //--- تابع پردازش اصلی ---
+   // باید در هر کندل جدید تایم‌فریم مربوطه فراخوانی شود
+   bool ProcessNewBar()
+   {
+      datetime currentBarTime = iTime(m_symbol, m_timeframe, 0);
+      if (currentBarTime == m_lastProcessedBarTime) return false;
+      m_lastProcessedBarTime = currentBarTime;
+      UpdateRsiBuffer();
+      bool found = false;
+      // بررسی سقف‌ها
+      SwingPoint highNew = m_minor.GetMinorSwingHigh(0);
+      SwingPoint highOld = m_minor.GetMinorSwingHigh(1);
+      if (highNew.bar_index != -1 && highOld.bar_index != -1)
+      {
+         double rsiNew = AdjustRsiSwing(highNew, true);
+         double rsiOld = AdjustRsiSwing(highOld, true);
+         if (rsiNew == EMPTY_VALUE || rsiOld == EMPTY_VALUE) return false;
+         int divType = CheckDivergence(highNew, rsiNew, highOld, rsiOld, true);
+         if (divType > 0)
+         {
+            DivergenceInfo div;
+            div.isBullish = (divType == 1);
+            div.time_start = highOld.time;
+            div.price_start = highOld.price;
+            div.rsi_start = rsiOld;
+            div.time_end = highNew.time;
+            div.price_end = highNew.price;
+            div.rsi_end = rsiNew;
+            div.points_involved = 2;
+            AddDivergence(div);
+            if (m_showDrawing) DrawDivergence(div);
+            found = true;
+         }
+      }
+      // بررسی کف‌ها
+      SwingPoint lowNew = m_minor.GetMinorSwingLow(0);
+      SwingPoint lowOld = m_minor.GetMinorSwingLow(1);
+      if (lowNew.bar_index != -1 && lowOld.bar_index != -1)
+      {
+         double rsiNew = AdjustRsiSwing(lowNew, false);
+         double rsiOld = AdjustRsiSwing(lowOld, false);
+         if (rsiNew == EMPTY_VALUE || rsiOld == EMPTY_VALUE) return false;
+         int divType = CheckDivergence(lowNew, rsiNew, lowOld, rsiOld, false);
+         if (divType > 0)
+         {
+            DivergenceInfo div;
+            div.isBullish = (divType == 1);
+            div.time_start = lowOld.time;
+            div.price_start = lowOld.price;
+            div.rsi_start = rsiOld;
+            div.time_end = lowNew.time;
+            div.price_end = lowNew.price;
+            div.rsi_end = rsiNew;
+            div.points_involved = 2;
+            AddDivergence(div);
+            if (m_showDrawing) DrawDivergence(div);
+            found = true;
+         }
+      }
+      return found;
+   }
+
+   //--- توابع دسترسی عمومی (Public Accessors) ---
+   // برای دریافت اطلاعات واگرایی‌های شناسایی شده از خارج کلاس
+
+   // دریافت تعداد واگرایی‌های ذخیره شده
+   int GetDivergenceCount() const
+   {
+      return ArraySize(m_divergences);
+   }
+   // دریافت اطلاعات یک واگرایی خاص با استفاده از اندیس (0 = جدیدترین)
+   DivergenceInfo GetDivergence(const int index) const
+   {
+      if (index >= 0 && index < ArraySize(m_divergences)) return m_divergences[index];
+      DivergenceInfo empty;
+      return empty;
+   }
+   // دریافت اطلاعات آخرین واگرایی شناسایی شده
+   DivergenceInfo GetLastDivergence() const
+   {
+      if (ArraySize(m_divergences) > 0) return m_divergences[0];
+      DivergenceInfo empty;
+      return empty;
+   }
+};
 
 //+------------------------------------------------------------------+
