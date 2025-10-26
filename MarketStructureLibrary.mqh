@@ -1,3 +1,4 @@
+```mqh
 //+------------------------------------------------------------------+
 //|                                MarketStructureLibrary.mqh         |
 //|                              Copyright 2025, Khajavi - HipoAlgoritm|
@@ -4073,8 +4074,8 @@ public:
       for (int i = total - 1; i >= 0; i--)
       {
          string name = ObjectName(m_chartId, i);
-         if (StringFind(name, "RSIDiv_" + m_timeframeSuffix) != -1)
-         {
+         if (StringFind(name, "RSIDiv_" + m_timeframeSuffix) == 0) // <-- فقط آبجکت‌هایی که با این اسم شروع می‌شوند
+         66{
             ObjectDelete(m_chartId, name);
          }
       }
@@ -4088,7 +4089,8 @@ public:
       for (int i = total - 1; i >= 0; i--)
       {
          string name = ObjectName(m_chartId, i);
-         if (StringFind(name, "RSIDiv_" + m_timeframeSuffix) != -1)
+         if (StringFind(name, "RSIDiv_" + m_timeframeSuffix) == 0) // <-- فقط آبجکت‌هایی که با این اسم شروع می‌شوند
+
          {
             ObjectDelete(m_chartId, name);
          }
@@ -4182,3 +4184,4 @@ public:
 };
 
 //+------------------------------------------------------------------+
+```
