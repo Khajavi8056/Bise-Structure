@@ -1,730 +1,116 @@
-چاکرم محمد جان! نقشه راه تموم شد. وقتشه آچار به دست بشیم و این کلاس CReactionZones رو از صفر تا صد بسازیم.
-گفتی یه کد تمیز و کامل می‌خوای که به عنوان یه پکیج مستقل کار کنه و فقط به کلاس‌های MarketStructure و MinorStructure (که الان داریمشون) وابسته باشه. و گفتی که خطوط Draw/Flip باید تا وقتی معتبرن، تو لیست بمونن (نه اینکه با هر OB جدید پاک بشن).
-کارت رو راحت کردم. کل پکیج رو برات آماده کردم. فقط یه لطف کوچیک باید بکنی:
-پیش‌نیاز: اضافه کردن ۱ تابع کمکی به کلاس MarketStructure
-کلاس جدید ما (CReactionZones) باید بتونه هر لحظه از MarketStructure بپرسه "هی رفیق، اون OB که منبع این خط Draw بود هنوز معتبره؟". برای همین، باید یه تابع عمومی کوچیک به MarketStructure اضافه کنیم.
-۱. این کد رو کپی کن:
-   //+------------------------------------------------------------------+
-   //| تابع کمکی: بررسی اعتبار یک OB بر اساس شناسه آن                 |
-   //| (برای استفاده کلاس CReactionZones)                              |
-   //+------------------------------------------------------------------+
-   bool IsOBValid(string ob_id) const
-   {
-      // جستجو در لیست مصرف‌نشده‌ها
-      for(int i = 0; i < ArraySize(m_unmitigatedOBs); i++)
-      {
-         if(m_unmitigatedOBs[i].id == ob_id)
-            return true; // پیدا شد، معتبر است
-      }
-      
-      // جستجو در لیست مصرف‌شده‌ها
-      for(int i = 0; i < ArraySize(m_mitigatedOBs); i++)
-      {
-         if(m_mitigatedOBs[i].id == ob_id)
-            return true; // پیدا شد، معتبر است (مصرف شده ولی هنوز باطل نشده)
-      }
-      
-      // اگر در هیچکدام از لیست‌ها نبود، یعنی باطل شده است
-      return false;
-   }
-
-۲. این کد رو کجا بذاری؟
-برو داخل فایل MarketStructureLibrary.mqh، کلاس MarketStructure رو پیدا کن، و این تابع رو داخل بخش public: اون کلاس (مثلاً بعد از تابع GetLastMajorEQPattern()) پیست کن.
-بسته کامل کلاس CReactionZones (مناطق واکنشی)
-حالا این کد پکیج اصلیه. این رو می‌تونی کلاً کپی کنی و در انتهای فایل MarketStructureLibrary.mqh (بعد از کلاس CPinbarDetector) پیست کنی. این کلاس به طور کامل با سیستم لاگ، ساختارهای داده، و کلاس‌های MarketStructure و MinorStructure تو هماهنگه.
-//==================================================================//
-//|                                                                  |
-//|      کلاس ۵: مدیریت مناطق واکنشی (Draw & Flip)                     |
-//|      (CReactionZones)                                            |
-//|                                                                  |
-//==================================================================//
-
-//--- ثابت‌ها برای تنظیمات کلاس
-#define MAX_REACTION_LINE_AGE_BARS 500  // حداکثر عمر یک خط Draw/Flip (500 کندل)
-#define MAX_REACTION_LINES_PER_TYPE 10  // حداکثر تعداد خطوط Draw/Flip از هر نوع (سقف/کف)
-
-//--- نوع خط واکنشی (برای وضوح بیشتر)
-enum ENUM_REACTION_LINE_TYPE
-{
-   LINE_TYPE_DRAW, // خط Draw
-   LINE_TYPE_FLIP  // خط Flip
-};
-
-//+------------------------------------------------------------------+
-//| ساختار داده (کلاس) برای نگهداری اطلاعات خطوط Draw و Flip        |
-//| این کلاس از CObject ارث‌بری می‌کند تا بتواند در CArrayObj ذخیره شود
-//+------------------------------------------------------------------+
-class CReactionLine : public CObject
-{
-public:
-   //--- اطلاعات شناسایی
-   string                  source_ob_id;   // شناسه OB ماژور منبع که این خط از آن مشتق شده
-   ENUM_REACTION_LINE_TYPE lineType;       // نوع خط: Draw یا Flip
-   bool                    isBullish;      // آیا این خط حمایت صعودی است (true) یا مقاومت نزولی (false)؟
-   
-   //--- اطلاعات قیمت و زمان
-   double                  price;          // قیمت دقیق خط
-   datetime                time;           // زمان ایجاد (برای Draw: زمان کندل واکنش، برای Flip: زمان شکست ساختار)
-   int                     bar_index;      // اندیس کندل ایجاد
-   
-   //--- اطلاعات اضافی (مخصوص Flip)
-   string                  flipType;       // "F1" (بر اساس مینور) یا "F2" (بر اساس اکستریمم)
-
-   //--- متغیرهای گرافیکی (برای مدیریت آسان‌تر)
-   string                  obj_name_line;  // نام آبجکت خط روی چارت
-   string                  obj_name_label; // نام آبجکت لیبل روی چارت
-   
-   //--- سازنده
-   CReactionLine(void)
-   {
-      source_ob_id = "";
-      lineType = LINE_TYPE_DRAW;
-      isBullish = false;
-      price = 0.0;
-      time = 0;
-      bar_index = -1;
-      flipType = "";
-      obj_name_line = "";
-      obj_name_label = "";
-   }
-};
-
-
-//+------------------------------------------------------------------+
-//|                  کلاس اصلی CReactionZones                       |
-//+------------------------------------------------------------------+
-class CReactionZones
-{
-private:
-   //--- وابستگی‌ها (تزریق شده)
-   MarketStructure* m_major;        // پوینتر به آبجکت ساختار ماژور
-   MinorStructure* m_minor;        // پوینتر به آبجکت ساختار مینور
-
-   //--- تنظیمات اصلی
-   string                  m_symbol;          // نماد معاملاتی
-   ENUM_TIMEFRAMES         m_timeframe;       // تایم فریم اجرایی این آبجکت
-   long                    m_chartId;         // شناسه چارت
-   bool                    m_enableLogging;   // فعال/غیرفعال کردن لاگ‌ها
-   LOG_LEVEL               m_logLevel;        // سطح لاگ
-   string                  m_timeframeSuffix; // پسوند تایم فریم برای نامگذاری اشیاء
-   bool                    m_showDrawing;     // کنترل کلی نمایش ترسیمات این کلاس
-
-   //--- آرایه‌های نگهداری (دائمی تا زمان ابطال)
-   CArrayObj* m_drawLines;       // لیست تمام خطوط Draw معتبر
-   CArrayObj* m_flipLines;       // لیست تمام خطوط Flip معتبر
-   
-   //--- لیست ردیابی (برای جلوگیری از دوباره‌کاری)
-   CArrayString* m_processedOB_IDs; // لیست ID ی تمام OB هایی که برایشان محاسبه انجام شده
-
-   //--- متغیرهای کنترلی
-   datetime                m_lastProcessedBarTime; // برای جلوگیری از اجرای تکراری ProcessNewBar
-   
-//--- توابع داخلی (محاسباتی و مدیریتی) ---
-
-   //+------------------------------------------------------------------+
-   //| ۱. پیدا کردن مناطق واکنشی جدید                                    |
-   //+------------------------------------------------------------------+
-   void FindNewReactionZones(void)
-   {
-      CentralLog(LOG_FULL, m_logLevel, 0, "[RZ]", "شروع جستجو برای مناطق واکنشی جدید...");
-      
-      // ۱. چک کردن OB های مصرف‌نشده جدید
-      int obCount = m_major.GetUnmitigatedOBCount();
-      for(int i = 0; i < obCount; i++)
-      {
-         OrderBlock ob = m_major.GetUnmitigatedOB(i);
-         if(ob.bar_index == -1) continue; // اگر OB نامعتبر بود، رد شو
-         
-         // ۲. آیا این OB قبلاً پردازش شده؟
-         if(m_processedOB_IDs.Search(ob.id) == -1)
-         {
-            // این یک OB جدید است!
-            CentralLog(LOG_PERFORMANCE, m_logLevel, 0, "[RZ]", "OB ماژور جدید یافت شد: " + ob.id + ". شروع محاسبه Draw/Flip...");
-            
-            // ۳. آخرین زمان شکست ساختار را پیدا کن
-            // (این همان زمانی است که باعث شد این OB شناسایی شود)
-            datetime break_time = MathMax(m_major.GetLastBoSTime(), m_major.GetLastChoChTime());
-            if(break_time == 0)
-            {
-               CentralLog(LOG_ERROR, m_logLevel, ERROR_CODE_105, "[RZ]", "زمان شکست (BoS/CHoCH) برای OB " + ob.id + " یافت نشد. محاسبه لغو شد.", true);
-               m_processedOB_IDs.Add(ob.id); // اضافه می‌کنیم تا دوباره چک نشود
-               continue;
-            }
-            
-            // ۴. محاسبه خط Draw
-            CReactionLine* drawLine = CalculateDrawLine_Internal(ob, break_time);
-            if(CheckPointer(drawLine) == POINTER_VALID)
-            {
-               ManageListCapacity(m_drawLines, drawLine.isBullish); // مدیریت ظرفیت لیست
-               m_drawLines.Add(drawLine); // اضافه کردن به لیست
-               if(m_showDrawing) DrawReactionLine(drawLine); // رسم روی چارت
-               CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_214, "[RZ]", "خط Draw جدید (" + (drawLine.isBullish ? "صعودی" : "نزولی") + ") در قیمت " + DoubleToString(drawLine.price, _Digits) + " ثبت شد.");
-
-               // ۵. محاسبه خط Flip (فقط اگر Draw معتبر بود)
-               CReactionLine* flipLine = CalculateFlipLine_Internal(*drawLine, ob, break_time);
-               if(CheckPointer(flipLine) == POINTER_VALID)
-               {
-                  ManageListCapacity(m_flipLines, flipLine.isBullish); // مدیریت ظرفیت لیست
-                  m_flipLines.Add(flipLine); // اضافه کردن به لیست
-                  if(m_showDrawing) DrawReactionLine(flipLine); // رسم روی چارت
-                  CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_214, "[RZ]", "خط Flip جدید (" + (flipLine.isBullish ? "صعودی" : "نزولی") + ") نوع " + flipLine.flipType + " در قیمت " + DoubleToString(flipLine.price, _Digits) + " ثبت شد.");
-               }
-            }
-            
-            // ۶. علامت‌گذاری OB به عنوان پردازش شده
-            m_processedOB_IDs.Add(ob.id);
-         }
-      }
-      CentralLog(LOG_FULL, m_logLevel, 0, "[RZ]", "پایان جستجو برای مناطق واکنشی جدید.");
-   }
-   
-   //+------------------------------------------------------------------+
-   //| ۲. تابع اصلی محاسبه خط Draw                                      |
-   //+------------------------------------------------------------------+
-   CReactionLine* CalculateDrawLine_Internal(OrderBlock &ob, datetime break_time)
-   {
-      int break_index = iBarShift(m_symbol, m_timeframe, break_time, false);
-      int ob_index = ob.bar_index;
-      
-      // بررسی اعتبار اندیس‌ها
-      if(break_index == -1 || ob_index == -1 || ob_index <= break_index + 1)
-      {
-         CentralLog(LOG_ERROR, m_logLevel, ERROR_CODE_105, "[RZ-Draw]", "بازه جستجو برای Draw نامعتبر است. BreakIndex: " + IntegerToString(break_index) + ", OBIndex: " + IntegerToString(ob_index), true);
-         return NULL;
-      }
-      
-      // حلقه جستجو: از کندل قبل OB (جدیدتر) به سمت کندل بعد شکست (قدیمی‌تر)
-      for(int i = ob_index - 1; i > break_index; i--)
-      {
-         bool reaction_found = false;
-         double reaction_price = 0.0;
-         
-         // اگر OB صعودی بود (دنبال Draw حمایت)
-         if(ob.isBullish)
-         {
-            double high = iHigh(m_symbol, m_timeframe, i);
-            if(high >= ob.lowPrice && high <= ob.highPrice)
-            {
-               reaction_found = true;
-               reaction_price = high; // قیمت Draw می‌شود High کندل واکنش
-            }
-         }
-         // اگر OB نزولی بود (دنبال Draw مقاومت)
-         else
-         {
-            double low = iLow(m_symbol, m_timeframe, i);
-            if(low >= ob.lowPrice && low <= ob.highPrice)
-            {
-               reaction_found = true;
-               reaction_price = low; // قیمت Draw می‌شود Low کندل واکنش
-            }
-         }
-         
-         // اگر اولین واکنش پیدا شد
-         if(reaction_found)
-         {
-            CReactionLine* line = new CReactionLine();
-            line.source_ob_id = ob.id;
-            line.lineType = LINE_TYPE_DRAW;
-            line.isBullish = ob.isBullish;
-            line.price = reaction_price;
-            line.time = iTime(m_symbol, m_timeframe, i); // زمان کندل واکنش
-            line.bar_index = i;
-            line.flipType = "";
-            // نام‌گذاری آبجکت‌ها
-            string typeStr = (line.isBullish ? "Draw_Bull" : "Draw_Bear");
-            line.obj_name_line = "RZ_" + typeStr + "_" + TimeToString(line.time) + m_timeframeSuffix;
-            line.obj_name_label = line.obj_name_line + "_Label";
-            
-            return line; // خط معتبر را برمی‌گردانیم
-         }
-      }
-      
-      CentralLog(LOG_FULL, m_logLevel, 0, "[RZ-Draw]", "خط Draw برای OB " + ob.id + " یافت نشد (هیچ واکنشی در بازه نبود).");
-      return NULL; // هیچ واکنشی پیدا نشد
-   }
-   
-   //+------------------------------------------------------------------+
-   //| ۳. تابع اصلی محاسبه خط Flip                                      |
-   //+------------------------------------------------------------------+
-   CReactionLine* CalculateFlipLine_Internal(CReactionLine &drawLine, OrderBlock &sourceOB, datetime break_time)
-   {
-      int break_index = iBarShift(m_symbol, m_timeframe, break_time, false);
-      int draw_index = drawLine.bar_index;
-      
-      // ۱. پیدا کردن "آخرین تماس با OB" (Touch Candle)
-      int touch_index = draw_index; // پیش‌فرض: خود کندل Draw اولین تماس بوده
-      for(int i = draw_index - 1; i > break_index; i--)
-      {
-         double high = iHigh(m_symbol, m_timeframe, i);
-         double low = iLow(m_symbol, m_timeframe, i);
-         
-         // آیا کندل i با زون OB تماس داشته؟
-         bool touched = (MathMax(high, low) >= sourceOB.lowPrice && MathMin(high, low) <= sourceOB.highPrice);
-         
-         if(touched)
-         {
-            touch_index = i; // اندیس آخرین کندل (نزدیکترین به شکست) که تماس داشته
-            break; 
-         }
-      }
-      
-      // ۲. مشخص کردن "منطقه جنگ"
-      int search_start_index = break_index + 1;
-      int search_end_index = touch_index - 1;
-      
-      // ۳. بررسی اعتبار منطقه جنگ
-      if(search_end_index < search_start_index)
-      {
-         CentralLog(LOG_FULL, m_logLevel, 0, "[RZ-Flip]", "خط Flip یافت نشد: بازه جستجو (منطقه جنگ) وجود ندارد. DrawIndex: " + IntegerToString(draw_index) + ", TouchIndex: " + IntegerToString(touch_index));
-         return NULL; // بازه‌ای برای جستجو وجود ندارد
-      }
-      
-      datetime search_start_time = iTime(m_symbol, m_timeframe, search_end_index); // زمان جدیدتر
-      datetime search_end_time = iTime(m_symbol, m_timeframe, search_start_index); // زمان قدیمی‌تر
-      
-      double flipPrice = 0.0;
-      string flipType = "";
-
-      // ۴. روش F1 (شکارچی مینور)
-      double f1_price = 0.0;
-      datetime f1_time = 0;
-      
-      int minorCount = drawLine.isBullish ? m_minor.GetMinorHighsCount() : m_minor.GetMinorLowsCount();
-      
-      for(int i = 0; i < minorCount; i++)
-      {
-         SwingPoint sp = drawLine.isBullish ? m_minor.GetMinorSwingHigh(i) : m_minor.GetMinorSwingLow(i);
-         
-         // آیا سوئینگ مینور در "منطقه جنگ" قرار دارد؟
-         if(sp.time >= search_end_time && sp.time <= search_start_time)
-         {
-            // آیا این سوئینگ، جدیدترین سوئینگی است که تا حالا پیدا کردیم؟
-            if(sp.time > f1_time) 
-            {
-               f1_time = sp.time;
-               f1_price = sp.price;
-            }
-         }
-      }
-      
-      if(f1_price > 0)
-      {
-         flipPrice = f1_price;
-         flipType = "F1";
-         CentralLog(LOG_FULL, m_logLevel, 0, "[RZ-Flip]", "کاندیدای F1 (مینور) یافت شد: " + DoubleToString(flipPrice, _Digits));
-      }
-      
-      // ۵. روش F2 (نقشه B - اکستریمم قیمت)
-      if(flipPrice == 0.0)
-      {
-         int count = search_end_index - search_start_index + 1;
-         if(count > 0)
-         {
-            if(drawLine.isBullish) // دنبال سقف (حمایت) می‌گردیم
-            {
-               int highest_index = iHighest(m_symbol, m_timeframe, MODE_HIGH, count, search_start_index);
-               if(highest_index != -1) flipPrice = iHigh(m_symbol, m_timeframe, highest_index);
-            }
-            else // دنبال کف (مقاومت) می‌گردیم
-            {
-               int lowest_index = iLowest(m_symbol, m_timeframe, MODE_LOW, count, search_start_index);
-               if(lowest_index != -1) flipPrice = iLow(m_symbol, m_timeframe, lowest_index);
-            }
-            
-            if(flipPrice > 0)
-            {
-               flipType = "F2";
-               CentralLog(LOG_FULL, m_logLevel, 0, "[RZ-Flip]", "کاندیدای F2 (اکستریمم) یافت شد: " + DoubleToString(flipPrice, _Digits));
-            }
-         }
-      }
-      
-      // ۶. اعتبار سنجی نهایی
-      if(flipPrice > 0)
-      {
-         // چک نهایی قیمت (Flip نباید از Draw رد شده باشد)
-         bool price_valid = false;
-         if(drawLine.isBullish && flipPrice <= drawLine.price) price_valid = true; // Flip حمایت باید زیر یا مساوی Draw حمایت باشد
-         if(!drawLine.isBullish && flipPrice >= drawLine.price) price_valid = true; // Flip مقاومت باید بالا یا مساوی Draw مقاومت باشد
-         
-         if(price_valid)
-         {
-            CReactionLine* line = new CReactionLine();
-            line.source_ob_id = sourceOB.id;
-            line.lineType = LINE_TYPE_FLIP;
-            line.isBullish = sourceOB.isBullish;
-            line.price = flipPrice;
-            line.time = break_time; // زمان ایجاد Flip همان زمان شکست است
-            line.bar_index = break_index;
-            line.flipType = flipType;
-            // نام‌گذاری آبجکت‌ها
-            string typeStr = (line.isBullish ? "Flip_Bull" : "Flip_Bear");
-            line.obj_name_line = "RZ_" + typeStr + "_" + TimeToString(line.time) + m_timeframeSuffix;
-            line.obj_name_label = line.obj_name_line + "_Label";
-            
-            return line; // خط معتبر را برمی‌گردانیم
-         }
-         else
-         {
-            CentralLog(LOG_FULL, m_logLevel, 0, "[RZ-Flip]", "خط Flip رد شد: قیمت (" + DoubleToString(flipPrice, _Digits) + ") از خط Draw (" + DoubleToString(drawLine.price, _Digits) + ") عبور کرده بود.");
-         }
-      }
-      
-      CentralLog(LOG_FULL, m_logLevel, 0, "[RZ-Flip]", "خط Flip برای OB " + sourceOB.id + " یافت نشد (هیچ کاندیدای F1 یا F2 معتبری نبود).");
-      return NULL; // هیچ خط فلیپی پیدا نشد
-   }
-
-   //+------------------------------------------------------------------+
-   //| ۴. تابع بررسی ابطال خطوط                                         |
-   //+------------------------------------------------------------------+
-   void CheckLinesInvalidation(void)
-   {
-      CentralLog(LOG_FULL, m_logLevel, 0, "[RZ]", "شروع بررسی ابطال خطوط Draw/Flip...");
-      
-      // گرفتن اطلاعات کندل آخر
-      double close = iClose(m_symbol, m_timeframe, 1);
-      datetime time = iTime(m_symbol, m_timeframe, 1);
-      int current_index = iBarShift(m_symbol, m_timeframe, time, false);
-      if(close == 0) return; // داده‌ها هنوز آماده نیست
-      
-      //--- بررسی خطوط Draw
-      for(int i = m_drawLines.Total() - 1; i >= 0; i--)
-      {
-         CReactionLine* line = (CReactionLine*)m_drawLines.At(i);
-         if(CheckPointer(line) == POINTER_INVALID) continue;
-         
-         bool isInvalid = false;
-         string reason = "";
-         
-         // شرط ۱: نقض با بسته شدن قیمت
-         if(line.isBullish && close < line.price) { isInvalid = true; reason = "نقض با کلوز قیمت"; }
-         if(!line.isBullish && close > line.price) { isInvalid = true; reason = "نقض با کلوز قیمت"; }
-         
-         // شرط ۲: مرگ OB منبع
-         if(!isInvalid && !m_major.IsOBValid(line.source_ob_id)) { isInvalid = true; reason = "OB منبع باطل شد"; }
-         
-         // شرط ۳: پیری (انقضای زمانی)
-         if(!isInvalid && (current_index - line.bar_index) > MAX_REACTION_LINE_AGE_BARS) { isInvalid = true; reason = "انقضای زمانی"; }
-         
-         if(isInvalid)
-         {
-            CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_210, "[RZ-Draw]", "خط Draw (" + line.obj_name_line + ") به دلیل '" + reason + "' باطل شد.");
-            DeleteReactionLine(line, i, true);
-         }
-      }
-      
-      //--- بررسی خطوط Flip
-      for(int i = m_flipLines.Total() - 1; i >= 0; i--)
-      {
-         CReactionLine* line = (CReactionLine*)m_flipLines.At(i);
-         if(CheckPointer(line) == POINTER_INVALID) continue;
-         
-         bool isInvalid = false;
-         string reason = "";
-         
-         // شرط ۱: نقض با بسته شدن قیمت
-         if(line.isBullish && close < line.price) { isInvalid = true; reason = "نقض با کلوز قیمت"; }
-         if(!line.isBullish && close > line.price) { isInvalid = true; reason = "نقض با کلوز قیمت"; }
-         
-         // شرط ۲: مرگ OB منبع
-         if(!isInvalid && !m_major.IsOBValid(line.source_ob_id)) { isInvalid = true; reason = "OB منبع باطل شد"; }
-         
-         // شرط ۳: پیری (انقضای زمانی)
-         if(!isInvalid && (current_index - line.bar_index) > MAX_REACTION_LINE_AGE_BARS) { isInvalid = true; reason = "انقضای زمانی"; }
-
-         if(isInvalid)
-         {
-            CentralLog(LOG_PERFORMANCE, m_logLevel, PERF_CODE_210, "[RZ-Flip]", "خط Flip (" + line.obj_name_line + ") به دلیل '" + reason + "' باطل شد.");
-            DeleteReactionLine(line, i, false);
-         }
-      }
-   }
-   
-   //+------------------------------------------------------------------+
-   //| ۵. تابع مدیریت ظرفیت لیست‌ها                                     |
-   //+------------------------------------------------------------------+
-   void ManageListCapacity(CArrayObj* list, bool isBullish)
-   {
-      int count = 0;
-      // شمارش تعداد خطوط از همین نوع (صعودی/نزولی)
-      for(int i = 0; i < list.Total(); i++)
-      {
-         CReactionLine* line = (CReactionLine*)list.At(i);
-         if(line.isBullish == isBullish)
-            count++;
-      }
-      
-      // اگر ظرفیت پر شده، قدیمی‌ترین خط از *همین نوع* را حذف کن
-      if(count >= MAX_REACTION_LINES_PER_TYPE)
-      {
-         int oldest_index = -1;
-         datetime oldest_time = TimeCurrent();
-         
-         for(int i = 0; i < list.Total(); i++)
-         {
-            CReactionLine* line = (CReactionLine*)list.At(i);
-            if(line.isBullish == isBullish && line.time < oldest_time)
-            {
-               oldest_time = line.time;
-               oldest_index = i;
-            }
-         }
-         
-         // حذف قدیمی‌ترین
-         if(oldest_index != -1)
-         {
-            bool isDraw = (list == m_drawLines);
-            CReactionLine* lineToDel = (CReactionLine*)list.At(oldest_index);
-            CentralLog(LOG_FULL, m_logLevel, 0, "[RZ]", "ظرفیت خطوط " + (isDraw ? "Draw" : "Flip") + " " + (isBullish ? "صعودی" : "نزولی") + " تکمیل. قدیمی‌ترین خط (" + lineToDel.obj_name_line + ") حذف شد.");
-            DeleteReactionLine(lineToDel, oldest_index, isDraw);
-         }
-      }
-   }
-
-   //+------------------------------------------------------------------+
-   //| ۶. توابع گرافیکی (رسم، حذف، آپدیت لیبل)                         |
-   //+------------------------------------------------------------------+
-   
-   //--- رسم خط
-   void DrawReactionLine(CReactionLine* line)
-   {
-      if(!m_showDrawing || CheckPointer(line) == POINTER_INVALID) return;
-      
-      //--- تنظیمات ظاهری
-      color line_color = clrNONE;
-      ENUM_LINE_STYLE line_style = STYLE_SOLID;
-      string label_text = "";
-      
-      if(line.lineType == LINE_TYPE_DRAW)
-      {
-         line_color = COLOR_OB_ZONE; // رنگ طلایی/خاکی (مثل OB)
-         line_style = STYLE_DASH;
-         label_text = line.isBullish ? "Draw (S)" : "Draw (R)";
-      }
-      else // LINE_TYPE_FLIP
-      {
-         line_color = C'0,128,255'; // آبی
-         line_style = STYLE_DOT;
-         label_text = (line.isBullish ? "Flip (S)" : "Flip (R)") + " [" + line.flipType + "]";
-      }
-      label_text += m_timeframeSuffix;
-
-      //--- رسم خط اصلی (امتداددار)
-      if(ObjectCreate(m_chartId, line.obj_name_line, OBJ_HLINE, 0, 0, line.price))
-      {
-         ObjectSetInteger(m_chartId, line.obj_name_line, OBJPROP_COLOR, line_color);
-         ObjectSetInteger(m_chartId, line.obj_name_line, OBJPROP_STYLE, line_style);
-         ObjectSetInteger(m_chartId, line.obj_name_line, OBJPROP_WIDTH, 1);
-         ObjectSetInteger(m_chartId, line.obj_name_line, OBJPROP_BACK, true);
-         ObjectSetInteger(m_chartId, line.obj_name_line, OBJPROP_RAY_RIGHT, true); // امتداد به راست
-      }
-      
-      //--- رسم لیبل متنی (متحرک)
-      datetime midTime = TimeCurrent(); // موقعیت اولیه
-      double midPrice = line.price;
-      
-      if(ObjectCreate(m_chartId, line.obj_name_label, OBJ_TEXT, 0, midTime, midPrice))
-      {
-         ObjectSetString(m_chartId, line.obj_name_label, OBJPROP_TEXT, label_text); 
-         ObjectSetInteger(m_chartId, line.obj_name_label, OBJPROP_COLOR, line_color);
-         ObjectSetInteger(m_chartId, line.obj_name_label, OBJPROP_FONTSIZE, BASE_LABEL_FONT_SIZE);
-         ObjectSetInteger(m_chartId, line.obj_name_label, OBJPROP_ANCHOR, ANCHOR_CENTER); // وسط‌چین
-      }
-      
-      UpdateLineLabelPosition(line); // تنظیم موقعیت اولیه لیبل
-   }
-   
-   //--- آپدیت موقعیت لیبل (برای فراخوانی در OnTick)
-   void UpdateLineLabelPosition(CReactionLine* line)
-   {
-      if(!m_showDrawing || CheckPointer(line) == POINTER_INVALID) return;
-      
-      // محاسبه زمان وسط بین زمان ایجاد خط و زمان فعلی چارت
-      datetime currentTime = iTime(NULL, PERIOD_CURRENT, 0);
-      datetime midTime = line.time + (currentTime - line.time) / 2;
-      
-      ObjectMove(m_chartId, line.obj_name_label, 0, midTime, line.price);
-   }
-   
-   //--- حذف کامل گرافیک و آبجکت
-   void DeleteReactionLine(CReactionLine* line, int list_index, bool isDrawLine)
-   {
-      if(CheckPointer(line) == POINTER_INVALID) return;
-      
-      // ۱. حذف گرافیک از چارت
-      if(m_showDrawing)
-      {
-         ObjectDelete(m_chartId, line.obj_name_line);
-         ObjectDelete(m_chartId, line.obj_name_label);
-      }
-      
-      // ۲. حذف از لیست مربوطه
-      if(isDrawLine)
-      {
-         m_drawLines.Delete(list_index);
-      }
-      else
-      {
-         m_flipLines.Delete(list_index);
-      }
-      
-      // ۳. حذف خود آبجکت از حافظه
-      delete line;
-   }
-   
-   //--- پاکسازی کلی (برای Destructor)
-   void ClearAll(void)
-   {
-      CentralLog(LOG_FULL, m_logLevel, 0, "[RZ]", "شروع پاکسازی کلی CReactionZones...");
-      for(int i = m_drawLines.Total() - 1; i >= 0; i--)
-      {
-         DeleteReactionLine((CReactionLine*)m_drawLines.At(i), i, true);
-      }
-      for(int i = m_flipLines.Total() - 1; i >= 0; i--)
-      {
-         DeleteReactionLine((CReactionLine*)m_flipLines.At(i), i, false);
-      }
-      m_processedOB_IDs.Clear();
-      CentralLog(LOG_FULL, m_logLevel, 0, "[RZ]", "پاکسازی کلی CReactionZones انجام شد.");
-   }
-
-public:
-   //+------------------------------------------------------------------+
-   //| سازنده کلاس (Constructor)                                       |
-   //+------------------------------------------------------------------+
-   CReactionZones(MarketStructure *major_ptr, MinorStructure *minor_ptr,
-                  const string symbol, const ENUM_TIMEFRAMES timeframe, const long chartId,
-                  const bool enableLogging_in, const bool showDrawing_in)
-   {
-      // ۱. تزریق وابستگی‌ها و اعتبارسنجی
-      if (CheckPointer(major_ptr) == POINTER_INVALID || CheckPointer(minor_ptr) == POINTER_INVALID)
-      {
-         CentralLog(LOG_ERROR, DEFAULT_LOG_LEVEL, ERROR_CODE_103, "[RZ]", "خطای حیاتی: پوینترهای Major/Minor نامعتبر هستند!", true);
-         return;
-      }
-      m_major = major_ptr;
-      m_minor = minor_ptr;
-      
-      // ۲. تنظیمات اصلی
-      m_symbol = symbol;
-      m_timeframe = timeframe;
-      m_chartId = chartId;
-      m_enableLogging = enableLogging_in;
-      m_logLevel = DEFAULT_LOG_LEVEL;
-      m_showDrawing = showDrawing_in;
-      m_timeframeSuffix = " (" + TimeFrameToStringShort(timeframe) + ")";
-      
-      // ۳. ایجاد لیست‌ها
-      m_drawLines = new CArrayObj();
-      m_flipLines = new CArrayObj();
-      m_processedOB_IDs = new CArrayString();
-      if(CheckPointer(m_drawLines) == POINTER_INVALID || CheckPointer(m_flipLines) == POINTER_INVALID || CheckPointer(m_processedOB_IDs) == POINTER_INVALID)
-      {
-         CentralLog(LOG_ERROR, DEFAULT_LOG_LEVEL, ERROR_CODE_104, "[RZ]", "خطای حیاتی: تخصیص حافظه برای آرایه‌ها شکست خورد!", true);
-         return;
-      }
-      
-      // ۴. مقداردهی اولیه
-      m_lastProcessedBarTime = 0;
-
-      CentralLog(LOG_FULL, m_logLevel, 0, "[RZ]", "کلاس CReactionZones برای نماد " + m_symbol + " و تایم فریم " + EnumToString(m_timeframe) + " آغاز به کار کرد.");
-   }
-
-   //+------------------------------------------------------------------+
-   //| مخرب کلاس (Destructor)                                           |
-   //+------------------------------------------------------------------+
-   ~CReactionZones()
-   {
-      // پاکسازی کامل خطوط و آبجکت‌ها
-      ClearAll();
-      
-      // حذف لیست‌ها از حافظه
-      if(CheckPointer(m_drawLines) == POINTER_VALID) delete m_drawLines;
-      if(CheckPointer(m_flipLines) == POINTER_VALID) delete m_flipLines;
-      if(CheckPointer(m_processedOB_IDs) == POINTER_VALID) delete m_processedOB_IDs;
-      
-      CentralLog(LOG_FULL, m_logLevel, 0, "[RZ]", "کلاس CReactionZones متوقف شد.");
-   }
-
-   //+------------------------------------------------------------------+
-   //| تابع اصلی: پردازش کندل بسته شده                                |
-   //+------------------------------------------------------------------+
-   bool ProcessNewBar()
-   {
-      // ۱. جلوگیری از اجرای تکراری
-      datetime currentBarTime = iTime(m_symbol, m_timeframe, 0);
-      if (currentBarTime == m_lastProcessedBarTime) return false;
-      m_lastProcessedBarTime = currentBarTime;
-
-      // ۲. اعتبارسنجی وابستگی‌ها (برای اطمینان)
-      if (CheckPointer(m_major) == POINTER_INVALID || CheckPointer(m_minor) == POINTER_INVALID)
-      {
-         CentralLog(LOG_ERROR, m_logLevel, ERROR_CODE_103, "[RZ]", "وابستگی‌های Major/Minor در ProcessNewBar نامعتبر هستند!", true);
-         return false;
-      }
-      
-      CentralLog(LOG_FULL, m_logLevel, 0, "[RZ]", "شروع پردازش بار جدید...");
-      
-      // ۳. اجرای منطق اصلی
-      FindNewReactionZones();    // پیدا کردن خطوط جدید بر اساس OB های جدید
-      CheckLinesInvalidation();  // پاکسازی خطوط قدیمی و باطل شده
-      
-      CentralLog(LOG_FULL, m_logLevel, 0, "[RZ]", "پایان پردازش بار جدید.");
-      return true; // (می‌توانیم در آینده bool معنادارتری برگردانیم)
-   }
-
-   //+------------------------------------------------------------------+
-   //| تابع تیکی: به‌روزرسانی لیبل‌ها (توسط EA در OnTick/OnTimer)     |
-   //+------------------------------------------------------------------+
-   void UpdateGraphics(void)
-   {
-      if(!m_showDrawing) return;
-      
-      // آپدیت لیبل‌های Draw
-      for(int i = 0; i < m_drawLines.Total(); i++)
-      {
-         CReactionLine* line = (CReactionLine*)m_drawLines.At(i);
-         UpdateLineLabelPosition(line);
-      }
-      
-      // آپدیت لیبل‌های Flip
-      for(int i = 0; i < m_flipLines.Total(); i++)
-      {
-         CReactionLine* line = (CReactionLine*)m_flipLines.At(i);
-         UpdateLineLabelPosition(line);
-      }
-   }
-
-   //+------------------------------------------------------------------+
-   //| توابع دسترسی عمومی (Accessors) - برای استفاده اکسپرت معاملاتی     |
-   //+------------------------------------------------------------------+
-   
-   //--- گرفتن تعداد خطوط Draw معتبر
-   int GetDrawLinesCount(void) const
-   {
-      return m_drawLines.Total();
-   }
-   
-   //--- گرفتن اطلاعات یک خط Draw خاص
-   CReactionLine* GetDrawLine(int index) const
-   {
-      return (CReactionLine*)m_drawLines.At(index);
-   }
-   
-   //--- گرفتن تعداد خطوط Flip معتبر
-   int GetFlipLinesCount(void) const
-   {
-      return m_flipLines.Total();
-   }
-
-   //--- گرفتن اطلاعات یک خط Flip خاص
-   CReactionLine* GetFlipLine(int index) const
-   {
-      return (CReactionLine*)m_flipLines.At(index);
-   }
-};
-//==================================================================//
-//|                پایان کلاس CReactionZones                        |
-//==================================================================//
-
+MarketStructureLibrary.mqh			
+declaration without type	MarketStructureLibrary.mqh	4013	30
+'CObject' - syntax error	MarketStructureLibrary.mqh	4013	30
+'CArrayObj' - unexpected token, probably type is missing?	MarketStructureLibrary.mqh	4069	4
+'*' - semicolon expected	MarketStructureLibrary.mqh	4069	13
+'CArrayObj' - unexpected token, probably type is missing?	MarketStructureLibrary.mqh	4070	4
+'*' - semicolon expected	MarketStructureLibrary.mqh	4070	13
+'CArrayString' - unexpected token, probably type is missing?	MarketStructureLibrary.mqh	4073	4
+'*' - semicolon expected	MarketStructureLibrary.mqh	4073	16
+declaration without type	MarketStructureLibrary.mqh	4403	28
+'*' - comma expected	MarketStructureLibrary.mqh	4403	37
+undeclared identifier	MarketStructureLibrary.mqh	1872	33
+implicit conversion from 'unknown' to 'string'	MarketStructureLibrary.mqh	1872	33
+undeclared identifier	MarketStructureLibrary.mqh	1879	31
+implicit conversion from 'unknown' to 'string'	MarketStructureLibrary.mqh	1879	31
+undeclared identifier	MarketStructureLibrary.mqh	4095	13
+undeclared identifier	MarketStructureLibrary.mqh	4098	95
+implicit conversion from 'unknown' to 'string'	MarketStructureLibrary.mqh	4098	95
+undeclared identifier	MarketStructureLibrary.mqh	4105	112
+implicit conversion from 'unknown' to 'string'	MarketStructureLibrary.mqh	4105	112
+undeclared identifier	MarketStructureLibrary.mqh	4106	16
+undeclared identifier	MarketStructureLibrary.mqh	4112	42
+undeclared identifier	MarketStructureLibrary.mqh	4114	35
+undeclared identifier	MarketStructureLibrary.mqh	4115	16
+undeclared identifier	MarketStructureLibrary.mqh	4121	45
+undeclared identifier	MarketStructureLibrary.mqh	4123	38
+undeclared identifier	MarketStructureLibrary.mqh	4124	19
+undeclared identifier	MarketStructureLibrary.mqh	4131	13
+undeclared identifier	MarketStructureLibrary.mqh	4183	36
+implicit conversion from 'unknown' to 'string'	MarketStructureLibrary.mqh	4183	36
+undeclared identifier	MarketStructureLibrary.mqh	4199	80
+implicit conversion from 'unknown' to 'string'	MarketStructureLibrary.mqh	4199	80
+undeclared identifier	MarketStructureLibrary.mqh	4310	42
+implicit conversion from 'unknown' to 'string'	MarketStructureLibrary.mqh	4310	42
+undeclared identifier	MarketStructureLibrary.mqh	4330	86
+implicit conversion from 'unknown' to 'string'	MarketStructureLibrary.mqh	4330	86
+undeclared identifier	MarketStructureLibrary.mqh	4348	19
+undeclared identifier	MarketStructureLibrary.mqh	4350	48
+'(CReactionLine*)' - invalid cast operation	MarketStructureLibrary.mqh	4350	32
+undeclared identifier	MarketStructureLibrary.mqh	4374	19
+undeclared identifier	MarketStructureLibrary.mqh	4376	48
+'(CReactionLine*)' - invalid cast operation	MarketStructureLibrary.mqh	4376	32
+undeclared identifier	MarketStructureLibrary.mqh	4407	26
+undeclared identifier	MarketStructureLibrary.mqh	4409	48
+'(CReactionLine*)' - invalid cast operation	MarketStructureLibrary.mqh	4409	32
+undeclared identifier	MarketStructureLibrary.mqh	4420	29
+undeclared identifier	MarketStructureLibrary.mqh	4422	51
+'(CReactionLine*)' - invalid cast operation	MarketStructureLibrary.mqh	4422	35
+undeclared identifier	MarketStructureLibrary.mqh	4433	28
+undeclared identifier	MarketStructureLibrary.mqh	4433	36
+undeclared identifier	MarketStructureLibrary.mqh	4434	56
+'(CReactionLine*)' - invalid cast operation	MarketStructureLibrary.mqh	4434	40
+undeclared identifier	MarketStructureLibrary.mqh	4521	10
+undeclared identifier	MarketStructureLibrary.mqh	4525	10
+undeclared identifier	MarketStructureLibrary.mqh	4536	19
+undeclared identifier	MarketStructureLibrary.mqh	4538	45
+'(CReactionLine*)' - invalid cast operation	MarketStructureLibrary.mqh	4538	29
+undeclared identifier	MarketStructureLibrary.mqh	4540	19
+undeclared identifier	MarketStructureLibrary.mqh	4542	45
+'(CReactionLine*)' - invalid cast operation	MarketStructureLibrary.mqh	4542	29
+undeclared identifier	MarketStructureLibrary.mqh	4544	7
+undeclared identifier	MarketStructureLibrary.mqh	4575	7
+declaration without type	MarketStructureLibrary.mqh	4575	25
+'CArrayObj' - class type expected	MarketStructureLibrary.mqh	4575	25
+cannot resolve function call 'CArrayObj'	MarketStructureLibrary.mqh	4575	25
+expression of 'void' type is illegal	MarketStructureLibrary.mqh	4575	21
+'=' - illegal operation use	MarketStructureLibrary.mqh	4575	19
+undeclared identifier	MarketStructureLibrary.mqh	4576	7
+declaration without type	MarketStructureLibrary.mqh	4576	25
+'CArrayObj' - class type expected	MarketStructureLibrary.mqh	4576	25
+cannot resolve function call 'CArrayObj'	MarketStructureLibrary.mqh	4576	25
+expression of 'void' type is illegal	MarketStructureLibrary.mqh	4576	21
+'=' - illegal operation use	MarketStructureLibrary.mqh	4576	19
+undeclared identifier	MarketStructureLibrary.mqh	4577	7
+declaration without type	MarketStructureLibrary.mqh	4577	31
+'CArrayString' - class type expected	MarketStructureLibrary.mqh	4577	31
+cannot resolve function call 'CArrayString'	MarketStructureLibrary.mqh	4577	31
+expression of 'void' type is illegal	MarketStructureLibrary.mqh	4577	27
+'=' - illegal operation use	MarketStructureLibrary.mqh	4577	25
+undeclared identifier	MarketStructureLibrary.mqh	4578	23
+object pointer expected	MarketStructureLibrary.mqh	4578	23
+   built-in: ENUM_POINTER_TYPE CheckPointer(const T*)	MarketStructureLibrary.mqh	4578	10
+undeclared identifier	MarketStructureLibrary.mqh	4578	71
+object pointer expected	MarketStructureLibrary.mqh	4578	71
+   built-in: ENUM_POINTER_TYPE CheckPointer(const T*)	MarketStructureLibrary.mqh	4578	58
+undeclared identifier	MarketStructureLibrary.mqh	4578	119
+object pointer expected	MarketStructureLibrary.mqh	4578	119
+   built-in: ENUM_POINTER_TYPE CheckPointer(const T*)	MarketStructureLibrary.mqh	4578	106
+undeclared identifier	MarketStructureLibrary.mqh	4599	23
+object pointer expected	MarketStructureLibrary.mqh	4599	23
+   built-in: ENUM_POINTER_TYPE CheckPointer(const T*)	MarketStructureLibrary.mqh	4599	10
+undeclared identifier	MarketStructureLibrary.mqh	4599	39
+undeclared identifier	MarketStructureLibrary.mqh	4599	61
+'m_drawLines' - object pointer expected	MarketStructureLibrary.mqh	4599	61
+undeclared identifier	MarketStructureLibrary.mqh	4600	23
+object pointer expected	MarketStructureLibrary.mqh	4600	23
+   built-in: ENUM_POINTER_TYPE CheckPointer(const T*)	MarketStructureLibrary.mqh	4600	10
+undeclared identifier	MarketStructureLibrary.mqh	4600	39
+undeclared identifier	MarketStructureLibrary.mqh	4600	61
+'m_flipLines' - object pointer expected	MarketStructureLibrary.mqh	4600	61
+undeclared identifier	MarketStructureLibrary.mqh	4601	23
+object pointer expected	MarketStructureLibrary.mqh	4601	23
+   built-in: ENUM_POINTER_TYPE CheckPointer(const T*)	MarketStructureLibrary.mqh	4601	10
+undeclared identifier	MarketStructureLibrary.mqh	4601	45
+undeclared identifier	MarketStructureLibrary.mqh	4601	67
+'m_processedOB_IDs' - object pointer expected	MarketStructureLibrary.mqh	4601	67
+undeclared identifier	MarketStructureLibrary.mqh	4641	26
+undeclared identifier	MarketStructureLibrary.mqh	4643	48
+'(CReactionLine*)' - invalid cast operation	MarketStructureLibrary.mqh	4643	32
+undeclared identifier	MarketStructureLibrary.mqh	4648	26
+undeclared identifier	MarketStructureLibrary.mqh	4650	48
+'(CReactionLine*)' - invalid cast operation	MarketStructureLibrary.mqh	4650	32
+undeclared identifier	MarketStructureLibrary.mqh	4662	14
+undeclared identifier	MarketStructureLibrary.mqh	4668	30
+'(CReactionLine*)' - invalid cast operation	MarketStructureLibrary.mqh	4668	14
+100 errors, 8 warnings		100	8
