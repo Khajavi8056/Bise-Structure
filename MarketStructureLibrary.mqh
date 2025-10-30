@@ -5,7 +5,7 @@
 //| راهنمای اجرا و استفاده (Blueprint for Memento Project):          |
 //| این کتابخانه شامل چهار کلاس مستقل 'MarketStructure'، 'FVGManager'،|
 //| 'MinorStructure' و 'CLiquidityManager' است که قابلیت اجرای چندگانه (Multi-Timeframe/Multi-Symbol) را فراهم می کنند.|
-//|                                                                  |
+//|                                                                   |
 //| ۱. ایجاد آبجکت: در تابع OnInit() اکسپرت، نمونه‌هایی از این کلاس‌ها را ایجاد کنید. برای هر تایم فریم/نماد مورد نیاز، یک آبجکت جدید بسازید.|
 //|    مثال: MarketStructure *H1_Struct = new MarketStructure(...);  |
 //|          MinorStructure *H1_Minor = new MinorStructure(...);     |
