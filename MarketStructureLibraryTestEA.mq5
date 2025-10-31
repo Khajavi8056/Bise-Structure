@@ -3,10 +3,10 @@
 //| Copyright 2025, Khajavi |
 //| Test Structure lib |
 //+------------------------------------------------------------------+
-#property copyright "Copyright 2025, Khajavi & Gemini"
-#property link "https://www.google.com"
-#property version "1.04"
-#property description "تست کتابخانه MarketStructureLibrary با قابلیت MTF و کلاس MinorStructure روی چارت فعلی"
+#property copyright "Copyright 2025, Khajavi "
+
+#property version "1.05"
+#property description "تست کتابخانه MarketStructureLibrary با قابلیت MTF و کلاس MinorStructure و CReactionZones"
 #include <MarketStructureLibrary.mqh> // ایمپورت کتابخانه کلاس‌بندی شده
 //+------------------------------------------------------------------+
 //| ورودی‌های اکسپرت (Inputs) - نامگذاری جدید برای جلوگیری از تداخل |
@@ -33,13 +33,13 @@ MarketStructure *Chart_Structure = NULL; // ساختار برای تایم فر�
 FVGManager *Chart_FVG = NULL; // FVG برای تایم فریم فعلی چارت
 MinorStructure *Chart_Minor = NULL; // ساختار مینور برای تایم فریم فعلی چارت
 CLiquidityManager *Chart_Liq = NULL; // مدیریت نقدینگی برای تایم فریم فعلی
-CReactionZones *Chart_RZ = NULL; // مدیریت مناطق واکنشی برای تایم فریم فعلی
+CReactionZones *Chart_RZ = NULL; // مدیریت خطوط واکنش برای تایم فریم فعلی
 
 MarketStructure *MTF_Structure = NULL; // ساختار برای تایم فریم MTF (مثلاً H4)
 FVGManager *MTF_FVG = NULL; // FVG برای تایم فریم MTF (مثلاً H4)
 MinorStructure *MTF_Minor = NULL; // ساختار مینور برای تایم فریم MTF (مثلاً H4)
 CLiquidityManager *MTF_Liq = NULL; // مدیریت نقدینگی برای تایم فریم MTF
-CReactionZones *MTF_RZ = NULL; // مدیریت مناطق واکنشی برای تایم فریم MTF
+CReactionZones *MTF_RZ = NULL; // مدیریت خطوط واکنش برای تایم فریم MTF
 
 CPinbarDetector *chartPinbarDetector = NULL; // شناسایی پینبار برای تایم فریم فعلی
 
@@ -84,7 +84,7 @@ int OnInit()
    Chart_FVG = new FVGManager(_Symbol, _Period, ChartID(), Input_EnableLogging, false);
    Chart_Minor = new MinorStructure(_Symbol, _Period, ChartID(), Input_EnableLogging, true, Input_AOFractalLength,false,minorType);
    Chart_Liq = new CLiquidityManager(Chart_Structure, Chart_Minor, _Symbol, _Period, ChartID(), Input_EnableLogging, true, DrawEQ, DrawTraps, DrawPDL, DrawPWL, DrawPML, DrawPYL);
-   Chart_RZ = new CReactionZones(Chart_Structure, Chart_Minor, _Symbol, _Period, ChartID(), Input_EnableLogging, true);
+   Chart_RZ = new CReactionZones(Chart_Structure, Chart_Minor, _Symbol, _Period, ChartID(), ShowMTFDrawing, DEFAULT_LOG_LEVEL);
    
    // غیرفعال کردن گرید چارت
  
@@ -94,8 +94,8 @@ int OnInit()
    MTF_FVG = new FVGManager(_Symbol, MTF_Timeframe, ChartID(), Input_EnableLogging, ShowMTFDrawing);
    MTF_Minor = new MinorStructure(_Symbol, MTF_Timeframe, ChartID(), Input_EnableLogging, ShowMTFDrawing, Input_AOFractalLength,false,minorType);
    MTF_Liq = new CLiquidityManager(MTF_Structure, MTF_Minor, _Symbol, MTF_Timeframe, ChartID(), Input_EnableLogging, ShowMTFDrawing, DrawEQ, DrawTraps, DrawPDL, DrawPWL, DrawPML, DrawPYL);
-   MTF_RZ = new CReactionZones(MTF_Structure, MTF_Minor, _Symbol, MTF_Timeframe, ChartID(), Input_EnableLogging, ShowMTFDrawing);
-   
+   MTF_RZ = new CReactionZones(MTF_Structure, MTF_Minor, _Symbol, MTF_Timeframe, ChartID(), ShowMTFDrawing, DEFAULT_LOG_LEVEL);
+//int handellao = iAO(_Symbol,PERIOD_CURRENT);
    // ایجاد آبجکت پینبار برای تایم فریم فعلی
    chartPinbarDetector = new CPinbarDetector();
    
@@ -132,18 +132,7 @@ void OnTick()
    if (Chart_FVG != NULL && Chart_FVG.ProcessNewTick()) chartRedrawNeeded = true;
    if (MTF_FVG != NULL && MTF_FVG.ProcessNewTick()) chartRedrawNeeded = true;
  
-   //--- ۲. اجرای منطق OB در هر تیک (برای میتگیشن لحظه‌ای)
-   if (Chart_Structure != NULL && Chart_Structure.ProcessNewTick()) chartRedrawNeeded = true;
-   if (MTF_Structure != NULL && MTF_Structure.ProcessNewTick()) chartRedrawNeeded = true;
-   if (Chart_Minor != NULL && Chart_Minor.ProcessNewTick()) chartRedrawNeeded = true;
-   if (MTF_Minor != NULL && MTF_Minor.ProcessNewTick()) chartRedrawNeeded = true;
- 
-   //--- ۳. به‌روزرسانی گرافیک‌های RZ (لیبل‌ها) در هر تیک
-   if (Chart_RZ != NULL) Chart_RZ.UpdateGraphics();
-
-   if (MTF_RZ != NULL) MTF_RZ.UpdateGraphics();
- 
-   //--- ۴. اجرای منطق ساختارها فقط در کلوز کندل جدید مربوطه
+   //--- ۲. اجرای منطق ساختارها فقط در کلوز کندل جدید مربوطه
    if (IsNewBar())
    {
       // پردازش برای تایم فریم چارت فعلی (PERIOD_CURRENT)
@@ -151,7 +140,7 @@ void OnTick()
       if (Chart_FVG != NULL && Chart_FVG.ProcessNewBar()) chartRedrawNeeded = true;
       if (Chart_Minor != NULL && Chart_Minor.ProcessNewBar()) chartRedrawNeeded = true;
       if (Chart_Liq != NULL && Chart_Liq.ProcessNewBar()) chartRedrawNeeded = true;
-      if (Chart_RZ != NULL && Chart_RZ.ProcessNewBar()) chartRedrawNeeded = true;
+      if (Chart_RZ != NULL) Chart_RZ.ProcessNewBar();
   
     /*
       // بررسی و رسم پینبار برای تایم فریم فعلی
@@ -174,7 +163,7 @@ void OnTick()
       if (MTF_FVG != NULL && MTF_FVG.ProcessNewBar()) chartRedrawNeeded = true;
       if (MTF_Minor != NULL && MTF_Minor.ProcessNewBar()) chartRedrawNeeded = true;
       if (MTF_Liq != NULL && MTF_Liq.ProcessNewBar()) chartRedrawNeeded = true;
-      if (MTF_RZ != NULL && MTF_RZ.ProcessNewBar()) chartRedrawNeeded = true;
+      if (MTF_RZ != NULL) MTF_RZ.ProcessNewBar();
    }
  
    //--- مثال دسترسی به داده‌های کلاس جدید MinorStructure (برای لاگ یا منطق معاملاتی)
